@@ -10,7 +10,7 @@
      用一次 debounce 换掉一整套容易出错的增量状态机。
    ============================================================ */
 
-importScripts('js/db.js', 'js/bookmarks.js', 'js/content-index.js', 'js/organizer.js', 'js/organizer-moves.js', 'js/pageinfo.js', 'js/ai.js', 'js/store.js', 'js/bookmark-auto.js', 'js/documents.js', 'js/rag.js', 'js/capture-adapters.js', 'js/sync-engine.js');
+importScripts('js/db.js', 'js/bookmarks.js', 'js/content-index.js', 'js/organizer.js', 'js/organizer-moves.js', 'js/pageinfo.js', 'js/ai.js', 'js/store.js', 'js/bookmark-auto.js', 'js/bookmark-enrich.js', 'js/documents.js', 'js/rag.js', 'js/capture-adapters.js', 'js/sync-engine.js');
 
 var REBUILD_DELAY = 1500;   /* 连续变更（如导入一大批）合并成一次重建 */
 var HISTORY_DAYS = 90;
@@ -104,6 +104,9 @@ if (chrome.bookmarks) {
     chrome.bookmarks.onCreated.addListener(function (id, node) {
       AutoOrganizer.onCreated(id, node).catch(function () {});
     });
+    chrome.bookmarks.onCreated.addListener(function (id, node) {
+      BookmarkEnrich.onCreated(id, node).catch(function () {});
+    });
   }
   if (chrome.bookmarks.onMoved) {
     chrome.bookmarks.onMoved.addListener(function (id, info) {
@@ -125,16 +128,21 @@ if (chrome.bookmarks) {
 chrome.runtime.onInstalled.addListener(function () {
   rebuild().then(function () { return SyncEngine.request(); }).catch(function () {});
   AutoOrganizer.bootstrap().catch(function () {});
+  BookmarkEnrich.alarm().catch(function () {});
 });
 
 chrome.runtime.onStartup.addListener(function () {
   rebuild().then(function () { return SyncEngine.request(); }).catch(function () {});
   AutoOrganizer.bootstrap().catch(function () {});
+  BookmarkEnrich.alarm().then(function () { return BookmarkEnrich.run(); }).catch(function () {});
 });
 
 /* 后台每次启动都补建 alarm，队列与租约保存在 IndexedDB。 */
 if (chrome.alarms) {
-  chrome.alarms.onAlarm.addListener(function (alarm) { if (alarm.name === SyncEngine.ALARM) return SyncEngine.run(); });
+  chrome.alarms.onAlarm.addListener(function (alarm) {
+    if (alarm.name === SyncEngine.ALARM) return SyncEngine.run();
+    if (alarm.name === BookmarkEnrich.ALARM) return BookmarkEnrich.run();
+  });
   SyncEngine.alarm().catch(function () {});
 }
 if (chrome.permissions && chrome.permissions.onAdded) chrome.permissions.onAdded.addListener(function () { SyncEngine.request({ force: true }).catch(function () {}); });
@@ -168,7 +176,10 @@ chrome.action.onClicked.addListener(async function (tab) {
     if (!captured.info.text) throw new Error('未读取到正文，请等待页面加载后重试');
     await Documents.reconcile(rows);
     await Documents.capture(info.id, Object.assign(captured.info, { fetchedAt: Date.now() }));
-    for (var match of matches) await AgentDB.putPage(Object.assign({}, captured.info, { url: ContentIndex.normUrl(match.url), status: 'ok', version: ContentIndex.VERSION, fetchedAt: Date.now() }));
+    for (var match of matches) {
+      await AgentDB.putPage(Object.assign({}, captured.info, { url: ContentIndex.normUrl(match.url), status: 'ok', version: ContentIndex.VERSION, fetchedAt: Date.now() }));
+      await BookmarkEnrich.onCaptured(match.id, match);
+    }
     await SyncEngine.enqueue(info.id, false);
     await SyncEngine.markDirty(false);
     SyncEngine.run().catch(function () {});
@@ -194,6 +205,16 @@ var HANDLERS = {
     SyncEngine.run().catch(function () {});
     return result;
   },
+  'enrich:status': function () { return BookmarkEnrich.status(); },
+  'enrich:toggle': function (msg) { return BookmarkEnrich.toggle(msg.enabled); },
+  'enrich:scan': function (msg) { return BookmarkEnrich.scan({ mode: 'enrich', limit: msg.limit || 20 }); },
+  'enrich:capture': function (msg) { return BookmarkEnrich.scan({ mode: 'capture', limit: msg.limit || 30 }); },
+  'enrich:apply': async function (msg) { var result = await BookmarkEnrich.apply(msg.id); memRows = null; chrome.runtime.sendMessage({ type: 'enrich:updated' }).catch(function () {}); return result; },
+  'enrich:apply-all': async function () { var result = await BookmarkEnrich.applyAll(); memRows = null; chrome.runtime.sendMessage({ type: 'enrich:updated' }).catch(function () {}); return result; },
+  'enrich:undo': async function () { var result = await BookmarkEnrich.undoLast(); memRows = null; chrome.runtime.sendMessage({ type: 'enrich:updated' }).catch(function () {}); return result; },
+  'enrich:dismiss': function (msg) { return BookmarkEnrich.dismiss(msg.id); },
+  'enrich:retry': function (msg) { return BookmarkEnrich.retry(msg.id); },
+  'enrich:suggest-private': function (msg) { return BookmarkEnrich.suggestPrivate(msg.id); },
   'pipeline:status': function () { return SyncEngine.summary(); },
   'pipeline:start': function (msg) { return SyncEngine.request({ manual: true, force: !!msg.force }); },
   'pipeline:retry-failed': function () { return SyncEngine.retryFailed(); },

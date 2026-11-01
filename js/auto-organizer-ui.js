@@ -144,7 +144,7 @@
 
     details.addEventListener('toggle', function () { if (details.open) refresh(); });
     document.addEventListener('workspace:view', function (event) {
-      if (event.detail === 'bookmarks') refresh();
+      if (event.detail === 'search') refresh();
     });
     refresh();
     return { refresh: refresh };

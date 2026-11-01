@@ -112,7 +112,7 @@
       var text = query.value.trim().toLowerCase();
       var filtered = data.filter(function (r) { return !text || [r.title, r.url, r.folder, r.desc, r.text].join(' ').toLowerCase().includes(text); });
       document.querySelector('#organizer-count').textContent = rows.length + ' 条书签';
-      document.querySelector('#organizer-pending').textContent = '沿用原有目录';
+      document.querySelector('#organizer-pending').textContent = '最新收藏优先';
       document.querySelector('#organizer-list-title').textContent = current ? current.title : '全部书签';
       document.querySelector('#organizer-list-count').textContent = filtered.length + ' 条';
       list.replaceChildren();
@@ -144,7 +144,14 @@
       refreshing = true;
       try {
         var tree = await chrome.bookmarks.getTree(); var selected = folder.value;
-        rows = Bookmarks.flatten(tree); await ContentIndex.hydrate(rows); folders = indexFolders(tree);
+        rows = Bookmarks.flatten(tree);
+        /* 默认按收藏时间从新到旧排列；目录只用于筛选，不改变时间顺序。 */
+        rows.sort(function (a, b) { return (b.added || 0) - (a.added || 0); });
+        await ContentIndex.hydrate(rows);
+        var classes = await Organizer.records(rows);
+        rows.forEach(function (row) { if (classes[row.id] && classes[row.id].tags) row.hay += ' ' + classes[row.id].tags.join(' ').toLowerCase(); });
+        if (typeof BookmarkEnrich !== 'undefined') await BookmarkEnrich.applySummaries(rows);
+        folders = indexFolders(tree);
         folder.replaceChildren();
         var all = el('option', '全部书签'); all.value = ''; folder.append(all);
         folders.forEach(function (f) { var option = el('option', f.title + '（' + f.ids.size + '）'); option.value = f.id; folder.append(option); });
@@ -157,6 +164,11 @@
     }
     document.querySelector('#organizer-open').addEventListener('click', function () { Workspace.open('bookmarks'); });
     document.querySelector('#organizer-close').addEventListener('click', function () { Workspace.close(); });
+    document.querySelector('#organizer-sync-settings').addEventListener('click', function () {
+      Workspace.open('search');
+      var section = document.querySelector('#workspace-search .settings-section');
+      if (section) section.scrollIntoView({ block: 'start' });
+    });
     document.addEventListener('workspace:view', function (event) {
       if (event.detail === 'bookmarks') refresh().catch(function () { status.textContent = '无法读取书签，请在扩展页面使用'; });
     });

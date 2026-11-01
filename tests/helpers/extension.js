@@ -27,6 +27,12 @@ function fixture(options = {}) {
       const list = Array.isArray(ids) ? ids : [ids];
       return list.map(id => { const found = node(String(id)); if (!found) throw new Error('书签不存在'); return clone(found); });
     },
+    update: async (id, changes) => {
+      const found = node(String(id)); if (!found) throw new Error('书签不存在');
+      if (changes.title !== undefined) found.title = changes.title;
+      if (changes.url !== undefined) found.url = changes.url;
+      return clone(found);
+    },
     create: async data => {
       const parent = node(data.parentId); if (!parent || !parent.children) throw new Error('目标不存在');
       const n = { id: String(next++), title: data.title, parentId: data.parentId };
@@ -45,7 +51,7 @@ function fixture(options = {}) {
   const c = { URL, crypto: webcrypto, TextEncoder, TextDecoder, FormData, Response, AbortController, setTimeout, clearTimeout,
     indexedDB: options.db || new IDBFactory(), chrome: { bookmarks }, fetch: options.fetch };
   c.self = c; vm.createContext(c);
-  for (const name of ['db', 'bookmarks', 'content-index', 'documents', 'pageinfo', 'capture-adapters', 'ai', 'organizer', 'organizer-moves', 'rag', 'sync-engine', 'bookmark-answer', 'bookmark-search']) vm.runInContext(fs.readFileSync(path.join(root, 'js', name + '.js'), 'utf8'), c);
+  for (const name of ['db', 'bookmarks', 'content-index', 'documents', 'pageinfo', 'capture-adapters', 'ai', 'organizer', 'organizer-moves', 'rag', 'sync-engine', 'bookmark-answer', 'bookmark-enrich', 'bookmark-search']) vm.runInContext(fs.readFileSync(path.join(root, 'js', name + '.js'), 'utf8'), c);
   return { c, node, tree, bookmarks };
 }
 module.exports = { fixture };
