@@ -225,7 +225,7 @@ score = frecency * (1 + 0.2 * ln(1 + manualHit))
 - 常用区固定 3 个槽位，避免长尾把面板撑长
 - 无匹配时第三区变为"＋ 把「xxx」创建为快捷标签"
 
-实际渲染（替身数据）：`quick-tags-panel.png`（空查询）、`quick-tags-filter.png`（输入 `@gh`）、`tag-manager-collapsed.png`（管理页）、`tag-manager-expanded.png`（展开 12 条候选）、`tag-manager-narrow.png`（900px 单列）。
+实际渲染（替身数据），原图见 `assets/screenshots/`：`quick-tags-panel.jpg`（空查询）、`quick-tags-filter.jpg`（输入 `@gh`）、`tag-manager-collapsed.jpg`（管理页）、`tag-manager-expanded.jpg`（展开 12 条候选）、`tag-manager-narrow.jpg`（900px 单列）。
 
 ### 4.3 分期
 
