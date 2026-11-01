@@ -54,13 +54,19 @@
 
 ## 界面图墙
 
-截图均为真实渲染，点击任意图片查看原图。
+截图均为真实渲染，点击任意图片查看原图。图墙只放真实界面截图，不使用拼图或示意图。
 
 ### 新标签页 · `@` 快捷标签
 
 <a href="docs/assets/screenshots/newtab-quick-tags.jpg"><img src="docs/assets/screenshots/newtab-quick-tags.jpg" alt="新标签页与 @ 快捷标签面板" width="100%"></a>
 
 <p align="center"><strong>输入框首字符 <code>@</code> 展开标签面板</strong><br>固定区按手写顺序排列、可一键移除；「常用 · 系统推荐」来自常访站点与近期书签，点「固定」才转正</p>
+
+### 新标签页 · 本地书签检索
+
+<a href="docs/assets/screenshots/newtab-bookmark-search.jpg"><img src="docs/assets/screenshots/newtab-bookmark-search.jpg" alt="输入 /测试 检索本地书签" width="100%"></a>
+
+<p align="center"><strong>输入 <code>/关键词</code> 检索本机书签</strong><br>标题、网址、目录与已采集正文一并匹配，完全不联网；登录或动态页面读不到时标注「网页暂时无法读取，将自动重试」</p>
 
 ### 工作台 · 四个核心页面
 
@@ -83,41 +89,6 @@
     <td width="50%" valign="top" align="center">
       <a href="docs/assets/screenshots/workspace-quick-tags.jpg"><img src="docs/assets/screenshots/workspace-quick-tags.jpg" alt="工作台 快捷标签：固定与推荐" width="100%"></a>
       <p><strong>快捷标签 · 固定与推荐</strong><br>改名与调序、忽略恢复、学习数据导入导出，全部只存本机</p>
-    </td>
-  </tr>
-</table>
-
-### 快捷标签与联想细节
-
-<table>
-  <tr>
-    <td width="50%" valign="top" align="center">
-      <a href="docs/assets/screenshots/quick-tags-panel.jpg"><img src="docs/assets/screenshots/quick-tags-panel.jpg" alt="空查询状态下的快捷标签面板" width="100%"></a>
-      <p><strong>空查询</strong><br>固定 2 条、推荐 3 条，两区边界清晰</p>
-    </td>
-    <td width="50%" valign="top" align="center">
-      <a href="docs/assets/screenshots/quick-tags-filter.jpg"><img src="docs/assets/screenshots/quick-tags-filter.jpg" alt="输入 @gh 过滤命中 GitHub" width="100%"></a>
-      <p><strong>输入 <code>@gh</code></strong><br>名称、词首缩写、域名片段都能命中</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top" align="center">
-      <a href="docs/assets/screenshots/tag-manager-collapsed.jpg"><img src="docs/assets/screenshots/tag-manager-collapsed.jpg" alt="快捷标签管理页折叠态" width="100%"></a>
-      <p><strong>管理页 · 折叠</strong><br>主栏推荐 + 侧栏固定 / 已忽略 / 数据</p>
-    </td>
-    <td width="50%" valign="top" align="center">
-      <a href="docs/assets/screenshots/tag-manager-expanded.jpg"><img src="docs/assets/screenshots/tag-manager-expanded.jpg" alt="管理页展开 12 条候选" width="100%"></a>
-      <p><strong>管理页 · 展开</strong><br>列表限高内部滚动，不把面板拉长</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top" align="center">
-      <a href="docs/assets/screenshots/tag-manager-narrow.jpg"><img src="docs/assets/screenshots/tag-manager-narrow.jpg" alt="900px 窄屏单列布局" width="100%"></a>
-      <p><strong>窄屏 · 900px</strong><br>双列合并为单列并重排顺序</p>
-    </td>
-    <td width="50%" valign="top" align="center">
-      <a href="docs/assets/screenshots/search-suggest.jpg"><img src="docs/assets/screenshots/search-suggest.jpg" alt="普通输入的全网联想面板" width="100%"></a>
-      <p><strong>全网联想</strong><br>边打边要建议词，命中片段高亮</p>
     </td>
   </tr>
 </table>

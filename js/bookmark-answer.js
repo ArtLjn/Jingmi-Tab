@@ -114,7 +114,9 @@
     var allowed = new Map(evidence.map(function (item) { return [item.id, item]; }));
     var seen = {};
     var sources = [];
-    var list = Array.isArray(parsed.sources) ? parsed.sources : [];
+    /* 兼容模型把回答任务当成重排、只返回 picks 的情况，直接用它的选择。 */
+    var list = Array.isArray(parsed.sources) ? parsed.sources
+      : Array.isArray(parsed.picks) ? parsed.picks : [];
     list.forEach(function (source) {
       var id = source && source.id !== undefined && source.id !== null ? String(source.id) : '';
       if (!allowed.has(id) || seen[id]) return;

@@ -225,7 +225,7 @@ score = frecency * (1 + 0.2 * ln(1 + manualHit))
 - 常用区固定 3 个槽位，避免长尾把面板撑长
 - 无匹配时第三区变为"＋ 把「xxx」创建为快捷标签"
 
-实际渲染（替身数据），原图见 `assets/screenshots/`：`quick-tags-panel.jpg`（空查询）、`quick-tags-filter.jpg`（输入 `@gh`）、`tag-manager-collapsed.jpg`（管理页）、`tag-manager-expanded.jpg`（展开 12 条候选）、`tag-manager-narrow.jpg`（900px 单列）。
+早期用替身数据渲染的示意截图已移除：真实界面见仓库 README 的「界面图墙」，空查询与 `@gh` 过滤状态在 `newtab-quick-tags.jpg`，管理页在 `workspace-quick-tags.jpg`。
 
 ### 4.3 分期
 

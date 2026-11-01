@@ -52,8 +52,8 @@
       : Promise.resolve({ hits: [] });
     /* 本地已有足够候选时直接交给重排，省掉一次改写往返；零召回才需要扩展词。 */
     var rewrite = { ok: false };
-    /* 问句且本地已有候选时不再改写；零召回的「放哪里」仍要改写扩展召回。 */
-    if (local.length < 3 && AI.available(cfg) && !(isQuestion(q) && local.length)) {
+    /* 问句必须扩展召回：本地命中「网站」不代表命中用户真正想找的电商站点。 */
+    if (AI.available(cfg) && (local.length < 3 || isQuestion(q))) {
       try { rewrite = await AI.rewrite({ cfg: cfg, query: q }); }
       catch (e) { rewrite = { ok: false }; }
     }
