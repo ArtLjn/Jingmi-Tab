@@ -60,6 +60,28 @@ html, body {
   transition: filter 0.3s var(--ease), opacity 0.6s var(--ease);
 }
 
+/* 背景加载层：启动或切换图片时盖住旧画面，用镜片扫光表示仍在解码。 */
+.bg-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 55% at 32% 26%, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 68%),
+    linear-gradient(112deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.055) 46%, rgba(255, 255, 255, 0.14) 50%, rgba(255, 255, 255, 0.055) 54%, rgba(255, 255, 255, 0) 62%),
+    rgba(8, 11, 16, 0.38);
+  background-size: 100% 100%, 240% 240%, 100% 100%;
+  animation: lens-sweep 1.9s ease-in-out infinite;
+  animation-play-state: paused;
+  transition: opacity 0.5s var(--ease);
+}
+.bg-loader.is-on { opacity: 1; animation-play-state: running; }
+@keyframes lens-sweep {
+  from { background-position: 0 0, 140% 0, 0 0; }
+  to { background-position: 0 0, -40% 0, 0 0; }
+}
+
 /* 环境光只使用 transform / opacity 动画，避免持续触发布局与绘制。 */
 .ambient-light {
   position: absolute;
@@ -444,6 +466,8 @@ html, body {
 .ac-answer-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: rgba(255, 255, 255, 0.42); font-size: 10px; letter-spacing: 0.04em; }
 .ac-answer-label { color: rgba(168, 198, 255, 0.92); font-weight: 600; letter-spacing: 0.06em; }
 .ac-answer-text { color: rgba(255, 255, 255, 0.9); font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ac-answer.is-streaming .ac-answer-text::after { content: "▌"; margin-left: 2px; color: rgba(168, 198, 255, 0.85); animation: answer-caret 1s steps(1) infinite; }
+@keyframes answer-caret { 50% { opacity: 0; } }
 .ac-answer-sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .ac-source { max-width: 100%; overflow: hidden; padding: 4px 8px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px; color: rgba(255, 255, 255, 0.6); font-size: 10px; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
 .ac-source:hover { color: #fff; border-color: rgba(255, 255, 255, 0.26); background: rgba(255, 255, 255, 0.06); }
@@ -1030,18 +1054,24 @@ body.panel-open .panel {
   background-image: none !important;
 }
 
-.wp-item.is-loading::before {
+/* 缩略图与大图共用同一套镜片扫光：斜向高光 + 左上柔光，比纯横向 shimmer 更像玻璃反光。 */
+.wp-item.is-loading::before,
+.wp-item.is-applying::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, rgba(255, 255, 255, 0.03) 30%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.03) 70%);
-  background-size: 200% 100%;
-  animation: shimmer 1.2s infinite linear;
+  z-index: 1;
+  background:
+    radial-gradient(90% 70% at 24% 18%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(112deg, rgba(255, 255, 255, 0.02) 34%, rgba(255, 255, 255, 0.1) 46%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.1) 54%, rgba(255, 255, 255, 0.02) 66%);
+  background-size: 100% 100%, 220% 100%;
+  animation: wp-lens 1.6s ease-in-out infinite;
+  pointer-events: none;
 }
 
-@keyframes shimmer {
-  from { background-position: 120% 0; }
-  to { background-position: -80% 0; }
+@keyframes wp-lens {
+  from { background-position: 0 0, 145% 0; }
+  to { background-position: 0 0, -45% 0; }
 }
 
 .wp-status {
@@ -1561,6 +1591,12 @@ kbd {
 .appearance-grid { display: grid; grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr); gap: 14px; align-items: start; }
 .settings-stack { min-width: 0; display: grid; gap: 14px; }
 .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+/* 配置页内的次级分组：用一条分隔线把「搜索/AI」与「内容自动化」分开，
+   标题层级低于页面标题，避免和左侧导航抢注意力。 */
+.settings-section { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--workspace-border); }
+.settings-section-head { margin-bottom: 12px; }
+.settings-section-head h3 { margin: 0; color: rgba(255, 255, 255, 0.8); font-size: 14px; font-weight: 550; letter-spacing: -0.01em; }
+.settings-section-head p:not(.view-eyebrow) { margin: 6px 0 0; color: var(--ink-faint); font-size: 11px; line-height: 1.6; }
 /* 卡片表面与书签空间的 automation-card 保持同一套：只留底色和顶部高光，
    不再叠加第二层毛玻璃与外阴影，避免同一工作台里出现两种卡片质感。 */
 .group.settings-card {
@@ -1711,6 +1747,9 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 #organizer-pending { display: inline-flex; align-items: center; gap: 8px; color: rgba(255, 255, 255, 0.52); }
 #organizer-pending::before { content: ""; width: 3px; height: 3px; border-radius: 50%; background: rgba(255, 255, 255, 0.25); }
 #organizer-dialog .organizer-done { height: 31px; padding: 0 13px; border-color: rgba(255, 255, 255, 0.08); color: var(--ink-soft); font-size: 11px; }
+.organizer-head-actions { display: flex; align-items: center; gap: 8px; }
+#organizer-dialog .organizer-head-actions .organizer-config { height: 31px; padding: 0 11px; border-color: transparent; background: transparent; color: var(--ink-faint); font-size: 11px; }
+#organizer-dialog .organizer-head-actions .organizer-config:hover { border-color: rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.04); color: var(--ink); }
 
 #organizer-dialog .organizer-command-bar { display: grid; grid-template-columns: minmax(210px, 1.1fr) minmax(270px, 1fr); gap: 14px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.075); border-radius: 15px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.022)); }
 #organizer-dialog .organizer-search-label { position: relative; display: flex; align-items: center; min-width: 0; }
@@ -1839,6 +1878,8 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .wp-pagination .btn-ghost:disabled { opacity: 0.28; cursor: default; border-color: rgba(255, 255, 255, 0.08); background: transparent; }
 #wp-page { min-width: 52px; color: var(--ink-faint); font-size: 10.5px; text-align: center; font-variant-numeric: tabular-nums; }
 #wp-quality { margin: 10px 0 0; text-align: center; }
+.current-bg-card #wp-quality { margin: 0; text-align: left; }
+.current-bg-card .wallpaper-save-row { margin: 12px 0 0; }
 
 @media (max-width: 900px) {
   #organizer-dialog .organizer-command-bar { grid-template-columns: 1fr; }
@@ -1911,6 +1952,18 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .auto-action:hover { border-color: rgba(255, 255, 255, 0.26); color: #fff; background: rgba(255, 255, 255, 0.06); }
 .auto-action.adopt { border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08); color: #f5f5f7; }
 .auto-action.adopt:hover { background: rgba(255, 255, 255, 0.16); }
+/* 收藏补全：正文采集与标题建议 */
+.enrich-body { display: grid; gap: 8px; margin-top: 10px; }
+.enrich-toolbar { display: flex; flex-wrap: wrap; gap: 6px; }
+.enrich-all { justify-self: start; height: 28px; font-size: 10px; }
+.enrich-tags { margin: 3px 0 0; color: rgba(168, 198, 255, 0.72); font-size: 9.5px; letter-spacing: 0.02em; }
+.enrich-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 9px; background: rgba(255, 255, 255, 0.025); }
+.enrich-main { min-width: 0; }
+.enrich-current { margin: 0; overflow: hidden; color: rgba(255, 255, 255, 0.42); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.enrich-suggest { margin: 3px 0 0; overflow: hidden; color: rgba(255, 255, 255, 0.86); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+.enrich-summary { margin: 3px 0 0; color: var(--ink-faint); font-size: 9.5px; line-height: 1.5; }
+.enrich-host { margin: 3px 0 0; color: rgba(255, 255, 255, 0.3); font-size: 9px; }
+.enrich-actions { display: flex; gap: 4px; flex: none; }
 .organizer-advanced { margin: 9px 0 0; padding: 8px 2px; border: 0; }
 #organizer-dialog .organizer-command-bar { grid-template-columns: auto minmax(180px, 320px); align-items: end; justify-content: space-between; gap: 12px; margin-top: 3px; padding: 12px; border: 1px solid var(--workspace-border); border-radius: 12px; background: rgba(255,255,255,.028); }
 #organizer-dialog .organizer-command-bar > strong { color: rgba(255,255,255,.68); font-size: 12px; font-weight: 500; }
@@ -2033,7 +2086,7 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .wp-suggest-chip:hover { color: var(--workspace-accent); border-color: var(--workspace-accent); }
 .wp-suggest-ai { border-style: solid; color: var(--workspace-accent); }
 .wp-suggest-loading { padding: 4px 2px; color: var(--ink-faint); font-size: 10px; }
-.wp-source-badge { position: absolute; left: 5px; bottom: 5px; max-width: calc(100% - 10px); overflow: hidden; padding: 3px 5px; border-radius: 4px; background: rgba(10,12,18,.72); color: #fff; font-size: 8px; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
+.wp-source-badge { position: absolute; left: 5px; bottom: 5px; z-index: 2; max-width: calc(100% - 10px); overflow: hidden; padding: 3px 5px; border-radius: 4px; background: rgba(10,12,18,.72); color: #fff; font-size: 8px; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
 .wallpaper-photo-settings { display: grid; gap: 8px; margin: 12px 0; color: var(--ink-soft); font-size: 11px; }
 .wallpaper-photo-settings[hidden] { display: none; }
 .wallpaper-photo-settings a { color: var(--workspace-accent); font-size: 10px; }
@@ -2044,6 +2097,7 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
   position: absolute;
   bottom: 5px;
   left: 5px;
+  z-index: 2;
   max-width: calc(100% - 10px);
   overflow: hidden;
   padding: 2px 5px;
@@ -2058,9 +2112,10 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 }
 .wp-photo-credit:hover { background: rgba(10, 12, 18, 0.86); color: #fff; }
 
-/* 使用历史：横向缩略图条，点一下直接恢复，不再请求图源。 */
-.wp-history { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
-.wp-history[hidden] { display: none; }
+/* 使用历史：和「我的背景」同列，横向缩略图条，点一下直接恢复，不再请求图源。 */
+.history-card[hidden] { display: none; }
+.history-card .wp-history-head { margin-bottom: 10px; }
+.history-card .wp-history-head h3 { margin: 0; color: rgba(255, 255, 255, 0.66); font-size: 11px; letter-spacing: 0.08em; }
 .wp-history-head {
   display: flex;
   align-items: center;

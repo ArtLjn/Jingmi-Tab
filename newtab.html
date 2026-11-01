@@ -13,6 +13,7 @@
 <body data-page-node-id="vE2gKGeliCAewbxQFtBX7H">
   <div class="bg-layer" data-page-node-id="QkyL9ZKZWO83JSywDDUMTv" aria-hidden="true">
     <div class="bg-image" id="bg-image" data-page-node-id="GxKpB4GFK6EdLaJWdZ4DvU"></div>
+    <div class="bg-loader" id="bg-loader" aria-hidden="true"></div>
     <div class="ambient-light ambient-light-a"></div>
     <div class="ambient-light ambient-light-b"></div>
     <div class="grain" data-page-node-id="XhD3qdP7NRiNsmbeC0SbJd"></div>
@@ -81,11 +82,11 @@
         </button>
         <button class="workspace-tab" id="workspace-tab-search" type="button" role="tab" aria-selected="false" aria-controls="workspace-search" data-workspace-target="search" tabindex="-1" data-page-node-id="0xZYfAnjV5GZJWpgJTLGBU">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" data-page-node-id="bJtiauEIUF3wxeZiAeJXF9"><circle cx="10.5" cy="10.5" r="6.5" data-page-node-id="PQTCEm9E3Z9adDC8VAKiBH"/><path d="m15.5 15.5 4.5 4.5M9 8.5h3M9 11.5h3" data-page-node-id="ISABLPGvDSFsamuJsUqk5J"/></svg>
-          <span data-page-node-id="Se9VznGM2fxqcpWGUe09Gg"><strong data-page-node-id="loFIB0oEYPNPKC39HgMRxA">搜索与 AI</strong><small data-page-node-id="on5V6JXZnFCnaBSAAnqQFT">索引与智能检索</small></span>
+          <span data-page-node-id="Se9VznGM2fxqcpWGUe09Gg"><strong data-page-node-id="loFIB0oEYPNPKC39HgMRxA">搜索与 AI</strong><small data-page-node-id="on5V6JXZnFCnaBSAAnqQFT">索引、AI 与自动化</small></span>
         </button>
         <button class="workspace-tab" id="workspace-tab-bookmarks" type="button" role="tab" aria-selected="false" aria-controls="organizer-dialog" data-workspace-target="bookmarks" tabindex="-1" data-page-node-id="tOuHFPNrjOdsFoTTHMljrm">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-page-node-id="yOsclws8HRvUdW0IxC96B5"><path d="M6 4.5h12a1.5 1.5 0 0 1 1.5 1.5v14l-7.5-4-7.5 4V6A1.5 1.5 0 0 1 6 4.5z" data-page-node-id="r0qRJeyII78YeKXtLW4y3m"/></svg>
-          <span data-page-node-id="dAPMG7qDcRtorW5g6DhAH1"><strong data-page-node-id="3d24cPGETcIMGm0bJUqtWD">书签空间</strong><small data-page-node-id="g9phFasNurTm8ww3hS1jVi">目录浏览与内容同步</small></span>
+          <span data-page-node-id="dAPMG7qDcRtorW5g6DhAH1"><strong data-page-node-id="3d24cPGETcIMGm0bJUqtWD">书签空间</strong><small data-page-node-id="g9phFasNurTm8ww3hS1jVi">目录浏览与正文状态</small></span>
         </button>
         <button class="workspace-tab" id="workspace-tab-preferences" type="button" role="tab" aria-selected="false" aria-controls="workspace-preferences" data-workspace-target="preferences" tabindex="-1" data-page-node-id="lt6Hpgyd8qUXqDk7FjXRiI">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" data-page-node-id="1wxpkY4HHFr6iMsZ59JJYj"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" data-page-node-id="0qQ70BBGOQIotcpTL8zGC3"/></svg>
@@ -130,6 +131,15 @@
                 <div class="switch-row"><span class="label">动态效果</span><label class="switch"><input id="sw-motion" type="checkbox" aria-label="启用背景动效" /><i></i></label></div>
                 <p class="hint motion-hint">缓慢漂移、环境流光与指针视差；跟随系统的减少动态效果设置。</p>
               </section>
+              <section class="group settings-card current-bg-card">
+                <h3>当前背景</h3>
+                <p id="wp-quality" class="hint" role="status" aria-live="polite" data-page-node-id="SLqi8vhqtrfr0t8B3Qj7jo">当前背景：正在检测…</p>
+                <div class="wallpaper-save-row"><button id="wp-save" class="btn-ghost" type="button" disabled>保存到离线图库</button><span>默认在线使用，需要时再保存</span></div>
+              </section>
+              <section class="group settings-card history-card" id="wp-history-wrap" hidden>
+                <div class="wp-history-head"><h3>最近使用</h3><button id="wp-history-clear" type="button">清空</button></div>
+                <div class="wp-history-list" id="wp-history" aria-label="最近使用的壁纸"></div>
+              </section>
             </div>
 
             <section class="group settings-card wallpaper-card" data-page-node-id="uNJ65OFKCbUhfEWA24yrkz">
@@ -153,12 +163,6 @@
                 <span id="wp-page" aria-live="polite" data-page-node-id="vVL2zJXTCpY6SfAU8poifc">第 1 页</span>
                 <button class="btn-ghost wp-more" id="wp-more" type="button" data-page-node-id="Scq4rm5sguBpOTL6AQzUG0">下一页</button>
               </div>
-              <p class="hint" id="wp-quality" role="status" aria-live="polite" data-page-node-id="SLqi8vhqtrfr0t8B3Qj7jo">当前背景：正在检测…</p>
-              <div class="wallpaper-save-row"><button id="wp-save" class="btn-ghost" type="button" disabled>保存到离线图库</button><span>默认在线使用，需要时再保存</span></div>
-              <div class="wp-history" id="wp-history-wrap" hidden>
-                <div class="wp-history-head"><span>使用历史</span><button id="wp-history-clear" type="button">清空</button></div>
-                <div class="wp-history-list" id="wp-history" aria-label="最近使用的壁纸"></div>
-              </div>
               <details id="wp-hao-settings" class="advanced-settings" hidden data-page-node-id="wrZ7x0rA9nkJr62ZQAPgip">
                 <summary data-page-node-id="N9dQIOv4s2NdXKSY24K2jW">高清原图与登录设置<span data-page-node-id="Bm8ZaC48dXrisc1f3hs7Ya">可选</span></summary>
                 <div class="advanced-content" data-page-node-id="8svczQEEOesXPM09sRRFXh">
@@ -173,7 +177,7 @@
         </section>
 
         <section class="settings-view" id="workspace-search" role="tabpanel" aria-labelledby="workspace-tab-search" data-workspace-view="search" hidden data-page-node-id="GvVVIWegfNDhZirBExCWMt">
-          <div class="view-heading" data-page-node-id="HbIhT2nqcSDJBHD8p6KEvp"><div data-page-node-id="yi0LSWvDycZiJUeedQlxHs"><p class="view-eyebrow" data-page-node-id="lZYYTIX4PXubZTi9aVY53B">SEARCH</p><h2 data-page-node-id="l6ui7eplaggvaMETr2FtVd">从一个搜索框，找到所有收藏</h2><p data-page-node-id="uM2tD1jbZf1DLuY4oyKjEf">本地检索保障隐私，AI 与 RAG 按需要开启。</p></div><span class="view-badge" data-page-node-id="RD1Drz7NhoRunfcMWmfCKC">本地优先</span></div>
+          <div class="view-heading" data-page-node-id="HbIhT2nqcSDJBHD8p6KEvp"><div data-page-node-id="yi0LSWvDycZiJUeedQlxHs"><p class="view-eyebrow" data-page-node-id="lZYYTIX4PXubZTi9aVY53B">SEARCH</p><h2 data-page-node-id="l6ui7eplaggvaMETr2FtVd">从一个搜索框，找到所有收藏</h2><p data-page-node-id="uM2tD1jbZf1DLuY4oyKjEf">本地检索保障隐私；AI、同步与自动化按需要开启。</p></div><span class="view-badge" data-page-node-id="RD1Drz7NhoRunfcMWmfCKC">本地优先</span></div>
           <div class="settings-grid" data-page-node-id="F2KPOD7oWlPHgsom8rFHGl">
             <section class="group settings-card" data-page-node-id="ZJgZSqltb09ue9XHklDTT2">
               <h3 data-page-node-id="mwtTh5ZdaxehFR4ZFCQCz4">默认搜索引擎</h3>
@@ -193,6 +197,8 @@
               <div class="field-grid" data-page-node-id="zutp5ffaaHsKhNCRZ05qFu">
                 <label class="field" data-page-node-id="htgZdiKAzA8BzKfxMCOrUJ"><span data-page-node-id="ULyot2Zp6fawNl8FCFbzrC">接口地址</span><input class="text-input" id="ai-base" type="text" placeholder="http://host:9000/v1" spellcheck="false" data-page-node-id="NgJmBE2VVtjGa2yO3rxE7Q" /></label>
                 <label class="field" data-page-node-id="Oz5SDwyAOR7nKZeevDeadL"><span data-page-node-id="RpdMvhDPseI5UMQIpMiWdo">模型名</span><input class="text-input" id="ai-model" type="text" placeholder="例如 qwen3.6-flash" spellcheck="false" data-page-node-id="HCHXZDR19wHE1gvWxvA3zV" /></label>
+                <label class="field"><span>快模型（可选）</span><input class="text-input" id="ai-fast-model" type="text" placeholder="改写、重排与补全" spellcheck="false" /></label>
+                <label class="field"><span>强模型（可选）</span><input class="text-input" id="ai-strong-model" type="text" placeholder="问答与摘要" spellcheck="false" /></label>
                 <label class="field field-wide" data-page-node-id="qD1saNEZfCch2e93t8XRSm"><span data-page-node-id="Vth3WELFQT7Lx7N2v6ytcG">API Key</span><input class="text-input" id="ai-key" type="password" placeholder="只保存在本机" spellcheck="false" autocomplete="off" data-page-node-id="faOZzNfhWEl34ckYcgbDst" /></label>
               </div>
               <div class="inline-actions" data-page-node-id="EpcSBa5gnHzVjGeOVWTAZm"><button class="btn-ghost" id="ai-test" type="button" data-page-node-id="JRwsD3ifonYGc8m49TIPfb">测试连接</button><span class="hint" id="ai-status" role="status" aria-live="polite" data-page-node-id="HBwZwXdGV0Jjj9CyUNTmAe"></span></div>
@@ -200,7 +206,68 @@
             </div>
           </details>
 
-
+          <section class="settings-section" aria-labelledby="automation-title">
+            <div class="settings-section-head">
+              <div>
+                <p class="view-eyebrow">AUTOMATION</p>
+                <h3 id="automation-title">内容自动化</h3>
+                <p>收藏后自动采集正文、同步索引、整理目录并补全标题；关闭只停止后续处理。</p>
+              </div>
+            </div>
+            <div class="automation-grid" data-page-node-id="UCn9AFhy4oGGrACjMDgA5w">
+              <section class="automation-card" aria-labelledby="rag-flow-title" data-page-node-id="ARmMHGBv5OyfvQXONzAHhC">
+                <div class="automation-heading" data-page-node-id="raqYI5i48871UKMGDQsUKT"><div data-page-node-id="qHDhuXprQpirhE1SfBOiFD"><span class="automation-step" data-page-node-id="phlqlEijEo9WppIGhUDPvE">书签内容</span><h3 id="rag-flow-title" data-page-node-id="gfCQfmf8XWidsb49hBOHyG">自动同步到 RAG</h3></div><label class="switch" data-page-node-id="O5xzbMkwwCnJfMmulxefke"><input id="rag-enabled" type="checkbox" aria-label="自动同步到 RAG" data-page-node-id="D5LhktIzHt8SYRWJniVknm" /><i data-page-node-id="NlBqEhwE39NSCK25DoTSPB"></i></label></div>
+                <p class="automation-description" data-page-node-id="NBduQuw3PVFQu1hOcYTgAG">采集每个收藏页面的正文，同步到 RAG 并更新搜索索引。</p>
+                <div class="automation-path" data-page-node-id="BZ6wiHTZtBOay2dpqn0OUA"><span data-page-node-id="nnAjJCg0o9Y2wSduDcNqDD">采集正文</span><b aria-hidden="true" data-page-node-id="d3SCk51lyGnMBqcsLxZm36">→</b><span data-page-node-id="fUaJBLSPi8E3c7aRF4m4bk">同步入库</span><b aria-hidden="true" data-page-node-id="3OAUeHdncvMDDVRnTZuxFK">→</b><span data-page-node-id="xB2HZGIXn63sYDDd07ABMM">可搜索</span></div>
+                <div class="inline-actions" data-page-node-id="azeyhn0pVvceAr7iPIv73T"><button id="pipeline-start" class="btn-ghost action-primary" type="button" data-page-node-id="sstXuHm9f3mecaJYJEbILO">同步一次</button><button id="pipeline-retry" class="btn-ghost" type="button" hidden data-page-node-id="G74AGU5CH7hOqLkLsHBxlx">重试失败项</button></div>
+                <p id="pipeline-status" class="automation-progress" role="status" aria-live="polite" data-page-node-id="BS1G2rVuGgv1hOj4H1REzg">自动同步未开启</p>
+                <p class="automation-note" data-page-node-id="3bXxKesdkVqF671xGGw7Mm">收藏变更自动同步，无需单独建立索引。登录或动态页面可打开后点击扩展图标采集。</p>
+                <details id="rag-connection" class="automation-details" data-page-node-id="iUlthvXjvZ4bKJ1KlM6FCg">
+                  <summary data-page-node-id="MBeYlduY99v9NRPcwXmI8N">连接与同步设置</summary>
+                  <div class="field-grid" data-page-node-id="UIgns9OPX5AIa0OFiBnCyT">
+                    <label class="field field-wide" data-page-node-id="FNR7aaC67VWHovuHjoBAPg"><span data-page-node-id="CF43IsdUUGPS7ATvQckZNH">RAG 服务地址</span><input class="text-input" id="rag-url" type="url" placeholder="https://..." spellcheck="false" data-page-node-id="hHV3P85HmumM6WP1iJv7I0" /></label>
+                    <label class="field" data-page-node-id="cHeWNZykBFcDRp8FwFTUlv"><span data-page-node-id="CBcD7SZcNPSI2ijeqMqNAb">API Key</span><input class="text-input" id="rag-key" type="password" placeholder="只保存在本机" autocomplete="off" data-page-node-id="tDniypsdebA7wk6Nk9KCyQ" /></label>
+                    <label class="field" data-page-node-id="3NZ1xPCDpQg8OgLeXGQ1GH"><span data-page-node-id="VsYop8bKbIN4fxJ25VTo6K">书签集合名称</span><input class="text-input" id="rag-collection" type="text" placeholder="chrome_tab_ 开头" spellcheck="false" data-page-node-id="CWcA88bBgtjT4r0GThgAFe" /></label>
+                    <label class="field field-wide" data-page-node-id="DPtKtc6MTtJbJRbIAsrOms"><span data-page-node-id="ibN3kC4LAfSL0trdQsf5Uz">公开正文刷新间隔（天）</span><input id="rag-refresh" class="text-input" type="number" min="1" max="90" data-page-node-id="dpVsj1Tck9JzE4bc8AtVrj" /></label>
+                  </div>
+                  <div class="switch-row" data-page-node-id="dpRKGX6DQHx33tJrVuFonl"><span class="label" data-page-node-id="irR3BSIXwiyIPn0ab1kNUa">上传手动采集的登录页面正文</span><label class="switch" data-page-node-id="aKAaVJbK15lFtg3QlAn3fH"><input id="rag-private" type="checkbox" aria-label="上传登录页面正文" data-page-node-id="G7JABBBCdMmOd2CaRQPrGJ" /><i data-page-node-id="Xh7Qbp0HRyISwvgTKVT0iy"></i></label></div>
+                  <p class="automation-note" data-page-node-id="zrGRYz8uIutkQ3W96g4XGL">关闭自动开关会停止后台同步，已同步内容仍可检索。</p>
+                  <div class="inline-actions" data-page-node-id="F0LZ0GGDwXYhxXV6w3Qiaz"><button id="rag-test" class="btn-ghost" type="button" data-page-node-id="3idMfCgKByBJy1MDwfE0m0">测试连接</button><button id="pipeline-pause" class="btn-ghost" type="button" data-page-node-id="QopgHPxYmYGwmII1vgya7D">暂停本次同步</button></div>
+                  <p id="rag-status" class="hint" role="status" aria-live="polite" data-page-node-id="SATyEu8yfd0Gh9ekWqZUv5"></p>
+                </details>
+              </section>
+              <section id="auto-organize-card" class="automation-card" aria-labelledby="auto-organize-title">
+                <div class="automation-heading">
+                  <div><span class="automation-step">收藏归档</span><h3 id="auto-organize-title">按域名记忆自动归档</h3></div>
+                  <label class="switch"><input id="auto-organize-enabled" type="checkbox" aria-label="自动归档新收藏" /><i></i></label>
+                </div>
+                <p class="automation-description">同一域名归对一次，之后的新收藏自动进入该目录，子域名同样生效。陌生域名由 AI 建议目录（需配置 AI 接口），确认后写回记忆。</p>
+                <p id="auto-organize-status" class="automation-progress" role="status" aria-live="polite">正在读取归档规则…</p>
+                <div class="inline-actions"><button id="auto-organize-relearn" class="btn-ghost" type="button">从现有书签学习</button></div>
+                <details id="auto-organize-details" class="automation-details">
+                  <summary id="auto-organize-summary">域名规则与待确认建议</summary>
+                  <div id="auto-organize-body" class="auto-organize-body"></div>
+                </details>
+              </section>
+              <section id="enrich-card" class="automation-card" aria-labelledby="enrich-title">
+                <div class="automation-heading">
+                  <div><span class="automation-step">收藏补全</span><h3 id="enrich-title">标题、摘要与标签</h3></div>
+                  <label class="switch"><input id="enrich-enabled" type="checkbox" aria-label="自动补全新收藏" /><i></i></label>
+                </div>
+                <p class="automation-description">收藏后自动采集正文，并为泛泛的标题生成更具体的标题、一句话摘要与标签。应用前不会改名。</p>
+                <p id="enrich-status" class="automation-progress" role="status" aria-live="polite">正在读取补全状态…</p>
+                <div class="inline-actions"><button id="enrich-scan" class="btn-ghost" type="button">扫描最近收藏</button><button id="enrich-capture" class="btn-ghost" type="button">补采正文</button></div>
+                <details id="enrich-details" class="automation-details">
+                  <summary id="enrich-summary">待确认建议</summary>
+                  <div id="enrich-body" class="enrich-body"></div>
+                </details>
+              </section>
+            <details id="bookmark-health" class="automation-card automation-details">
+              <summary id="bookmark-health-summary">书签体检</summary>
+              <div id="bookmark-health-body" class="enrich-body"></div>
+            </details>
+            </div>
+          </section>
         </section>
 
         <section id="organizer-dialog" class="organizer-dialog settings-view" role="tabpanel" aria-labelledby="workspace-tab-bookmarks" data-workspace-view="bookmarks" hidden data-page-node-id="Ck8VmWngvDC0p1YOKwkllt">
@@ -210,45 +277,12 @@
               <div class="organizer-title-line" data-page-node-id="1c64d7GwaEkFbj4lCBwj4q"><h2 id="organizer-title" data-page-node-id="SNPO6q5WB18cr4dEUKEwUq">书签空间</h2><span class="organizer-local-badge" data-page-node-id="K5Br9AE3n71iz38Myq6myW"><i data-page-node-id="04ELh6dSlD4cCZEFkCvZHw"></i> 本地管理</span></div>
               <p class="organizer-summary" data-page-node-id="6vi546MItA2SAj4sN3GEqM"><span id="organizer-count" data-page-node-id="A3qg4jJrJdcZHVPQDSbfxX">正在读取书签</span><span id="organizer-pending" data-page-node-id="TTBbjt6pHSzUKaVtyilMDh"></span></p>
             </div>
-            <button id="organizer-close" class="btn-ghost organizer-done" type="button" data-page-node-id="p2zdzVLK3bNd5j4CtZQTig">完成</button>
+            <div class="organizer-head-actions">
+              <button id="organizer-sync-settings" class="btn-ghost organizer-config" type="button">自动化设置</button>
+              <button id="organizer-close" class="btn-ghost organizer-done" type="button" data-page-node-id="p2zdzVLK3bNd5j4CtZQTig">完成</button>
+            </div>
           </header>
 
-          <div class="automation-grid" data-page-node-id="UCn9AFhy4oGGrACjMDgA5w">
-            <section class="automation-card" aria-labelledby="rag-flow-title" data-page-node-id="ARmMHGBv5OyfvQXONzAHhC">
-              <div class="automation-heading" data-page-node-id="raqYI5i48871UKMGDQsUKT"><div data-page-node-id="qHDhuXprQpirhE1SfBOiFD"><span class="automation-step" data-page-node-id="phlqlEijEo9WppIGhUDPvE">书签内容</span><h3 id="rag-flow-title" data-page-node-id="gfCQfmf8XWidsb49hBOHyG">自动同步到 RAG</h3></div><label class="switch" data-page-node-id="O5xzbMkwwCnJfMmulxefke"><input id="rag-enabled" type="checkbox" aria-label="自动同步到 RAG" data-page-node-id="D5LhktIzHt8SYRWJniVknm" /><i data-page-node-id="NlBqEhwE39NSCK25DoTSPB"></i></label></div>
-              <p class="automation-description" data-page-node-id="NBduQuw3PVFQu1hOcYTgAG">采集每个收藏页面的正文，同步到 RAG 并更新搜索索引。</p>
-              <div class="automation-path" data-page-node-id="BZ6wiHTZtBOay2dpqn0OUA"><span data-page-node-id="nnAjJCg0o9Y2wSduDcNqDD">采集正文</span><b aria-hidden="true" data-page-node-id="d3SCk51lyGnMBqcsLxZm36">→</b><span data-page-node-id="fUaJBLSPi8E3c7aRF4m4bk">同步入库</span><b aria-hidden="true" data-page-node-id="3OAUeHdncvMDDVRnTZuxFK">→</b><span data-page-node-id="xB2HZGIXn63sYDDd07ABMM">可搜索</span></div>
-              <div class="inline-actions" data-page-node-id="azeyhn0pVvceAr7iPIv73T"><button id="pipeline-start" class="btn-ghost action-primary" type="button" data-page-node-id="sstXuHm9f3mecaJYJEbILO">同步一次</button><button id="pipeline-retry" class="btn-ghost" type="button" hidden data-page-node-id="G74AGU5CH7hOqLkLsHBxlx">重试失败项</button></div>
-              <p id="pipeline-status" class="automation-progress" role="status" aria-live="polite" data-page-node-id="BS1G2rVuGgv1hOj4H1REzg">自动同步未开启</p>
-              <p class="automation-note" data-page-node-id="3bXxKesdkVqF671xGGw7Mm">收藏变更自动同步，无需单独建立索引。登录或动态页面可打开后点击扩展图标采集。</p>
-              <details id="rag-connection" class="automation-details" data-page-node-id="iUlthvXjvZ4bKJ1KlM6FCg">
-                <summary data-page-node-id="MBeYlduY99v9NRPcwXmI8N">连接与同步设置</summary>
-                <div class="field-grid" data-page-node-id="UIgns9OPX5AIa0OFiBnCyT">
-                  <label class="field field-wide" data-page-node-id="FNR7aaC67VWHovuHjoBAPg"><span data-page-node-id="CF43IsdUUGPS7ATvQckZNH">RAG 服务地址</span><input class="text-input" id="rag-url" type="url" placeholder="https://..." spellcheck="false" data-page-node-id="hHV3P85HmumM6WP1iJv7I0" /></label>
-                  <label class="field" data-page-node-id="cHeWNZykBFcDRp8FwFTUlv"><span data-page-node-id="CBcD7SZcNPSI2ijeqMqNAb">API Key</span><input class="text-input" id="rag-key" type="password" placeholder="只保存在本机" autocomplete="off" data-page-node-id="tDniypsdebA7wk6Nk9KCyQ" /></label>
-                  <label class="field" data-page-node-id="3NZ1xPCDpQg8OgLeXGQ1GH"><span data-page-node-id="VsYop8bKbIN4fxJ25VTo6K">书签集合名称</span><input class="text-input" id="rag-collection" type="text" placeholder="chrome_tab_ 开头" spellcheck="false" data-page-node-id="CWcA88bBgtjT4r0GThgAFe" /></label>
-                  <label class="field field-wide" data-page-node-id="DPtKtc6MTtJbJRbIAsrOms"><span data-page-node-id="ibN3kC4LAfSL0trdQsf5Uz">公开正文刷新间隔（天）</span><input id="rag-refresh" class="text-input" type="number" min="1" max="90" data-page-node-id="dpVsj1Tck9JzE4bc8AtVrj" /></label>
-                </div>
-                <div class="switch-row" data-page-node-id="dpRKGX6DQHx33tJrVuFonl"><span class="label" data-page-node-id="irR3BSIXwiyIPn0ab1kNUa">上传手动采集的登录页面正文</span><label class="switch" data-page-node-id="aKAaVJbK15lFtg3QlAn3fH"><input id="rag-private" type="checkbox" aria-label="上传登录页面正文" data-page-node-id="G7JABBBCdMmOd2CaRQPrGJ" /><i data-page-node-id="Xh7Qbp0HRyISwvgTKVT0iy"></i></label></div>
-                <p class="automation-note" data-page-node-id="zrGRYz8uIutkQ3W96g4XGL">关闭自动开关会停止后台同步，已同步内容仍可检索。</p>
-                <div class="inline-actions" data-page-node-id="F0LZ0GGDwXYhxXV6w3Qiaz"><button id="rag-test" class="btn-ghost" type="button" data-page-node-id="3idMfCgKByBJy1MDwfE0m0">测试连接</button><button id="pipeline-pause" class="btn-ghost" type="button" data-page-node-id="QopgHPxYmYGwmII1vgya7D">暂停本次同步</button></div>
-                <p id="rag-status" class="hint" role="status" aria-live="polite" data-page-node-id="SATyEu8yfd0Gh9ekWqZUv5"></p>
-              </details>
-            </section>
-            <section id="auto-organize-card" class="automation-card" aria-labelledby="auto-organize-title">
-              <div class="automation-heading">
-                <div><span class="automation-step">收藏归档</span><h3 id="auto-organize-title">按域名记忆自动归档</h3></div>
-                <label class="switch"><input id="auto-organize-enabled" type="checkbox" aria-label="自动归档新收藏" /><i></i></label>
-              </div>
-              <p class="automation-description">同一域名归对一次，之后的新收藏自动进入该目录，子域名同样生效。陌生域名由 AI 建议目录（需配置 AI 接口），确认后写回记忆。</p>
-              <p id="auto-organize-status" class="automation-progress" role="status" aria-live="polite">正在读取归档规则…</p>
-              <div class="inline-actions"><button id="auto-organize-relearn" class="btn-ghost" type="button">从现有书签学习</button></div>
-              <details id="auto-organize-details" class="automation-details">
-                <summary id="auto-organize-summary">域名规则与待确认建议</summary>
-                <div id="auto-organize-body" class="auto-organize-body"></div>
-              </details>
-            </section>
-          </div>
           <section id="organizer-recovery" class="bookmark-recovery" hidden data-page-node-id="9EnaUI4ErDZaai9HSJm3vW">
             <div data-page-node-id="SyXq5oeKnbM8WMg7flYcjF"><strong data-page-node-id="IM9HMCZZQyKYavoeQVPb97">恢复之前的目录整理</strong><p data-page-node-id="5KyZLpfcoKMMVzfJoBogQJ">按本机日志恢复上一批原位置；后续人工修改会跳过。新建的空目录保留。</p></div>
             <button id="organizer-undo" class="btn-ghost" type="button" data-page-node-id="3Udwnxj3oQ4PAs2Dtyl0Gf">撤销上一批移动</button>
@@ -264,11 +298,11 @@
 
           <div class="organizer-body" data-page-node-id="EksORCJDHU1SGBNvibvGAA">
             <div class="organizer-content" data-page-node-id="aBotvu7LyL2iRePtRc1LUB">
-              <div class="organizer-list-head" data-page-node-id="vw4uE2UKVY8opN6G123eC0"><div data-page-node-id="Fj3kFbgi6NN3oAq2xhOHOt"><strong id="organizer-list-title" data-page-node-id="DJKe0HGDn0eLHUkZzOQ9sx">收集箱</strong><span id="organizer-list-count" data-page-node-id="8OTDmmGoobo1xl0LPo8FP6"></span></div><span data-page-node-id="1x50pi8eDcNq9O2iarkkGf">沿用浏览器目录</span></div>
+              <div class="organizer-list-head" data-page-node-id="vw4uE2UKVY8opN6G123eC0"><div data-page-node-id="Fj3kFbgi6NN3oAq2xhOHOt"><strong id="organizer-list-title" data-page-node-id="DJKe0HGDn0eLHUkZzOQ9sx">收集箱</strong><span id="organizer-list-count" data-page-node-id="8OTDmmGoobo1xl0LPo8FP6"></span></div><span data-page-node-id="1x50pi8eDcNq9O2iarkkGf">收藏时间 ↓</span></div>
               <div id="organizer-list" data-page-node-id="YCG0fjsUb5M4g84DmpG8IE"></div>
             </div>
           </div>
-          <footer class="organizer-foot" data-page-node-id="e14tI3JutKFqkqVVklkgPJ"><span class="local-dot" data-page-node-id="bbZI7txaKDHjOQvt4bsC0f"></span> 保留浏览器原有目录；正文缓存在本机，按设置同步到你的 RAG 书签集合。</footer>
+          <footer class="organizer-foot" data-page-node-id="e14tI3JutKFqkqVVklkgPJ"><span class="local-dot" data-page-node-id="bbZI7txaKDHjOQvt4bsC0f"></span> 保留浏览器原有目录；正文缓存与同步、归档、补全的开关统一在「搜索与 AI → 内容自动化」中设置。</footer>
         </section>
 
         <section class="settings-view" id="workspace-preferences" role="tabpanel" aria-labelledby="workspace-tab-preferences" data-workspace-view="preferences" hidden data-page-node-id="YiBEX6vtsjNGKpgqOOhXSX">
@@ -370,7 +404,11 @@
   <script src="js/workspace.js"></script>
   <script src="js/organizer-ui.js"></script>
   <script src="js/auto-organizer-ui.js"></script>
+  <script src="js/bookmark-enrich-ui.js"></script>
+  <script src="js/bookmark-health.js"></script>
+  <script src="js/bookmark-health-ui.js"></script>
   <script src="js/bookmark-answer.js"></script>
+  <script src="js/bookmark-enrich.js"></script>
   <script src="js/bookmark-search.js"></script>
   <script src="js/search-suggest.js"></script>
   <script src="js/quick-tags.js"></script>

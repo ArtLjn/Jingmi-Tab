@@ -36,9 +36,10 @@ test('旧自动整理设置被忽略，未命中域名规则时后台不移动�
   /* 新模块存在，但旧设置不会让它移动任何书签。 */
   assert.equal(typeof f.c.AutoOrganizer, 'object');
   assert.equal(typeof f.c.HANDLERS['auto:status'], 'function');
-  assert.equal(events.onCreated.length, 2); assert.equal(events.onMoved.length, 2);
+  /* 依次为索引重建、域名记忆、收藏补全。 */
+  assert.equal(events.onCreated.length, 3); assert.equal(events.onMoved.length, 2);
 
-  await events.onCreated[events.onCreated.length - 1]('999', {
+  await events.onCreated[1]('999', {
     id: '999', parentId: '2', index: 0, title: '陌生站点', url: 'https://unknown.example.com/'
   });
   await alarm({ name: f.c.SyncEngine.ALARM }); await f.c.rebuild();

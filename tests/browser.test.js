@@ -28,8 +28,9 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
       const system = JSON.parse(body).messages[0].content;
       const rewrite = system.includes('转成 2-4');
       const classify = system.includes('分类助手');
+      const answer = system.includes('私人书签库的问答助手');
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ choices: [{ message: { content: classify ? '{"items":[{"id":"1","category":"工作","type":"文档","tags":["接口"]}]}' : malformed ? '无效响应' : rewrite ? '{"k":["应收凭证"]}' : '{"picks":[{"id":"1","why":"正文提到应收凭证"}]}' } }] }));
+      res.end(JSON.stringify({ choices: [{ message: { content: classify ? '{"items":[{"id":"1","category":"工作","type":"文档","tags":["接口"]}]}' : malformed ? '无效响应' : answer ? '这是应收凭证订单同步的项目文档。[1]' : rewrite ? '{"k":["应收凭证"]}' : '{"picks":[{"id":"1","why":"正文提到应收凭证"}]}' } }] }));
       return;
     }
     if (req.url === '/collections' || req.url === '/ingest' || req.url === '/retrieve' || req.method === 'DELETE') {
@@ -109,6 +110,15 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     ] }] });
     await context.exposeBinding('bookmarkAPI', async (_, { method, args }) => model.bookmarks[method](...args));
     await context.addInitScript(({ origin }) => {
+      window.__enrichState = {
+        enabled: true, aiReady: true, totalPending: 0, pending: [], queue: 0,
+        captured: 15, totalFailed: 3, totalWeb: 400, withBody: 215,
+        failures: [
+          { id: 'a', title: '需要登录的页面', url: origin + '/article', reason: '正文采集失败：http_403', code: 'http_403' },
+          { id: 'b', title: '超时页面', url: origin + '/article', reason: '正文采集失败：timeout', code: 'timeout' },
+          { id: 'c', title: '已登录页面', url: origin + '/article', reason: '页面正文已保存', code: 'private' }
+        ], recent: [], undoable: false
+      };
       window.chrome.bookmarks = {
         getTree: cb => { var p = window.bookmarkAPI({ method: 'getTree', args: [] }); if (cb) p.then(cb); return p; },
         getChildren: id => window.bookmarkAPI({ method: 'getChildren', args: [id] }),
@@ -120,6 +130,7 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
         if (msg.type === 'pipeline:updated') { listeners.forEach(fn => fn(msg)); return; }
         try {
           var result;
+          if (msg.type === 'enrich:status') result = window.__enrichState;
           if (msg.type === 'organizer:undo') result = await OrganizerMoves.undo();
           if (msg.type === 'organizer:status') result = await OrganizerMoves.summary();
           if (typeof SyncEngine !== 'undefined') {
@@ -146,8 +157,18 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     await backend();
     await page.locator('#organizer-open').click();
     await page.waitForSelector('.organizer-item');
-    assert.equal(await page.locator('.automation-card').count(), 2);
+    assert.equal(await page.locator('#organizer-dialog .automation-card').count(), 0);
+    await page.locator('#organizer-sync-settings').click();
+    await page.waitForSelector('#workspace-search:not([hidden])');
+    assert.equal(await page.locator('#workspace-search .automation-card').count(), 4);
     assert.equal(await page.locator('#auto-organize-title').innerText(), '按域名记忆自动归档');
+    assert.equal(await page.locator('#enrich-title').innerText(), '标题、摘要与标签');
+    await page.locator('#enrich-details').evaluate(el => { el.open = true; el.dispatchEvent(new Event('toggle')); });
+    await page.waitForFunction(() => document.querySelector('#enrich-summary').textContent.includes('正文覆盖 215/400'));
+    assert.match(await page.locator('#enrich-body').innerText(), /公开抓取无法读取正文；打开页面后点击扩展图标采集/);
+    assert.equal(await page.locator('#enrich-body [data-enrich-retry]').count(), 1);
+    assert.equal(await page.locator('#enrich-body [data-enrich-private]').count(), 1);
+    assert.equal(await page.locator('#enrich-body a.auto-action').count(), 1);
     assert.equal(await page.locator('#index-build, #feishu-token, #feishu-authorize, #rag-auto, #rag-capture, #organizer-auto, #organizer-run, #organizer-target').count(), 0);
     assert.equal(await page.locator('#rag-enabled').isChecked(), false);
     await page.locator('#pipeline-start').click();
@@ -167,13 +188,23 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     await page.waitForSelector('.ac-evidence');
     await page.locator('#search-input').fill('?帮我找到财务接口说明');
     await page.locator('#search-input').press('Enter');
-    await page.waitForFunction(() => document.querySelector('#ac-panel').textContent.includes('找到 1 条匹配书签'), null, { timeout: 8000 }).catch(async error => { throw new Error(error.message + '；面板=' + await page.locator('#ac-panel').textContent() + '；调用=' + aiCalls + '；错误=' + JSON.stringify(errors)); });
-    assert.equal(aiCalls, 3);
-    assert.match(await page.locator('.ac-why').innerText(), /应收凭证/);
-    await page.locator('#search-input').press('ArrowDown');
-    await page.locator('#search-input').press('Enter');
-    await page.waitForFunction(() => document.querySelector('#ac-panel').textContent.includes('本地排序 · 共 1 条候选'));
-    assert.equal(aiCalls, 3);
+    await page.waitForFunction(() => document.querySelector('#ac-panel').textContent.includes('这是应收凭证订单同步的项目文档'), null, { timeout: 8000 }).catch(async error => { throw new Error(error.message + '；面板=' + await page.locator('#ac-panel').textContent() + '；调用=' + aiCalls + '；错误=' + JSON.stringify(errors)); });
+    assert.ok(aiCalls >= 1);
+    assert.match(await page.locator('#ac-panel').innerText(), /项目文档/);
+    await page.waitForSelector('.ac-answer:not(.is-streaming)');
+    await page.waitForFunction(() => document.querySelector('#ac-panel').textContent.includes('看本地排序的全部'));
+    await page.locator('.ac-act').first().dispatchEvent('mousedown');
+    await page.waitForFunction(() => document.querySelector('#ac-panel').textContent.includes('本地排序 · 共 1 条候选'), null, { timeout: 5000 }).catch(async error => { throw new Error(error.message + '；面板=' + await page.locator('#ac-panel').innerText()); });
+    assert.ok(aiCalls >= 1);
+    /* 中文输入法直接打全角问号/斜杠/at 也要进入对应模式。 */
+    await page.locator('#search-input').fill(' ？项目文档');
+    assert.equal(await page.locator('#search-form').evaluate(el => el.classList.contains('is-ai')), true);
+    assert.equal(await page.locator('#engine-chip').innerText(), 'AI');
+    await page.locator('#search-input').fill('／项目文档');
+    assert.equal(await page.locator('#search-form').evaluate(el => el.classList.contains('is-bookmarks')), true);
+    await page.locator('#search-input').fill('＠项目');
+    assert.equal(await page.locator('#search-form').evaluate(el => el.classList.contains('is-tags')), true);
+    await page.locator('#search-input').fill('');
     await page.screenshot({ path: '/tmp/chrome-tab-content-search.png' });
     malformed = true;
     await page.evaluate(() => AI.clearCache());
@@ -206,6 +237,7 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     await page.locator('#organizer-undo').click();
     await page.waitForFunction(() => document.querySelector('#organizer-status').textContent.includes('已恢复 1 条'));
     assert.equal(model.node('1').parentId, '10');
+    await page.locator('#workspace-tab-search').click();
     await page.locator('label.switch:has(#rag-enabled)').click();
     await page.waitForFunction(() => document.querySelector('#pipeline-status').textContent.includes('自动同步已开启'));
     await page.locator('label.switch:has(#rag-enabled)').click();
@@ -222,6 +254,7 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     await page.locator('#panel-close').click();
     await page.locator('#settings-btn').click();
     await page.waitForSelector('.wp-item');
+    assert.equal(await page.locator('.settings-stack #wp-history-wrap').count(), 1);
     assert.equal(await page.locator('#wp-provider').inputValue(), 'all');
     await page.waitForFunction(() => document.querySelector('#wp-status').textContent.includes('精选：人物精选'));
     await page.getByRole('button', { name: '唯美人物插画', exact: true }).click();
@@ -232,6 +265,7 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     await page.waitForSelector('.wp-item[title*="女演员"]');
     await page.locator('.wp-item[title*="女演员"]').click();
     await page.waitForFunction(() => document.querySelector('#wp-quality').textContent.includes('10wallpaper 中文') && document.querySelector('#wp-quality').textContent.includes('3840×2160'));
+    await page.waitForFunction(() => document.querySelector('#bg-image').style.backgroundImage.includes('/wallpaper/3840x2160/2601/portrait.png'));
     assert.equal(await page.evaluate(async () => (await ImageStore.list()).length), 0);
     await page.locator('#wp-provider').selectOption('wallpic');
     await page.waitForSelector('.wp-item[title*="精灵少女"]');

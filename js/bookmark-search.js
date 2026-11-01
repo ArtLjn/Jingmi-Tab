@@ -2,23 +2,34 @@
 (function (global) {
   'use strict';
 
-  /* 地址型查询：IP、带端口的站点、完整网址和常见域名。 */
-  var ADDRESS = [
-    /^\d{1,3}(?:\.\d{1,3}){1,3}(?::\d{1,5})?$/,
-    /^[a-z0-9.-]+:\d{1,5}$/i,
-    /^(?:https?:\/\/|www\.)\S+$/i,
-    /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|cn|net|org|io|co|dev|ai|app|me|cc|top|xyz|tech|cloud|site|info|biz|tv|hk|tw|jp|uk|us|de|internal|local|corp|lan)(?::\d{1,5})?(?:\/\S*)?$/i
-  ];
-
   function isAddressQuery(q) {
-    var s = String(q || '').trim();
-    return !!s && ADDRESS.some(function (re) { return re.test(s); });
+    var value = String(q || '').trim();
+    if (!value || value.indexOf(' ') !== -1) return false;
+    if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('www.')) return true;
+    var host = value.split('/')[0].split(':')[0];
+    if (host.indexOf('.') <= 0) return false;
+    for (var ch of host) {
+      var lower = ch.toLowerCase();
+      if (!((lower >= 'a' && lower <= 'z') || (lower >= '0' && lower <= '9') || ch === '.' || ch === '-')) return false;
+    }
+    return true;
   }
 
-  /* 问句直接交给 RAG + 回答，不再先花一次调用做同义词改写。 */
-  var QUESTION = /什么|怎么|如何|为什么|哪|多少|是否|能不能|可不可以|吗|呢|请问|有没有|总结|解释|说明一下|介绍一下/;
   function isQuestion(q) {
-    return QUESTION.test(String(q || ''));
+    return ['什么', '啥', '怎么', '如何', '为什么', '哪', '多少', '几个', '是否', '吗', '呢',
+      '请问', '有没有', '推荐', '列出', '总结', '解释', '说明', '介绍', '帮我找', '帮我找到']
+      .some(function (word) { return String(q || '').includes(word); });
+  }
+
+  function numericIdentifiers(q) {
+    var ids = [];
+    var part = '';
+    for (var ch of String(q || '')) {
+      if (ch >= '0' && ch <= '9') part += ch;
+      else if (part) { if (part.length >= 2) ids.push(part); part = ''; }
+    }
+    if (part.length >= 2) ids.push(part);
+    return ids;
   }
 
   function exactMatch(hit, ql) {
@@ -28,6 +39,24 @@
     });
   }
 
+  /* 类别词 → 常见站点名。模型改写失败或返回慢时，本地仍能召回。 */
+  var LOCAL_EXPAND = {
+    '电商': ['购物', '商城', '淘宝', '天猫', '京东'],
+    '购物': ['电商', '商城', '淘宝', '京东'],
+    '设计': ['Figma', '即时设计', 'Canva', '设计师'],
+    '云服务': ['阿里云', '腾讯云', 'AWS', '华为云'],
+    '文档': ['飞书', '语雀', 'Notion', '腾讯文档'],
+    '项目管理': ['Jira', '禅道', 'Teambition', '飞书项目']
+  };
+
+  function localExpansions(q) {
+    var out = [];
+    Object.keys(LOCAL_EXPAND).forEach(function (key) {
+      if (String(q || '').indexOf(key) !== -1) out = out.concat(LOCAL_EXPAND[key]);
+    });
+    return out;
+  }
+
   async function run(options) {
     var rows = options.rows;
     var q = options.query;
@@ -35,102 +64,121 @@
     var cfg = options.cfg;
     var current = options.current || function () { return true; };
     var progress = options.progress || function () {};
+    var onAnswer = options.onAnswer || function () {};
     var local = Bookmarks.query(rows, q, 30);
+    if (isQuestion(q)) {
+      var ids = numericIdentifiers(q);
+      if (ids.length) {
+        rows.forEach(function (row) {
+          if (!ids.some(function (id) { return String(row.title || '').includes(id); })) return;
+          if (!local.some(function (hit) { return String(hit.row.id) === String(row.id); })) {
+            local.unshift({ row: row, score: 100 });
+          }
+        });
+      }
+    }
+    if (!current()) return null;
 
-    /* 只有地址型查询走本地精确匹配：IP 不会被语义模型改错，也省掉两轮调用。
-       普通关键词仍交给 AI，用户输入 ? 就是明确要模型参与筛选。 */
     if (isAddressQuery(q)) {
-      if (!current()) return null;
       var addressMessage = local.length ? '按地址精确匹配 · 共 ' + local.length + ' 条' : '本地没有匹配的地址收藏';
       progress(addressMessage, local);
       return { hits: local, candidates: local, message: addressMessage };
     }
 
-    progress('正在理解描述…', local);
-    var remoteTask = options.rag && typeof Rag !== 'undefined' && Rag.available(options.rag)
-      ? Rag.retrieve(options.rag, q, rows).then(function (hits) { return { hits: hits }; }, function () { return { hits: [], failed: true }; })
-      : Promise.resolve({ hits: [] });
-    /* 本地已有足够候选时直接交给重排，省掉一次改写往返；零召回才需要扩展词。 */
-    var rewrite = { ok: false };
-    /* 问句必须扩展召回：本地命中「网站」不代表命中用户真正想找的电商站点。 */
-    if (AI.available(cfg) && (local.length < 3 || isQuestion(q))) {
-      try { rewrite = await AI.rewrite({ cfg: cfg, query: q }); }
-      catch (e) { rewrite = { ok: false }; }
+    progress(local.length ? '本地已找到 ' + local.length + ' 条，AI 正在回答…' : '正在查找相关收藏…', local);
+    var cands = local;
+    var remote = { hits: [] };
+    if (!cands.length || (isQuestion(q) && cands.length >= 3)) {
+      var remoteTask = options.rag && typeof Rag !== 'undefined' && Rag.available(options.rag)
+        ? Rag.retrieve(options.rag, q, rows).then(function (hits) { return { hits: hits }; }, function () { return { hits: [], failed: true }; })
+        : Promise.resolve({ hits: [] });
+      var rewriteTask = AI.available(cfg)
+        ? AI.rewrite({ cfg: cfg, query: q, signal: options.signal }).catch(function () { return { ok: false }; })
+        : Promise.resolve({ ok: false });
+      var results = await Promise.all([rewriteTask, remoteTask]);
+      if (!current()) return null;
+      var terms = [q].concat(results[0].ok ? results[0].keywords : []).concat(localExpansions(q));
+      remote = results[1];
+      var byBookmark = new Map();
+      var fused = new Map();
+      [Bookmarks.recall(rows, Array.from(new Set(terms)), 30), remote.hits].forEach(function (list) {
+        list.forEach(function (hit, rank) {
+          var id = String(hit.row.id);
+          byBookmark.set(id, hit.source === 'rag' ? hit : byBookmark.get(id) || hit);
+          fused.set(id, (fused.get(id) || 0) + 1 / (20 + rank));
+        });
+      });
+      cands = Array.from(fused).sort(function (a, b) { return b[1] - a[1]; })
+        .slice(0, 30).map(function (entry) { return byBookmark.get(entry[0]); });
+      if (cands.length) progress('AI 正在回答…', cands);
     }
-    var remote = await remoteTask;
-    if (!current()) return null;
-    var cands = Bookmarks.recall(rows, [q].concat(rewrite.ok ? rewrite.keywords : []), 30);
-    var byBookmark = new Map();
-    var fused = new Map();
-    [cands, remote.hits].forEach(function (list) { list.forEach(function (hit, rank) {
-      var id = String(hit.row.id);
-      byBookmark.set(id, hit.source === 'rag' ? hit : byBookmark.get(id) || hit);
-      fused.set(id, (fused.get(id) || 0) + 1 / (20 + rank));
-    }); });
-    cands = Array.from(fused).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 30).map(function (entry) { return byBookmark.get(entry[0]); });
-    if (!cands.length) return { hits: [], candidates: [], message: remote.failed ? '云端检索暂不可用，本地未找到匹配内容' : '没有找到匹配书签，可在「书签空间」同步内容后重试' };
-    progress('正在核对匹配内容…', cands);
-
-    if (!AI.available(cfg)) return { hits: cands, candidates: cands, message: remote.failed ? '云端检索暂不可用 · 已按本地排序显示' : '已找到 ' + cands.length + ' 条候选书签' };
+    if (!cands.length) return { hits: [], candidates: [], message: remote.failed
+      ? '云端检索暂不可用，本地也未找到相关收藏' : '没有找到相关收藏，可先采集正文后重试' };
+    if (!AI.available(cfg)) return { hits: cands, candidates: cands, message: '未配置 AI，已显示本地收藏' };
 
     var byId = new Map(cands.map(function (h) { return [String(h.row.id), h]; }));
-    /* 有正文证据时优先回答问题；关键词查询由模型只返回来源，不产生答案。 */
-    if (typeof BookmarkAnswer !== 'undefined' && BookmarkAnswer.available(cfg)) {
+    if (isQuestion(q) && typeof BookmarkAnswer !== 'undefined' && BookmarkAnswer.available(cfg) &&
+        typeof BookmarkAnswer.runStream === 'function') {
       progress('AI 正在组织回答…', cands);
-      var answered;
-      try { answered = await BookmarkAnswer.run({ cfg: cfg, query: q, cands: cands }); }
-      catch (e) { answered = { ok: false, error: 'network' }; }
+      var streamed;
+      var evidenceCands = [];
+      var evidenceIds = new Set();
+      cands.forEach(function (hit) {
+        var id = String(hit.row.id);
+        if (evidenceIds.has(id)) return;
+        evidenceIds.add(id);
+        evidenceCands.push(hit);
+      });
+      try {
+        streamed = await BookmarkAnswer.runStream({
+          cfg: cfg, query: q, cands: evidenceCands,
+          shouldContinue: current, signal: options.signal,
+          onDelta: function (delta, full) { onAnswer({ text: full, sources: [], streaming: true }); }
+        });
+      } catch (e) { streamed = { ok: false, error: 'network' }; }
       if (!current()) return null;
-      if (answered.ok && (answered.answer || (answered.sources && answered.sources.length))) {
-        var picked = [];
-        (answered.sources || []).forEach(function (source) {
+      if (streamed.ok && streamed.answer) {
+        var answerHits = [];
+        (streamed.sources || []).forEach(function (source) {
           var hit = byId.get(String(source.id));
-          if (!hit || picked.some(function (p) { return p.row.id === hit.row.id; })) return;
-          picked.push({ row: hit.row, score: 100, why: source.why });
+          if (!hit || answerHits.some(function (p) { return p.row.id === hit.row.id; })) return;
+          answerHits.push({ row: hit.row, score: 100, why: '' });
         });
         cands.filter(function (hit) { return exactMatch(hit, ql); }).forEach(function (hit) {
-          if (!picked.some(function (p) { return p.row.id === hit.row.id; })) picked.push(hit);
+          if (!answerHits.some(function (p) { return p.row.id === hit.row.id; })) answerHits.push(hit);
         });
-        if (answered.answer) {
+        var answerSources = (streamed.sources || []).map(function (source) {
+          var hit = byId.get(String(source.id));
           return {
-            hits: picked.length ? picked : cands,
-            candidates: cands,
-            message: 'AI 回答 · 引用 ' + (answered.sources || []).length + ' 条收藏',
-            answer: {
-              text: answered.answer,
-              sources: (answered.sources || []).map(function (source) {
-                var hit = byId.get(String(source.id));
-                return {
-                  id: source.id, title: hit.row.title || hit.row.url,
-                  host: hit.row.host || '', url: hit.row.url,
-                  folder: hit.row.folder || '', why: source.why
-                };
-              })
-            }
+            id: source.id, marker: source.marker || 0,
+            title: hit.row.title || hit.row.url, host: hit.row.host || '',
+            url: hit.row.url, folder: hit.row.folder || '', why: ''
           };
-        }
-        if (picked.length) return { hits: picked, candidates: cands, message: '找到 ' + picked.length + ' 条匹配书签' };
+        });
+        onAnswer({ text: streamed.answer, sources: answerSources, streaming: false, incomplete: !!streamed.incomplete });
+        return {
+          hits: answerHits.length ? answerHits : cands,
+          candidates: cands,
+          message: answerSources.length ? 'AI 回答 · 引用 ' + answerSources.length + ' 条收藏' : 'AI 回答 · 基于本地正文',
+          answer: { text: streamed.answer, sources: answerSources, incomplete: !!streamed.incomplete }
+        };
       }
-      /* 证据不足或模型失败：继续走原有重排，保留兜底结果。 */
+      return { hits: cands, candidates: cands, message: streamed.error === 'no_evidence'
+        ? '收藏缺少可用内容，已显示本地结果' : 'AI 回答暂不可用（' + AI.errText(streamed.error) + '），已显示本地结果' };
     }
-
-    progress('AI 正在筛选书签…', cands);
     var result;
-    try {
-      result = await AI.rerank({ cfg: cfg, query: q, hits: cands, topN: 20, memoryId: options.memoryId });
-    } catch (e) { result = { ok: false, error: 'network' }; }
+    try { result = await AI.rerank({ cfg: cfg, query: q, hits: cands, topN: 20, memoryId: options.memoryId, signal: options.signal }); }
+    catch (e) { result = { ok: false, error: 'network' }; }
     if (!current()) return null;
     if (!result.ok) return { hits: cands, candidates: cands, message: AI.errText(result.error) + ' · 已按本地排序显示' };
     var picks = result.picks.filter(function (p) { return byId.has(String(p.id)); }).map(function (p) {
       return { row: byId.get(String(p.id)).row, score: 100, why: p.why };
     });
-    /* 模型选中的排前面；标题、网址或主机精确命中的结果在其后补齐，避免二次隐藏。 */
     cands.filter(function (hit) { return exactMatch(hit, ql); }).forEach(function (hit) {
       if (!picks.some(function (pick) { return pick.row.id === hit.row.id; })) picks.push(hit);
     });
     return { hits: picks.length ? picks : cands, candidates: cands, message: picks.length
-      ? '找到 ' + picks.length + ' 条匹配书签'
-      : '以下是可能相关的书签，证据不足时请继续核对内容' };
+      ? '找到 ' + picks.length + ' 条匹配书签' : '以下是可能相关的书签，请继续核对内容' };
   }
 
   global.BookmarkSearch = { run: run, isAddressQuery: isAddressQuery };

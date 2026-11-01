@@ -28,6 +28,7 @@
 
   var els = {
     bg: $('#bg-image'),
+    bgLoader: $('#bg-loader'),
     clock: $('#clock'),
     dateLine: $('#date-line'),
     dateSolar: $('#date-solar'),
@@ -41,6 +42,8 @@
     aiBase: $('#ai-base'),
     aiKey: $('#ai-key'),
     aiModel: $('#ai-model'),
+    aiFastModel: $('#ai-fast-model'),
+    aiStrongModel: $('#ai-strong-model'),
     aiTest: $('#ai-test'),
     aiStatus: $('#ai-status'),
     quote: $('#quote'),
@@ -99,6 +102,7 @@
   var settings = null;
   var ragSettingsUI = null;
   var currentObjectUrl = null;   // 当前用于背景的 blob URL
+  var bgPaintSeq = 0;            // 背景图片解码序号，避免慢图覆盖新选择
   var galleryUrls = [];          // 缩略图 blob URL，重渲染时释放
   var saveTimer = null;
   var clockTimer = null;
@@ -112,9 +116,30 @@
   var acActions = [];            // 末尾的兜底动作（用引擎搜索）
   var acIndex = 0;               // 当前选中项
   var acBanner = '';             // 面板顶部说明行（AI 模式专用）
-  var aiAnswer = null;           // AI 问答结果：{ text, sources[] }
+  var aiAnswer = null;           // AI 问答结果：{ text, sources[], streaming }
+  var answerRenderTimer = 0;     // 流式输出节流，避免每收到一段就重绘整个面板
+
+  function applyStreamingAnswer(partial) {
+    aiAnswer = partial || null;
+    if (answerRenderTimer) return;
+    answerRenderTimer = setTimeout(function () {
+      answerRenderTimer = 0;
+      renderPanel();
+    }, 60);
+  }
+
+  function resetAnswer() {
+    aiAnswer = null;
+    clearTimeout(answerRenderTimer);
+    answerRenderTimer = 0;
+  }
   var aiBusy = false;            // 正在等模型返回，避免重复触发
   var aiSeq = 0;                 // 请求序号，用于丢弃过期响应
+  var aiController = null;
+  function cancelAI() {
+    if (aiController) aiController.abort();
+    aiController = null;
+  }
   var aiCands = [];              // 最近一次 AI 检索用到的本地候选，供「看全部」复用
 
   /* 普通搜索联想：全网建议词，防抖与竞态由 session 内部处理 */
@@ -134,6 +159,7 @@
   /* 在线壁纸：分页与加载状态 */
   var wallpaperApplySequence = 0;
   var wpState = { query: '', page: 1, loading: false, items: [], hasMore: true, sequence: 0 };
+  var wpThumbObserver = null;
 
   /* ------------------------- 工具 ------------------------- */
   function pad(n) { return n < 10 ? '0' + n : String(n); }
@@ -384,6 +410,42 @@
     }).catch(render);
   }
 
+  function showGradientBackground() {
+    bgPaintSeq++;
+    if (els.bgLoader) els.bgLoader.classList.remove('is-on');
+    els.bg.style.backgroundImage = gradientCss(settings.bg.gradient);
+    els.bg.style.backgroundColor = '#10161f';
+    updateWallpaperQuality(null);
+  }
+
+  /* 图片先解码再交给 CSS 背景，加载层负责镜片扫光，避免大图解码时的白闪。 */
+  function paintBackground(url) {
+    var seq = ++bgPaintSeq;
+    /* 缓存的图片通常瞬间完成，延迟 120ms 再显示加载层，避免闪一下扫光。 */
+    var showTimer = setTimeout(function () {
+      if (seq === bgPaintSeq && els.bgLoader) els.bgLoader.classList.add('is-on');
+    }, 120);
+    var probe = new Image();
+    probe.decoding = 'async';
+    probe.fetchPriority = 'high';
+    probe.referrerPolicy = 'no-referrer';
+    function settle(ok) {
+      clearTimeout(showTimer);
+      if (seq !== bgPaintSeq) return;
+      if (ok) {
+        els.bg.style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")';
+        els.bg.style.backgroundColor = '#000';
+      }
+      if (els.bgLoader) els.bgLoader.classList.remove('is-on');
+    }
+    probe.onload = function () {
+      var decoded = probe.decode ? probe.decode().catch(function () {}) : Promise.resolve();
+      decoded.then(function () { settle(true); });
+    };
+    probe.onerror = function () { settle(false); };
+    probe.src = url;
+  }
+
   function applyBackground() {
     wallpaperApplySequence++;
     var bg = settings.bg;
@@ -400,24 +462,18 @@
           // 图片被删了，回退到渐变
           settings.bg.mode = 'gradient';
           persist();
-          els.bg.style.backgroundImage = gradientCss(settings.bg.gradient);
-          els.bg.style.backgroundColor = '#10161f';
-          updateWallpaperQuality(null);
+          showGradientBackground();
           return;
         }
         currentObjectUrl = URL.createObjectURL(row.blob);
-        els.bg.style.backgroundImage = 'url("' + currentObjectUrl + '")';
-        els.bg.style.backgroundColor = '#000';
+        paintBackground(currentObjectUrl);
         updateWallpaperQuality(row);
       });
     } else if (bg.mode === 'url' && bg.url) {
-      els.bg.style.backgroundImage = 'url("' + bg.url.replace(/"/g, '%22') + '")';
-      els.bg.style.backgroundColor = '#000';
+      paintBackground(bg.url);
       updateWallpaperQuality(null);
     } else {
-      els.bg.style.backgroundImage = gradientCss(bg.gradient);
-      els.bg.style.backgroundColor = '#10161f';
-      updateWallpaperQuality(null);
+      showGradientBackground();
     }
 
     document.documentElement.style.setProperty('--bg-blur', bg.blur + 'px');
@@ -635,7 +691,53 @@
     if (els.wpStatus) els.wpStatus.textContent = text;
   }
 
+  /* 只加载进入视口附近的缩略图；首屏不再一次请求整页 24 张图。 */
+  function loadWpThumb(btn, item) {
+    if (btn.dataset.wpThumb || !item) return;
+    btn.dataset.wpThumb = '1';
+    var show = function (url) {
+      btn.style.backgroundImage = 'url("' + url + '")';
+      btn.classList.remove('is-loading');
+    };
+    var probe = new Image();
+    probe.decoding = 'async';
+    probe.referrerPolicy = 'no-referrer';
+    probe.onload = function () {
+      var decoded = probe.decode ? probe.decode().catch(function () {}) : Promise.resolve();
+      decoded.then(function () { show(item.thumb); });
+    };
+    probe.onerror = function () {
+      var full = new Image();
+      full.decoding = 'async';
+      full.referrerPolicy = 'no-referrer';
+      full.onload = function () {
+        var decoded = full.decode ? full.decode().catch(function () {}) : Promise.resolve();
+        decoded.then(function () { show(item.image); });
+      };
+      full.onerror = function () { btn.classList.remove('is-loading'); };
+      full.src = item.image;
+    };
+    probe.src = item.thumb;
+  }
+
+  function mountWpThumb(btn, item) {
+    if (!('IntersectionObserver' in window)) { loadWpThumb(btn, item); return; }
+    if (!wpThumbObserver) {
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          observer.unobserve(entry.target);
+          loadWpThumb(entry.target, entry.target._wpItem);
+        });
+      }, { root: els.wpGrid, rootMargin: '180px 0px' });
+      wpThumbObserver = observer;
+    }
+    btn._wpItem = item;
+    wpThumbObserver.observe(btn);
+  }
+
   function renderWpGrid() {
+    if (wpThumbObserver) { wpThumbObserver.disconnect(); wpThumbObserver = null; }
     els.wpGrid.innerHTML = '';
 
     wpState.items.forEach(function (item) {
@@ -651,24 +753,8 @@
       }
       btn.title = item.title + (item.provider === 'uhdpaper' ? ' · 原生 ' + (item.resolution || '4K') : '');
 
-      // 先取缩略图，失败则退回原图（图床有防盗链，必须去掉 Referer）
-      var probe = new Image();
-      probe.referrerPolicy = 'no-referrer';
-      probe.onload = function () {
-        btn.classList.remove('is-loading');
-        btn.style.backgroundImage = 'url("' + item.thumb + '")';
-      };
-      probe.onerror = function () {
-        var full = new Image();
-        full.referrerPolicy = 'no-referrer';
-        full.onload = function () {
-          btn.classList.remove('is-loading');
-          btn.style.backgroundImage = 'url("' + item.image + '")';
-        };
-        full.onerror = function () { btn.classList.remove('is-loading'); };
-        full.src = item.image;
-      };
-      probe.src = item.thumb;
+      // 缩略图进入视口后再取；失败则退回原图（图床有防盗链，必须去掉 Referer）
+      mountWpThumb(btn, item);
 
       btn.addEventListener('click', function () { applyOnlineWallpaper(item, btn); });
       if (item.author && item.authorUrl) {
@@ -888,7 +974,7 @@
   }
   async function applyOnlineWallpaper(item, btn) {
     var sequence = ++wallpaperApplySequence;
-    if (btn) btn.classList.add('is-loading');
+    if (btn) btn.classList.add('is-applying');
     try {
       var key = item.sourceKey || 'haowallpaper:' + item.id;
       var current = settings.bg.online;
@@ -902,7 +988,7 @@
       recordWallpaperHistory(item, got);
       toast('已在线应用' + (got.original ? '高清原图' : '预览') + ' · ' + got.width + '×' + got.height);
     } catch (e) { if (sequence === wallpaperApplySequence) toast(wallpaperError(e)); }
-    finally { if (btn) btn.classList.remove('is-loading'); }
+    finally { if (btn) btn.classList.remove('is-applying'); }
   }
 
   function saveWallpaperOffline(item, btn) {
@@ -1078,6 +1164,7 @@
       await ContentIndex.hydrate(bmRows);
       var classes = await Organizer.records(bmRows);
       bmRows.forEach(function (row) { if (classes[row.id]) row.hay += ' ' + classes[row.id].tags.join(' ').toLowerCase(); });
+      if (typeof BookmarkEnrich !== 'undefined') await BookmarkEnrich.applySummaries(bmRows);
       bmReady = true;
       if (suggest) suggest.invalidate();      /* 书签变了，旧的联想缓存不能再用 */
       /* 管理页正开着时同步刷新候选，避免书签变动后列表停在旧数据 */
@@ -1098,22 +1185,29 @@
     } catch (e) { /* 未授权时静默降级：只用书签候选 */ }
   }
 
+  /* 中文输入法常打出全角问号/斜杠，前缀识别必须同时接受半角与全角。 */
+  var PREFIX_MODE = { '?': '?', '？': '?', '/': '/', '／': '/', '@': '@', '＠': '@' };
+
+  function prefixMode() {
+    return PREFIX_MODE[els.searchInput.value.trim().charAt(0)] || '';
+  }
+
   function isAIMode() {
-    return els.searchInput.value.charAt(0) === '?';
+    return prefixMode() === '?';
   }
 
   function isBookmarkMode() {
-    return els.searchInput.value.charAt(0) === '/';
+    return prefixMode() === '/';
   }
 
   /** @ 只在首字符触发：@ 在 Gmail / 微博里是 handle 前缀，任意位置触发会打断正常搜索 */
   function isTagMode() {
     if (!settings || !settings.tags || !settings.tags.enabled) return false;
-    return els.searchInput.value.charAt(0) === '@';
+    return prefixMode() === '@';
   }
 
   function queryText() {
-    return els.searchInput.value.replace(/^[?\/@]+/, '').trim();
+    return els.searchInput.value.trim().replace(/^[?？\/／@＠]+/, '').trim();
   }
 
   function engineLabel() {
@@ -1133,11 +1227,12 @@
 
   function clearPanel() {
     aiSeq++;
+    cancelAI();
     aiBusy = false;
     acHits = [];
     acActions = [];
     acBanner = '';
-    aiAnswer = null;
+    resetAnswer();
     acIndex = -1;
     tagGroups = { pinned: [], candidates: [] };
     if (suggest) suggest.cancel();       /* 作废在途联想，避免收起后又弹回来 */
@@ -1155,8 +1250,9 @@
 
     if (isAIMode()) {
       aiSeq++;              /* 作废进行中的请求 */
+      cancelAI();
       aiBusy = false;
-      aiAnswer = null;
+      resetAnswer();
       var q = queryText();
       acHits = [];
       acActions = q ? [{ q: q, ai: true }] : [];
@@ -1179,10 +1275,11 @@
 
   function refreshPanel() {
     aiSeq++;
+    cancelAI();
     aiBusy = false;
     acHits = [];
     acActions = [];
-    aiAnswer = null;
+    resetAnswer();
     acIndex = -1;
     acBanner = '';
 
@@ -1287,7 +1384,7 @@
     if (!engine) { clearPanel(); return; }
 
     /* @ 关了以后它仍是账号前缀：不做全网联想，避免为一句 handle 发请求 */
-    if (els.searchInput.value.charAt(0) === '@') { clearPanel(); return; }
+    if (/^[@＠]/.test(els.searchInput.value.trim())) { clearPanel(); return; }
 
     suggestNote = '';
     var q = suggestQuery();
@@ -1340,7 +1437,7 @@
    */
   function renderSuggest(state, keepSelection) {
     suggestState = state;
-    aiAnswer = null;
+    resetAnswer();
 
     var q = state.query || '';
     var items = state.items || [];
@@ -1417,7 +1514,8 @@
 
   function refreshTagPanel() {
     aiSeq++;
-    aiAnswer = null;
+    cancelAI();
+    resetAnswer();
     aiBusy = false;
     acActions = [];
     acBanner = '';
@@ -1555,20 +1653,27 @@
       acActions = [{ q: q }];
       acIndex = 0;
       acBanner = '请在设置里启用 AI 并填写接口地址与 Key';
-      aiAnswer = null;
+      resetAnswer();
       renderPanel();
       return;
     }
     var seq = ++aiSeq;
+    cancelAI();
+    aiController = new AbortController();
+    var signal = aiController.signal;
     aiBusy = true;
-    aiAnswer = null;
+    resetAnswer();
     acActions = [{ q: q }];
     try {
       var mid = await memoryPick(q);
       if (seq !== aiSeq) return;
+      if (AI.available(cfg) && typeof AgentDB !== 'undefined') {
+        await AgentDB.setMeta('ai:foreground', { seq: seq, until: Date.now() + 25000 });
+      }
       var result = await BookmarkSearch.run({
-        rows: bmRows, query: q, cfg: cfg, rag: settings.rag, memoryId: mid,
+        rows: bmRows, query: q, cfg: cfg, rag: settings.rag, signal: signal, memoryId: mid,
         current: function () { return seq === aiSeq; },
+        onAnswer: function (partial) { if (seq === aiSeq) applyStreamingAnswer(partial); },
         progress: function (message, hits) {
           if (seq !== aiSeq) return;
           acHits = hits.slice(0, AC_LIMIT);
@@ -1585,6 +1690,8 @@
       acActions.push({ q: q });
       acIndex = 0;
       acBanner = result.message;
+      clearTimeout(answerRenderTimer);
+      answerRenderTimer = 0;
       aiAnswer = result.answer || null;
     } catch (e) {
       if (seq !== aiSeq) return;
@@ -1592,9 +1699,12 @@
       acActions = [{ q: q }];
       acIndex = 0;
       acBanner = 'AI 暂不可用 · 已按本地排序显示';
-      aiAnswer = null;
+      resetAnswer();
     } finally {
-      if (seq === aiSeq) { aiBusy = false; renderPanel(); }
+      if (typeof AgentDB !== 'undefined') AgentDB.updateMeta('ai:foreground', function (active) {
+        return active && active.seq === seq ? null : active;
+      }).catch(function () {});
+      if (seq === aiSeq) { aiController = null; aiBusy = false; renderPanel(); }
     }
   }
 
@@ -1652,6 +1762,8 @@
       baseUrl: els.aiBase.value.trim(),
       apiKey: els.aiKey.value.trim(),
       model: els.aiModel.value.trim(),
+      fastModel: els.aiFastModel.value.trim(),
+      strongModel: els.aiStrongModel.value.trim(),
       timeout: 12000
     };
   }
@@ -1723,15 +1835,16 @@
 
     if (aiAnswer && aiAnswer.text) {
       var answerSources = aiAnswer.sources || [];
-      html += '<div class="ac-answer">' +
-        '<div class="ac-answer-head"><span class="ac-answer-label">AI 回答</span><span>' +
-          (answerSources.length ? '引用 ' + answerSources.length + ' 条收藏' : '基于本地正文') +
-        '</span></div>' +
+      var answerMeta = aiAnswer.streaming ? '生成中…'
+        : aiAnswer.incomplete ? '回答可能不完整'
+          : answerSources.length ? '引用 ' + answerSources.length + ' 条收藏' : '基于本地正文';
+      html += '<div class="ac-answer' + (aiAnswer.streaming ? ' is-streaming' : '') + '">' +
+        '<div class="ac-answer-head"><span class="ac-answer-label">AI 回答</span><span>' + answerMeta + '</span></div>' +
         '<div class="ac-answer-text">' + esc(aiAnswer.text) + '</div>';
       if (answerSources.length) {
         html += '<div class="ac-answer-sources">' + answerSources.map(function (source, i) {
           return '<a class="ac-source" href="' + esc(source.url) + '" rel="noopener noreferrer" title="' + esc(source.host || source.url) + '">' +
-            (i + 1) + ' · ' + esc(source.title || source.host) + '</a>';
+            (source.marker || i + 1) + ' · ' + esc(source.title || source.host) + '</a>';
         }).join('') + '</div>';
       }
       html += '</div>';
@@ -1815,6 +1928,7 @@
     if (act.ai) { runAI(); return; }
 
     if (act.local) {
+      resetAnswer();
       acHits = aiCands.slice(0, AC_LIMIT);
       acActions = [{ q: act.q, ai: true }, { q: act.q }];
       acIndex = 0;
@@ -2154,7 +2268,7 @@
 
     /* AI 设置 */
     els.swAi.addEventListener('change', persistAI);
-    [els.aiBase, els.aiKey, els.aiModel].forEach(function (el) {
+    [els.aiBase, els.aiKey, els.aiModel, els.aiFastModel, els.aiStrongModel].forEach(function (el) {
       el.addEventListener('change', persistAI);
     });
     els.aiTest.addEventListener('click', testAIConnection);
@@ -2245,14 +2359,22 @@
     });
   }
 
+  /* 本地图库、使用历史与在线壁纸都等到外观页真正可见时再渲染，减少启动请求。 */
+  function refreshAppearance() {
+    renderGallery();
+    renderWpHistory();
+    if (!wpState.items.length && !wpState.loading) loadWallpapers(true);
+  }
+
   function togglePanel(open) {
     document.body.classList.toggle('panel-open', !!open);
     els.panel.setAttribute('aria-hidden', open ? 'false' : 'true');
-    if (open) {
-      renderGallery();
-      if (!wpState.items.length) loadWallpapers(true);
-    }
+    if (open) refreshAppearance();
   }
+
+  document.addEventListener('workspace:view', function (event) {
+    if (event.detail === 'appearance') refreshAppearance();
+  });
 
   /** 把 settings 回填到面板控件 */
   function bindStateToControls() {
@@ -2278,6 +2400,8 @@
     els.aiBase.value = settings.ai.baseUrl || '';
     els.aiKey.value = settings.ai.apiKey || '';
     els.aiModel.value = settings.ai.model || '';
+    els.aiFastModel.value = settings.ai.fastModel || '';
+    els.aiStrongModel.value = settings.ai.strongModel || '';
     syncWallpaperProvider();
     els.wpToken.value = settings.wallpaper && settings.wallpaper.token
       ? settings.wallpaper.token
@@ -2293,6 +2417,8 @@
       ragSettingsUI = RagSettings.mount({ settings: function () { return settings; }, persist: persist });
       OrganizerUI.mount({ changed: loadBookmarks });
       if (typeof AutoOrganizerUI !== 'undefined') AutoOrganizerUI.mount();
+      if (typeof BookmarkEnrichUI !== 'undefined') BookmarkEnrichUI.mount();
+      if (typeof BookmarkHealthUI !== 'undefined') BookmarkHealthUI.mount();
       if (typeof TagManager !== 'undefined') {
         tagManager = TagManager.mount({
           ctx: function () { return { rows: bmRows, topSites: tagTopSites }; }
@@ -2308,8 +2434,6 @@
       startClock();
       renderDate();
       renderQuote();
-      renderGallery();
-      renderWpHistory();
       syncActive();
       if (typeof chrome !== 'undefined' && chrome.bookmarks) {
         var bookmarkReload;
@@ -2318,6 +2442,7 @@
         });
       }
       if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) chrome.runtime.onMessage.addListener(function (msg) {
+        if (msg && msg.type === 'enrich:updated') { loadBookmarks(); return; }
         if (msg && msg.type === 'pipeline:updated' && bmReady) ContentIndex.hydrate(bmRows).then(function () {
           if (isBookmarkMode() && document.activeElement === els.searchInput) refreshPanel();
         });

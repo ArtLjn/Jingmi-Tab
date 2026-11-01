@@ -16,6 +16,9 @@
   var DEFAULT_TIMEOUT = 12000;
   var REWRITE_TIMEOUT = 8000;
   var cache = new Map();
+  var rerankPending = new Map();
+  var rewriteCache = new Map();
+  var rewritePending = new Map();
 
   function normBase(b) {
     return String(b || '').trim().replace(/\/+$/, '');
@@ -23,6 +26,10 @@
 
   function available(cfg) {
     return !!(cfg && cfg.enabled && cfg.apiKey && cfg.baseUrl && cfg.model);
+  }
+
+  function modelFor(cfg, task) {
+    return (task === 'strong' ? cfg.strongModel : cfg.fastModel) || cfg.model;
   }
 
   function originPattern(baseUrl) {
@@ -101,16 +108,37 @@
     '只输出 JSON：{"k":["词1","词2"]}'
   ].join('\n');
 
+  /* 取第一个括号配平的 JSON 对象；模型在前后夹带示例或说明时也能解析。 */
+  function extractObject(text) {
+    var start = text.indexOf('{');
+    while (start !== -1) {
+      var depth = 0; var inString = false; var escape = false;
+      for (var i = start; i < text.length; i++) {
+        var ch = text[i];
+        if (inString) {
+          if (escape) escape = false;
+          else if (ch === '\\') escape = true;
+          else if (ch === '"') inString = false;
+        } else if (ch === '"') inString = true;
+        else if (ch === '{') depth += 1;
+        else if (ch === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            try { return JSON.parse(text.slice(start, i + 1)); } catch (e) { break; }
+          }
+        }
+      }
+      start = text.indexOf('{', start + 1);
+    }
+    return null;
+  }
+
   function parseJSONLoose(text) {
     if (!text) return null;
     var s = String(text).trim();
     var fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
     if (fence) s = fence[1].trim();
-
-    var brace = s.match(/\{[\s\S]*\}/);
-    if (!brace) return null;
-
-    try { return JSON.parse(brace[0]); } catch (e) { return null; }
+    return extractObject(s);
   }
 
   function parsePicks(content, candidates) {
@@ -142,6 +170,11 @@
     opts = opts || {};
     var timeout = opts.timeout || cfg.timeout || DEFAULT_TIMEOUT;
     var ctrl = new AbortController();
+    var abort = function () { ctrl.abort(); };
+    if (opts.signal) {
+      if (opts.signal.aborted) return { ok: false, error: 'cancelled' };
+      opts.signal.addEventListener('abort', abort, { once: true });
+    }
     var timedOut = false;
     var timer = setTimeout(function () { timedOut = true; ctrl.abort(); }, timeout);
     var t0 = Date.now();
@@ -154,7 +187,7 @@
           'Authorization': 'Bearer ' + cfg.apiKey
         },
         body: JSON.stringify({
-          model: cfg.model,
+          model: modelFor(cfg, opts.task),
           temperature: opts.temperature === undefined ? 0.1 : opts.temperature,
           max_tokens: opts.maxTokens || 400,
           messages: [
@@ -184,10 +217,121 @@
         tokens: (data && data.usage && data.usage.total_tokens) || 0
       };
     } catch (e) {
+      if (opts.signal && opts.signal.aborted) return { ok: false, error: 'cancelled' };
       if (timedOut || (e && e.name === 'AbortError')) return { ok: false, error: 'timeout' };
       return { ok: false, error: 'network', detail: String((e && e.message) || e) };
     } finally {
       clearTimeout(timer);
+      if (opts.signal) opts.signal.removeEventListener('abort', abort);
+    }
+  }
+
+  /**
+   * 流式回答：优先读取 SSE；服务端忽略 stream 参数时退回普通 JSON。
+   * onDelta(delta, full) 每收到一段就回调；shouldContinue 返回 false 时主动取消。
+   * 超时但已有部分内容时保留部分回答，避免用户白等。
+   */
+  async function chatStream(cfg, system, user, opts) {
+    opts = opts || {};
+    var timeout = opts.timeout || cfg.timeout || DEFAULT_TIMEOUT;
+    var ctrl = new AbortController();
+    var abort = function () { ctrl.abort(); };
+    if (opts.signal) {
+      if (opts.signal.aborted) return { ok: false, error: 'cancelled' };
+      opts.signal.addEventListener('abort', abort, { once: true });
+    }
+    var timedOut = false;
+    var timer = setTimeout(function () { timedOut = true; ctrl.abort(); }, timeout);
+    var t0 = Date.now();
+    var text = '';
+
+    function deltaOf(obj) {
+      var choice = obj && obj.choices && obj.choices[0];
+      var delta = choice && (choice.delta || choice.message);
+      if (!delta) return '';
+      if (typeof delta.content === 'string') return delta.content;
+      if (Array.isArray(delta.content)) return delta.content.map(function (part) { return part && part.text || ''; }).join('');
+      return '';
+    }
+
+    try {
+      var res = await fetch(normBase(cfg.baseUrl) + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + cfg.apiKey,
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({
+          model: modelFor(cfg, opts.task),
+          temperature: opts.temperature === undefined ? 0.2 : opts.temperature,
+          max_tokens: opts.maxTokens || 600,
+          stream: true,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ]
+        }),
+        signal: ctrl.signal
+      });
+
+      if (!res.ok) {
+        var body = '';
+        try { body = await res.text(); } catch (e) {}
+        return { ok: false, error: 'http_' + res.status, detail: body.replace(/\s+/g, ' ').slice(0, 160) };
+      }
+
+      var type = res.headers && res.headers.get ? (res.headers.get('content-type') || '') : '';
+      if (!/text\/event-stream/i.test(type) || !res.body) {
+        var data = await res.json();
+        var msg = data && data.choices && data.choices[0] && data.choices[0].message;
+        var content = (msg && msg.content) || '';
+        if (content && opts.onDelta) opts.onDelta(content, content);
+        return { ok: true, content: content, streamed: false, ms: Date.now() - t0 };
+      }
+
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      var done = false;
+      function appendLine(line) {
+        line = line.trim();
+        if (line.indexOf('data:') !== 0) return false;
+        var payload = line.slice(5).trim();
+        if (payload === '[DONE]') return true;
+        var obj;
+        try { obj = JSON.parse(payload); } catch (e) { return false; }
+        var delta = deltaOf(obj);
+        if (delta) {
+          text += delta;
+          if (opts.onDelta) opts.onDelta(delta, text);
+        }
+        return false;
+      }
+      while (!done) {
+        var read = await reader.read();
+        if (read.done) break;
+        buffer += decoder.decode(read.value, { stream: true });
+        var lines = buffer.split(/\r?\n/);
+        buffer = lines.pop();
+        for (var i = 0; i < lines.length; i++) {
+          if (appendLine(lines[i])) { done = true; break; }
+        }
+        if (opts.shouldContinue && !opts.shouldContinue()) {
+          try { await reader.cancel(); } catch (e) {}
+          break;
+        }
+      }
+      if (!done && buffer.trim()) appendLine(buffer);
+      return { ok: true, content: text, streamed: true, ms: Date.now() - t0 };
+    } catch (e) {
+      if (text) return { ok: true, content: text, streamed: true, incomplete: true, error: timedOut ? 'timeout' : 'network', ms: Date.now() - t0 };
+      if (opts.signal && opts.signal.aborted) return { ok: false, error: 'cancelled' };
+      if (timedOut || (e && e.name === 'AbortError')) return { ok: false, error: 'timeout' };
+      return { ok: false, error: 'network', detail: String((e && e.message) || e) };
+    } finally {
+      clearTimeout(timer);
+      if (opts.signal) opts.signal.removeEventListener('abort', abort);
     }
   }
 
@@ -220,19 +364,28 @@
     var candidates = hits.slice(0, topN).map(function (h) {
       return toCandidate(h.row, now, query);
     });
-    var ck = JSON.stringify([cfg.baseUrl, cfg.model, opts.memoryId || '', query, candidates]);
+    var ck = JSON.stringify([cfg.baseUrl, cfg.apiKey, modelFor(cfg, 'fast'), opts.memoryId || '', query, candidates]);
     var cached = cache.get(ck);
     if (cached && now - cached.t < CACHE_TTL) return Object.assign({}, cached.v, { cached: true });
 
+    var pending = rerankPending.get(ck);
+    if (pending && !(pending.signal && pending.signal.aborted)) return pending.task;
+    var task = rerankFresh(cfg, opts, query, candidates, ck);
+    var entry = { task: task, signal: opts.signal };
+    rerankPending.set(ck, entry);
+    try { return await task; } finally { if (rerankPending.get(ck) === entry) rerankPending.delete(ck); }
+  }
+
+  async function rerankFresh(cfg, opts, query, candidates, ck) {
     var user = buildUser(query, candidates, opts.memoryId || '');
     var t0 = Date.now();
 
-    var r = await chat(cfg, SYSTEM, user, { maxTokens: 400, temperature: 0.1 });
+    var r = await chat(cfg, SYSTEM, user, { maxTokens: 600, temperature: 0.1, signal: opts.signal, task: 'fast' });
     var retried = false;
 
-    if (!r.ok && retryable(r.error)) {
+    if (!r.ok && retryable(r.error) && !(opts.signal && opts.signal.aborted)) {
       await sleep(300);
-      r = await chat(cfg, SYSTEM, user, { maxTokens: 400, temperature: 0.1 });
+      r = await chat(cfg, SYSTEM, user, { maxTokens: 600, temperature: 0.1, signal: opts.signal, task: 'fast' });
       retried = true;
     }
 
@@ -263,12 +416,26 @@
     var query = (opts.query || '').trim();
     if (!available(cfg) || !query) return { ok: false, error: 'not_configured' };
 
+    var key = JSON.stringify([cfg.baseUrl, cfg.apiKey, modelFor(cfg, 'fast'), query.toLowerCase()]);
+    var saved = rewriteCache.get(key);
+    if (saved && Date.now() - saved.at < 864e5) return Object.assign({}, saved.value, { cached: true });
+    var pending = rewritePending.get(key);
+    if (pending && !(pending.signal && pending.signal.aborted)) return pending.task;
+
+    var task = rewriteFresh(cfg, query, opts.signal, key);
+    var entry = { task: task, signal: opts.signal };
+    rewritePending.set(key, entry);
+    try { return await task; } finally { if (rewritePending.get(key) === entry) rewritePending.delete(key); }
+  }
+
+  async function rewriteFresh(cfg, query, signal, key) {
     var r = await chat(cfg, REWRITE_SYSTEM, query, {
       maxTokens: 120,
       temperature: 0.2,
-      timeout: REWRITE_TIMEOUT
+      timeout: REWRITE_TIMEOUT,
+      signal: signal,
+      task: 'fast'
     });
-
     if (!r.ok) return r;
 
     var obj = parseJSONLoose(r.content);
@@ -279,12 +446,27 @@
       .filter(function (k) { return k && k.length <= 12; })
       .slice(0, 5);
 
+    /* 模型没按 JSON 返回时，从短句里兜底提取关键词，避免整条改写失效。 */
+    if (!keywords.length) {
+      var plain = String(r.content || '');
+      if (plain.length <= 200) {
+        keywords = plain.replace(/```[\s\S]*?```/g, ' ').replace(/[{}"“”\[\]]/g, ' ')
+          .split(/[\s,，、;；:：\n]+/)
+          .map(function (k) { return k.trim(); })
+          .filter(function (k) { return k && k.length >= 2 && k.length <= 12; })
+          .slice(0, 5);
+      }
+    }
+
     if (!keywords.length) return { ok: false, error: 'no_keywords' };
 
-    return { ok: true, keywords: keywords, ms: r.ms };
+    var output = { ok: true, keywords: keywords, ms: r.ms };
+    if (rewriteCache.size >= 100) rewriteCache.delete(rewriteCache.keys().next().value);
+    rewriteCache.set(key, { at: Date.now(), value: output });
+    return output;
   }
 
-  function clearCache() { cache.clear(); }
+  function clearCache() { cache.clear(); rewriteCache.clear(); }
 
   function errText(code) {
     var map = {
@@ -294,8 +476,9 @@
       no_keywords: '没识别出关键词',
       bad_base_url: '接口地址格式不对',
       timeout: '请求超时',
+      cancelled: '已取消',
       network: '网络不通或地址无法访问',
-      bad_response: 'AI 返回格式异常'
+      bad_response: 'AI 没能整理出结果'
     };
     if (map[code]) return map[code];
     if (/^http_40[13]$/.test(code)) return 'Key 无效或无权限';
@@ -308,10 +491,12 @@
   global.AI = {
     available: available,
     chat: chat,
+    chatStream: chatStream,
     originPattern: originPattern,
     rerank: rerank,
     rewrite: rewrite,
     parsePicks: parsePicks,
+    parseLoose: parseJSONLoose,
     toCandidate: toCandidate,
     errText: errText,
     clearCache: clearCache,

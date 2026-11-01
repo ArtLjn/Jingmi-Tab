@@ -30,6 +30,8 @@
       baseUrl: 'http://43.155.217.74:9000/v1',
       apiKey: '',
       model: 'qwen3.6-flash',
+      fastModel: '',
+      strongModel: '',
       timeout: 12000
     },
     rag: {
