@@ -1,0 +1,13 @@
+{
+  "name": "jingmi-newtab",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "lint": "node tools/check-js.js"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.4",
+    "linkedom": "^0.18.12",
+    "playwright-core": "^1.64.1"
+  }
+}

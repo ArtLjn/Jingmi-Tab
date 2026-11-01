@@ -1,0 +1,69 @@
+{
+  "manifest_version": 3,
+  "name": "静谧新标签页",
+  "short_name": "静谧",
+  "version": "1.14.0",
+  "description": "极简新标签页：大时钟、农历日期、胶囊搜索框，背景可上传、粘贴、拖拽，也可从在线壁纸库一键更换。支持输入实时联想、本地书签检索与 @ 快捷标签直达。每日一言多源轮换、自动去重。",
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "background": {
+    "service_worker": "sw.js"
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "bookmarks",
+    "topSites",
+    "activeTab",
+    "scripting",
+    "alarms"
+  ],
+  "optional_permissions": [
+    "history",
+    "cookies"
+  ],
+  "host_permissions": [
+    "https://api.bing.com/osjson.aspx*",
+    "https://www.baidu.com/sugrec*",
+    "https://suggestqueries.google.com/complete/search*",
+    "https://sor.html5.qq.com/api/getsug*",
+    "https://haowallpaper.com/*",
+    "https://*.haowallpaper.com/*",
+    "https://v1.hitokoto.cn/*",
+    "https://v2.jinrishici.com/*",
+    "https://v1.jinrishici.com/*",
+    "http://43.155.217.74:9000/*",
+    "https://www.uhdpaper.com/*",
+    "https://*.uhdpaper.com/*",
+    "https://wallpapercave.com/*",
+    "https://www.bing.com/*",
+    "https://api.pexels.com/*",
+    "https://images.pexels.com/*",
+    "https://api.unsplash.com/*",
+    "https://images.unsplash.com/*",
+    "https://pixabay.com/*",
+    "https://cdn.pixabay.com/*",
+    "https://www.wallpic.cn/*",
+    "https://www.10wallpaper.com/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "offline_enabled": true,
+  "icons": {
+    "16": "assets/icon16.png",
+    "32": "assets/icon32.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "action": {
+    "default_title": "将已收藏的当前页面内容保存到本机（使用 ? 时会发送相关片段给 AI）",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png",
+      "48": "assets/icon48.png"
+    }
+  }
+}

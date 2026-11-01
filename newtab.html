@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="HoOxDO6F1lyjUWBNBTfhea">
+<head data-page-node-id="EZ1fcqE9ksRn44j3g09zhh">
+  <meta charset="UTF-8" data-page-node-id="l8peRZOrALkhGFiDftFY0n" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="QXZDe3wu0lxlTDHCoNFWiF" />
+  <title>静谧</title>
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icon16.png?v=1.6.1" data-page-node-id="KPs7Ilfn7WQtpf6rreEADp" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon32.png?v=1.6.1" data-page-node-id="C00YkaHkbwWjD1mKzEiRp3" />
+  <link rel="icon" type="image/png" sizes="48x48" href="assets/icon48.png?v=1.6.1" data-page-node-id="w7git4B9U6YQdrPwS9pcdj" />
+  <link rel="stylesheet" href="css/newtab.css" data-page-node-id="0K2cidqBLYdKtLX7BZn3KJ" />
+</head>
+<body data-page-node-id="vE2gKGeliCAewbxQFtBX7H">
+  <div class="bg-layer" data-page-node-id="QkyL9ZKZWO83JSywDDUMTv" aria-hidden="true">
+    <div class="bg-image" id="bg-image" data-page-node-id="GxKpB4GFK6EdLaJWdZ4DvU"></div>
+    <div class="ambient-light ambient-light-a"></div>
+    <div class="ambient-light ambient-light-b"></div>
+    <div class="grain" data-page-node-id="XhD3qdP7NRiNsmbeC0SbJd"></div>
+    <div class="scrim" data-page-node-id="016DH4JxbpTTSV7kHfZNWv"></div>
+  </div>
+
+  <main class="stage" id="stage" data-page-node-id="E4WGPWtEEiIcu61qx17Npy">
+    <section class="clock-block" data-page-node-id="j8B9munMGMfkuYfliCiu5E">
+      <div class="clock" id="clock" aria-live="off" data-page-node-id="1R4PcGxGfLo6hCN4a6eyCW">--:--</div>
+      <div class="date-line" id="date-line" data-page-node-id="VdaZZKAgcJohc681MkEpH9">
+        <span id="date-solar" data-page-node-id="vDtRVB7YmyzEIj4pFislqC"></span>
+        <span class="dot" id="date-dot" data-page-node-id="fs7znJitrNXvuBQkHFbmvr">·</span>
+        <span id="date-lunar" data-page-node-id="DgZsBt2icDrv2BsiTqHuaC"></span>
+      </div>
+    </section>
+
+    <form class="search" id="search-form" autocomplete="off" data-page-node-id="fcbtKO3wcmmMpISc08X7mX">
+      <svg class="ico-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" data-page-node-id="Abnb3NRmbDEc5XhDB6rUrB">
+        <circle cx="11" cy="11" r="6.5" data-page-node-id="rJYeTq450RmYaDrRT5h5gW" />
+        <path d="M16 16l4.2 4.2" data-page-node-id="9QVzun0EUSGCTA3D6ecbCd" />
+      </svg>
+      <input id="search-input" type="text" placeholder="搜索网页，@ 快捷直达，/ 检索书签" spellcheck="false" autocomplete="off" data-page-node-id="B2pZIamMNAmpa9JawBsbJ1" />
+      <button class="engine-chip" id="engine-chip" type="button" title="点击切换搜索引擎" data-page-node-id="XAzDE8D5CPf42oocjTgwFv">必应</button>
+      <div class="ac-panel" id="ac-panel" role="listbox" aria-label="书签检索结果" data-page-node-id="s48zFidsGppmsRESchtHlp"></div>
+    </form>
+  </main>
+
+  <footer class="footer" data-page-node-id="xJa8PHxwSLNo0rqpMDuk9y">
+    <div class="quote" id="quote" data-page-node-id="AaNwWeGFMdmtCyo6fBy2Yx"></div>
+  </footer>
+
+  <div class="quick-dock" aria-label="快捷入口" data-page-node-id="VjNNJ2CQTkk0ts5g9MJltq">
+    <button id="organizer-open" class="dock-btn" type="button" title="打开书签空间" data-page-node-id="j2sfP2CgNT7MUJHoP9IULe">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-page-node-id="YqNcwXQ4G8hquBD0EkJu5a">
+        <path d="M6 4.5h12a1.5 1.5 0 0 1 1.5 1.5v14l-7.5-4-7.5 4V6A1.5 1.5 0 0 1 6 4.5z" data-page-node-id="iNllNauGgm3TYXQuuQAAII" />
+      </svg>
+      <span data-page-node-id="bj6j2ouBFCFSTDNrjgm14L">书签</span>
+    </button>
+    <button class="ghost-btn dock-btn" id="settings-btn" type="button" title="打开静谧工作台" data-page-node-id="OhyUNnxITTwmL2tXB8Zimb">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-page-node-id="dOiUsrMs2rucGnH2QeSeaR">
+        <circle cx="12" cy="12" r="3.1" data-page-node-id="aFUDSNWrPGHTUdvN9gtrgz" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.7 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.7 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.7a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.7a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.3 9v.09A1.7 1.7 0 0 0 20.86 10H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z" data-page-node-id="CiB5Nhg1HHF7b0u2fIfpLD" />
+      </svg>
+      <span data-page-node-id="Hl81ZLOkIZch42v08bHIG4">设置</span>
+    </button>
+  </div>
+
+  <div class="drop-hint" id="drop-hint" data-page-node-id="IVRkfhJrpqaXMCRMaIU4gF">松开即设为背景</div>
+
+  <aside class="panel" id="panel" aria-hidden="true" aria-label="静谧工作台" data-page-node-id="jY5HNmpBe8SCUnqrKosNv0">
+    <header class="panel-head" data-page-node-id="SLSVq4vTcFeVb714IiVrKn">
+      <div class="workspace-brand" data-page-node-id="UkdZWMoLR5HBB0xnnyHXfz">
+        <img class="brand-mark" src="assets/icon128.png" width="34" height="34" alt="" aria-hidden="true" data-page-node-id="FLm140TUCrHKjR39YekteB" />
+        <div data-page-node-id="t2Y48XJwmv7rkGHmxlTqPu"><h2 data-page-node-id="JHXyST9cvZGBVStXOUF5vM">静谧工作台</h2><p data-page-node-id="rVYQeU0AOM8nyBWFMRIABJ">你的浏览器，按你的方式</p></div>
+      </div>
+      <button class="panel-close" id="panel-close" type="button" title="关闭" aria-label="关闭工作台" data-page-node-id="e2hbr9gdVz5oP4IKZZeWWy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" data-page-node-id="H9Ed8b9b6j0wTAiuKmQtAR"><path d="M6 6l12 12M18 6L6 18" data-page-node-id="2kb0ZwiHLef8d5XMQDtxC3" /></svg>
+      </button>
+    </header>
+
+    <div class="workspace-layout" data-page-node-id="M4By6SAyLURAAhxSVz34DQ">
+      <nav class="workspace-nav" role="tablist" aria-label="工作台功能" data-page-node-id="1vfXZqrN2XyfV2uetNv8vC">
+        <button class="workspace-tab is-active" id="workspace-tab-appearance" type="button" role="tab" aria-selected="true" aria-controls="workspace-appearance" data-workspace-target="appearance" data-page-node-id="9Ei6anJ2udroVSjKrMpFyG">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" data-page-node-id="o0HGDygkwdpAJ1VnN8BGZs"><rect x="3" y="3" width="18" height="18" rx="4" data-page-node-id="yGJbT5dFIGcoH2CYIbyhPS"/><circle cx="8.5" cy="8.5" r="1.5" data-page-node-id="4RUTEUBIrlF8ExI8I0n8uG"/><path d="m4 16 4.5-4.5 3.5 3.5 2.5-2.5 5.5 5.5" data-page-node-id="ospHbhFgEKM6VkKr38GRz3"/></svg>
+          <span data-page-node-id="Y4CcavkwFQBlth83uAlmj8"><strong data-page-node-id="swJDZxXf8hyJp5tD0jaDMC">外观</strong><small data-page-node-id="N5B8RBpg5pcKLhZhH2RhL2">壁纸与画面</small></span>
+        </button>
+        <button class="workspace-tab" id="workspace-tab-search" type="button" role="tab" aria-selected="false" aria-controls="workspace-search" data-workspace-target="search" tabindex="-1" data-page-node-id="0xZYfAnjV5GZJWpgJTLGBU">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" data-page-node-id="bJtiauEIUF3wxeZiAeJXF9"><circle cx="10.5" cy="10.5" r="6.5" data-page-node-id="PQTCEm9E3Z9adDC8VAKiBH"/><path d="m15.5 15.5 4.5 4.5M9 8.5h3M9 11.5h3" data-page-node-id="ISABLPGvDSFsamuJsUqk5J"/></svg>
+          <span data-page-node-id="Se9VznGM2fxqcpWGUe09Gg"><strong data-page-node-id="loFIB0oEYPNPKC39HgMRxA">搜索与 AI</strong><small data-page-node-id="on5V6JXZnFCnaBSAAnqQFT">索引与智能检索</small></span>
+        </button>
+        <button class="workspace-tab" id="workspace-tab-bookmarks" type="button" role="tab" aria-selected="false" aria-controls="organizer-dialog" data-workspace-target="bookmarks" tabindex="-1" data-page-node-id="tOuHFPNrjOdsFoTTHMljrm">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-page-node-id="yOsclws8HRvUdW0IxC96B5"><path d="M6 4.5h12a1.5 1.5 0 0 1 1.5 1.5v14l-7.5-4-7.5 4V6A1.5 1.5 0 0 1 6 4.5z" data-page-node-id="r0qRJeyII78YeKXtLW4y3m"/></svg>
+          <span data-page-node-id="dAPMG7qDcRtorW5g6DhAH1"><strong data-page-node-id="3d24cPGETcIMGm0bJUqtWD">书签空间</strong><small data-page-node-id="g9phFasNurTm8ww3hS1jVi">目录浏览与内容同步</small></span>
+        </button>
+        <button class="workspace-tab" id="workspace-tab-preferences" type="button" role="tab" aria-selected="false" aria-controls="workspace-preferences" data-workspace-target="preferences" tabindex="-1" data-page-node-id="lt6Hpgyd8qUXqDk7FjXRiI">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" data-page-node-id="1wxpkY4HHFr6iMsZ59JJYj"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" data-page-node-id="0qQ70BBGOQIotcpTL8zGC3"/></svg>
+          <span data-page-node-id="77EgcufTAxaU8N7O9zCD29"><strong data-page-node-id="JJiCUK0I9sVuukBghUZi3z">偏好设置</strong><small data-page-node-id="CIYqFW0ih0rmOqFkR2KRSQ">时间与显示元素</small></span>
+        </button>
+        <button class="workspace-tab" id="workspace-tab-tags" type="button" role="tab" aria-selected="false" aria-controls="workspace-tags" data-workspace-target="tags" tabindex="-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.3"/></svg>
+          <span><strong>快捷标签</strong><small>常用入口与推荐</small></span>
+        </button>
+        <div class="workspace-nav-foot" data-page-node-id="b4fG3I7pK864DBeMMO0lrc"><span class="local-dot" data-page-node-id="isqXDW9fS6VGsHgPds7Jzr"></span>本地优先 · 按需连接</div>
+      </nav>
+
+      <div class="panel-body" data-page-node-id="KG1jgbTytwjzPQXnymb3hf">
+        <section class="settings-view" id="workspace-appearance" role="tabpanel" aria-labelledby="workspace-tab-appearance" data-workspace-view="appearance" data-page-node-id="I0aQB5aDTPoXLFqATINsLX">
+          <div class="view-heading" data-page-node-id="ZYJ2B5LF1m1OidrhR5y4nG"><div data-page-node-id="09riSFEhWWELRmIW2DT9oE"><p class="view-eyebrow" data-page-node-id="VjfR6ntAk0NEngAGdp4jHR">PERSONALIZE</p><h2 data-page-node-id="cu0sUD0fJSOiw663N5YuUU">让新标签页更像你</h2><p data-page-node-id="4M2FQeO7EvPf8CSKszrKDn">选择壁纸、调整画面，所有修改即时预览。</p></div><span class="view-badge" data-page-node-id="k1QkoEkAETgHEUAlo9hAtl">实时预览</span></div>
+          <div class="appearance-grid" data-page-node-id="GxWf4RbdBk9fa6te8WEDS1">
+            <div class="settings-stack" data-page-node-id="NawQwWDGVFXj9TF1qGDlSQ">
+              <section class="group settings-card" data-page-node-id="rFyfTEBs9eaF0Upup4sNjT">
+                <h3 data-page-node-id="DXfe1Tq2bffZILyV1wPo3m">我的背景<span class="src-link" data-page-node-id="qfiHuq8KFviF9DG5PJPr5r">本地图库</span></h3>
+                <div class="row" data-page-node-id="S7BkNRHUFdU8D6OB7ueOfJ">
+                  <label class="btn-primary" for="file-input" data-page-node-id="QlFOmiXjAMhBFfh3v5IDEJ">上传图片</label>
+                  <input id="file-input" type="file" accept="image/*" hidden data-page-node-id="M7zRWFX0ResCiFU07CNQCh" />
+                  <span class="hint" data-page-node-id="SFjJioLrVxE7Kw0A3O3T2J">支持拖拽 / 粘贴</span>
+                </div>
+                <div class="gallery" id="gallery" data-page-node-id="ICupIVNsZY1OeVUTyBs01g"></div>
+                <div class="empty-tip" id="gallery-empty" data-page-node-id="vi6bc76MhS4OtS2yZDeobF">还没有自定义图片</div>
+                <div class="row row-stack" data-page-node-id="HWzh7TRkS38EMTCm06jNUa">
+                  <input class="text-input" id="url-input" type="text" aria-label="网络图片链接" placeholder="粘贴图片链接 https://..." spellcheck="false" data-page-node-id="CiuPH7EeyGLMDPjLrJux97" />
+                  <button class="btn-ghost" id="url-apply" type="button" data-page-node-id="xGITEFCzfRHYQqn6s9Lh9j">应用</button>
+                </div>
+              </section>
+
+              <section class="group settings-card" data-page-node-id="5eVvc3wCznjj4YJ8ixsWWk">
+                <h3 data-page-node-id="LbNrHHbr5zE10XPikqaiig">预设背景<span class="src-link" data-page-node-id="HLhbZ7vE7GVlAxiGQxLATZ">8 款渐变</span></h3>
+                <div class="swatches" id="swatches" data-page-node-id="01sp6oWUEsho6NjVcrDwS0"></div>
+              </section>
+
+              <section class="group settings-card" data-page-node-id="3QmBTHdp1LCs7CDibgVTmS">
+                <h3 data-page-node-id="LaGZFZUr5lex6gaY1zckiy">画面调整</h3>
+                <div class="slider-row" data-page-node-id="pOEHBGFtXjYAHkTMQAaXgc"><span class="label" data-page-node-id="FUH94Bhkxrup1YQWAT68IJ">模糊</span><input id="blur-range" aria-label="背景模糊" type="range" min="0" max="24" step="1" data-page-node-id="NWCh9HgDi887VXnwlI64Sv" /><span class="value" id="blur-value" data-page-node-id="Fxi6JA8XzOeKWEGdA0YwUk">0</span></div>
+                <div class="slider-row" data-page-node-id="1uBwoJpEXrUC2WNb2F2Yvt"><span class="label" data-page-node-id="u4hecAOXaplEUqWzWaCugw">暗化</span><input id="scrim-range" aria-label="背景暗化" type="range" min="0" max="85" step="1" data-page-node-id="Pj3CfSslfy95rbMH9SqPPc" /><span class="value" id="scrim-value" data-page-node-id="oykbWxLfLW9sufBYg7Uyij">12</span></div>
+                <div class="switch-row"><span class="label">动态效果</span><label class="switch"><input id="sw-motion" type="checkbox" aria-label="启用背景动效" /><i></i></label></div>
+                <p class="hint motion-hint">缓慢漂移、环境流光与指针视差；跟随系统的减少动态效果设置。</p>
+              </section>
+            </div>
+
+            <section class="group settings-card wallpaper-card" data-page-node-id="uNJ65OFKCbUhfEWA24yrkz">
+              <h3 data-page-node-id="v2BmfGCEG0230EzP9XDeJi">在线壁纸<span class="src-link" data-page-node-id="SNAWZFFVHOWZXoG0mO7v6A">原生 4K / 8K</span></h3>
+              <div class="wallpaper-source-row"><label for="wp-provider">图源</label>
+                <select id="wp-provider" aria-label="选择壁纸图源"><option value="all">全部高清图源 · 国内优先</option><option value="domestic">国内精选 · 中文搜索</option><option value="wallpic">Wallpic · 国风 / 动漫 / 人物</option><option value="tenwallpaper">10wallpaper 中文 · 高清壁纸</option><option value="pexels">Pexels · 摄影（需 Key）</option><option value="unsplash">Unsplash · 摄影（需 Key）</option><option value="pixabay">Pixabay · 摄影 / 写真（需 Key）</option><option value="uhdpaper">UHD Paper · 4K / 8K</option><option value="wallpapercave">Wallpaper Cave · 主题搜索</option><option value="bing">Bing · 每日精选</option><option value="haowallpaper">哲风 · 原图需登录</option></select>
+                <a id="wp-source-link" href="https://www.wallpic.cn/" target="_blank" rel="noopener noreferrer">访问来源<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg></a>
+              </div>
+              <p id="wp-source-note" class="hint">支持全站搜索，常见中文关键词自动转换。</p>
+              <div id="wp-photo-settings" class="wallpaper-photo-settings" hidden><label id="wp-photo-key-label" for="wp-photo-key">摄影图库 API Key</label><input id="wp-photo-key" class="text-input" type="password" autocomplete="off" placeholder="填写自己的 Key，仅保存在本机" /><a id="wp-photo-key-help" target="_blank" rel="noopener noreferrer" href="https://www.pexels.com/api/">申请 / 查看说明 ↗</a></div>
+              <div class="row" data-page-node-id="nIPLOwboEOZZinZKE7TAJ9">
+                <input class="text-input" id="wp-query" type="text" aria-label="搜索在线壁纸" placeholder="搜索动漫、风景、星空或英文关键词…" spellcheck="false" data-page-node-id="gaLIVDCMUbPgfy4VzUVqYo" />
+                <button class="btn-ghost" id="wp-search" type="button" data-page-node-id="JzimWK8QgK69NSFAgglqi6">搜索</button>
+              </div>
+              <div class="wallpaper-suggest" id="wp-suggest" aria-label="搜索联想" hidden></div>
+              <div class="wallpaper-topics" aria-label="壁纸推荐主题"><button type="button" data-wallpaper-preference="portraits" aria-pressed="true">人物精选</button><button type="button" data-wallpaper-preference="illustration" aria-pressed="false">唯美人物插画</button><button type="button" data-wallpaper-query="国风美女">国风人物</button><button type="button" data-wallpaper-query="真人美女" data-wallpaper-provider="domestic">人物写真</button><button type="button" data-wallpaper-query="女明星" data-wallpaper-provider="domestic">明星写真</button><button type="button" data-wallpaper-query="氛围写真" data-wallpaper-provider="domestic">氛围写真</button><button type="button" data-wallpaper-query="风景">自然风光</button><button type="button" data-wallpaper-preference="all" aria-pressed="false">全部题材</button></div>
+              <div class="wp-grid" id="wp-grid" data-page-node-id="8BVvEvWDaQ2hLmKFzTo0Tn"></div>
+              <div class="wp-status" id="wp-status" data-page-node-id="6WxJY0lD8vAEWn38xl63B0">正在加载…</div>
+              <div class="wp-pagination" aria-label="壁纸分页" data-page-node-id="cd3zsQvoQhgTQkIKmJgnla">
+                <button class="btn-ghost" id="wp-prev" type="button" disabled data-page-node-id="4OaRWFP4cxOYcdd6WrIj8j">上一页</button>
+                <span id="wp-page" aria-live="polite" data-page-node-id="vVL2zJXTCpY6SfAU8poifc">第 1 页</span>
+                <button class="btn-ghost wp-more" id="wp-more" type="button" data-page-node-id="Scq4rm5sguBpOTL6AQzUG0">下一页</button>
+              </div>
+              <p class="hint" id="wp-quality" role="status" aria-live="polite" data-page-node-id="SLqi8vhqtrfr0t8B3Qj7jo">当前背景：正在检测…</p>
+              <div class="wallpaper-save-row"><button id="wp-save" class="btn-ghost" type="button" disabled>保存到离线图库</button><span>默认在线使用，需要时再保存</span></div>
+              <div class="wp-history" id="wp-history-wrap" hidden>
+                <div class="wp-history-head"><span>使用历史</span><button id="wp-history-clear" type="button">清空</button></div>
+                <div class="wp-history-list" id="wp-history" aria-label="最近使用的壁纸"></div>
+              </div>
+              <details id="wp-hao-settings" class="advanced-settings" hidden data-page-node-id="wrZ7x0rA9nkJr62ZQAPgip">
+                <summary data-page-node-id="N9dQIOv4s2NdXKSY24K2jW">高清原图与登录设置<span data-page-node-id="Bm8ZaC48dXrisc1f3hs7Ya">可选</span></summary>
+                <div class="advanced-content" data-page-node-id="8svczQEEOesXPM09sRRFXh">
+                  <label class="field-label" for="wp-token" data-page-node-id="7pNaJrYL3gLbVnZqfDrdHl">哲风登录 Token</label>
+                  <input class="text-input" id="wp-token" type="password" placeholder="仅用于 4K 原图，只保存在本机" spellcheck="false" autocomplete="off" data-page-node-id="mbwHQKYPOCOsV53A8Z9mZE" />
+                  <button class="btn-ghost" id="wp-auth" type="button" data-page-node-id="VleDFvpWDC3crlbI8Ahp9k">使用浏览器登录状态</button>
+                  <p class="panel-foot" data-page-node-id="mmUe0fSmAYDNr4dHobwzCk">下载后离线缓存；失败时自动使用公开预览。</p>
+                </div>
+              </details>
+            </section>
+          </div>
+        </section>
+
+        <section class="settings-view" id="workspace-search" role="tabpanel" aria-labelledby="workspace-tab-search" data-workspace-view="search" hidden data-page-node-id="GvVVIWegfNDhZirBExCWMt">
+          <div class="view-heading" data-page-node-id="HbIhT2nqcSDJBHD8p6KEvp"><div data-page-node-id="yi0LSWvDycZiJUeedQlxHs"><p class="view-eyebrow" data-page-node-id="lZYYTIX4PXubZTi9aVY53B">SEARCH</p><h2 data-page-node-id="l6ui7eplaggvaMETr2FtVd">从一个搜索框，找到所有收藏</h2><p data-page-node-id="uM2tD1jbZf1DLuY4oyKjEf">本地检索保障隐私，AI 与 RAG 按需要开启。</p></div><span class="view-badge" data-page-node-id="RD1Drz7NhoRunfcMWmfCKC">本地优先</span></div>
+          <div class="settings-grid" data-page-node-id="F2KPOD7oWlPHgsom8rFHGl">
+            <section class="group settings-card" data-page-node-id="ZJgZSqltb09ue9XHklDTT2">
+              <h3 data-page-node-id="mwtTh5ZdaxehFR4ZFCQCz4">默认搜索引擎</h3>
+              <div class="segmented" id="engines" data-page-node-id="w7cABYe2RgSQyBbF9hWVKX"></div>
+              <p class="panel-foot align-left" data-page-node-id="ECxQZDtoU2llzpcqJrfDqS">普通输入直接搜索网页，点击搜索框右侧标签也可切换。</p>
+            </section>
+
+          </div>
+
+          <details class="group settings-card advanced-card" data-page-node-id="ru20q5SWOIfkdMv78BVAYv">
+            <summary data-page-node-id="cEFjYkkSs0FuyALGB0JTdd"><span data-page-node-id="xqw1W3EHzZ01wFq1hqVLIW"><strong data-page-node-id="13AdrKybXTtC2vIfcYnODx">AI 模型配置</strong><small data-page-node-id="IALKqIPsMIuvQq6EtqBX2E">用于 ? 智能搜索</small></span><span class="summary-action" data-page-node-id="wDfnaChGP1uu2PMLMY0eUx">展开配置</span></summary>
+            <div class="advanced-card-body" data-page-node-id="mgyGFQDyhnvhSp4wlMsrLc">
+              <div class="compact-switches" data-page-node-id="02HbZeuStw0gPG5XakLx6M">
+                <div class="switch-row" data-page-node-id="aRcDdn3IJrXcuvRDDdiU2G"><span class="label" data-page-node-id="P1Q0OXjYVYDubBEb3gBJ8d">启用 AI 能力</span><label class="switch" data-page-node-id="0oaWSsFqaWVPeGOqLowsf7"><input id="sw-ai" type="checkbox" aria-label="启用 AI 能力" data-page-node-id="gvcEpmophnMvZc0HOD4ow0" /><i data-page-node-id="oGjmqnTPYjzYsIKkawWHD3"></i></label></div>
+
+              </div>
+              <div class="field-grid" data-page-node-id="zutp5ffaaHsKhNCRZ05qFu">
+                <label class="field" data-page-node-id="htgZdiKAzA8BzKfxMCOrUJ"><span data-page-node-id="ULyot2Zp6fawNl8FCFbzrC">接口地址</span><input class="text-input" id="ai-base" type="text" placeholder="http://host:9000/v1" spellcheck="false" data-page-node-id="NgJmBE2VVtjGa2yO3rxE7Q" /></label>
+                <label class="field" data-page-node-id="Oz5SDwyAOR7nKZeevDeadL"><span data-page-node-id="RpdMvhDPseI5UMQIpMiWdo">模型名</span><input class="text-input" id="ai-model" type="text" placeholder="例如 qwen3.6-flash" spellcheck="false" data-page-node-id="HCHXZDR19wHE1gvWxvA3zV" /></label>
+                <label class="field field-wide" data-page-node-id="qD1saNEZfCch2e93t8XRSm"><span data-page-node-id="Vth3WELFQT7Lx7N2v6ytcG">API Key</span><input class="text-input" id="ai-key" type="password" placeholder="只保存在本机" spellcheck="false" autocomplete="off" data-page-node-id="faOZzNfhWEl34ckYcgbDst" /></label>
+              </div>
+              <div class="inline-actions" data-page-node-id="EpcSBa5gnHzVjGeOVWTAZm"><button class="btn-ghost" id="ai-test" type="button" data-page-node-id="JRwsD3ifonYGc8m49TIPfb">测试连接</button><span class="hint" id="ai-status" role="status" aria-live="polite" data-page-node-id="HBwZwXdGV0Jjj9CyUNTmAe"></span></div>
+              <p class="panel-foot align-left" data-page-node-id="1XdCOL95YpEHf9DA1ptiQD">使用 ? 时会发送问题与候选书签片段；/ 检索始终保持本地。</p>
+            </div>
+          </details>
+
+
+        </section>
+
+        <section id="organizer-dialog" class="organizer-dialog settings-view" role="tabpanel" aria-labelledby="workspace-tab-bookmarks" data-workspace-view="bookmarks" hidden data-page-node-id="Ck8VmWngvDC0p1YOKwkllt">
+          <header class="organizer-head" data-page-node-id="xUfvkHFVlzaFpFGIeLy4GR">
+            <div class="organizer-heading" data-page-node-id="OJkCVsAWj9gGgC2aN5QOJr">
+              <p class="view-eyebrow" data-page-node-id="2JDC3bAaBf4C2Xs5Ec1xwo">BOOKMARK LIBRARY</p>
+              <div class="organizer-title-line" data-page-node-id="1c64d7GwaEkFbj4lCBwj4q"><h2 id="organizer-title" data-page-node-id="SNPO6q5WB18cr4dEUKEwUq">书签空间</h2><span class="organizer-local-badge" data-page-node-id="K5Br9AE3n71iz38Myq6myW"><i data-page-node-id="04ELh6dSlD4cCZEFkCvZHw"></i> 本地管理</span></div>
+              <p class="organizer-summary" data-page-node-id="6vi546MItA2SAj4sN3GEqM"><span id="organizer-count" data-page-node-id="A3qg4jJrJdcZHVPQDSbfxX">正在读取书签</span><span id="organizer-pending" data-page-node-id="TTBbjt6pHSzUKaVtyilMDh"></span></p>
+            </div>
+            <button id="organizer-close" class="btn-ghost organizer-done" type="button" data-page-node-id="p2zdzVLK3bNd5j4CtZQTig">完成</button>
+          </header>
+
+          <div class="automation-grid" data-page-node-id="UCn9AFhy4oGGrACjMDgA5w">
+            <section class="automation-card" aria-labelledby="rag-flow-title" data-page-node-id="ARmMHGBv5OyfvQXONzAHhC">
+              <div class="automation-heading" data-page-node-id="raqYI5i48871UKMGDQsUKT"><div data-page-node-id="qHDhuXprQpirhE1SfBOiFD"><span class="automation-step" data-page-node-id="phlqlEijEo9WppIGhUDPvE">书签内容</span><h3 id="rag-flow-title" data-page-node-id="gfCQfmf8XWidsb49hBOHyG">自动同步到 RAG</h3></div><label class="switch" data-page-node-id="O5xzbMkwwCnJfMmulxefke"><input id="rag-enabled" type="checkbox" aria-label="自动同步到 RAG" data-page-node-id="D5LhktIzHt8SYRWJniVknm" /><i data-page-node-id="NlBqEhwE39NSCK25DoTSPB"></i></label></div>
+              <p class="automation-description" data-page-node-id="NBduQuw3PVFQu1hOcYTgAG">采集每个收藏页面的正文，同步到 RAG 并更新搜索索引。</p>
+              <div class="automation-path" data-page-node-id="BZ6wiHTZtBOay2dpqn0OUA"><span data-page-node-id="nnAjJCg0o9Y2wSduDcNqDD">采集正文</span><b aria-hidden="true" data-page-node-id="d3SCk51lyGnMBqcsLxZm36">→</b><span data-page-node-id="fUaJBLSPi8E3c7aRF4m4bk">同步入库</span><b aria-hidden="true" data-page-node-id="3OAUeHdncvMDDVRnTZuxFK">→</b><span data-page-node-id="xB2HZGIXn63sYDDd07ABMM">可搜索</span></div>
+              <div class="inline-actions" data-page-node-id="azeyhn0pVvceAr7iPIv73T"><button id="pipeline-start" class="btn-ghost action-primary" type="button" data-page-node-id="sstXuHm9f3mecaJYJEbILO">同步一次</button><button id="pipeline-retry" class="btn-ghost" type="button" hidden data-page-node-id="G74AGU5CH7hOqLkLsHBxlx">重试失败项</button></div>
+              <p id="pipeline-status" class="automation-progress" role="status" aria-live="polite" data-page-node-id="BS1G2rVuGgv1hOj4H1REzg">自动同步未开启</p>
+              <p class="automation-note" data-page-node-id="3bXxKesdkVqF671xGGw7Mm">收藏变更自动同步，无需单独建立索引。登录或动态页面可打开后点击扩展图标采集。</p>
+              <details id="rag-connection" class="automation-details" data-page-node-id="iUlthvXjvZ4bKJ1KlM6FCg">
+                <summary data-page-node-id="MBeYlduY99v9NRPcwXmI8N">连接与同步设置</summary>
+                <div class="field-grid" data-page-node-id="UIgns9OPX5AIa0OFiBnCyT">
+                  <label class="field field-wide" data-page-node-id="FNR7aaC67VWHovuHjoBAPg"><span data-page-node-id="CF43IsdUUGPS7ATvQckZNH">RAG 服务地址</span><input class="text-input" id="rag-url" type="url" placeholder="https://..." spellcheck="false" data-page-node-id="hHV3P85HmumM6WP1iJv7I0" /></label>
+                  <label class="field" data-page-node-id="cHeWNZykBFcDRp8FwFTUlv"><span data-page-node-id="CBcD7SZcNPSI2ijeqMqNAb">API Key</span><input class="text-input" id="rag-key" type="password" placeholder="只保存在本机" autocomplete="off" data-page-node-id="tDniypsdebA7wk6Nk9KCyQ" /></label>
+                  <label class="field" data-page-node-id="3NZ1xPCDpQg8OgLeXGQ1GH"><span data-page-node-id="VsYop8bKbIN4fxJ25VTo6K">书签集合名称</span><input class="text-input" id="rag-collection" type="text" placeholder="chrome_tab_ 开头" spellcheck="false" data-page-node-id="CWcA88bBgtjT4r0GThgAFe" /></label>
+                  <label class="field field-wide" data-page-node-id="DPtKtc6MTtJbJRbIAsrOms"><span data-page-node-id="ibN3kC4LAfSL0trdQsf5Uz">公开正文刷新间隔（天）</span><input id="rag-refresh" class="text-input" type="number" min="1" max="90" data-page-node-id="dpVsj1Tck9JzE4bc8AtVrj" /></label>
+                </div>
+                <div class="switch-row" data-page-node-id="dpRKGX6DQHx33tJrVuFonl"><span class="label" data-page-node-id="irR3BSIXwiyIPn0ab1kNUa">上传手动采集的登录页面正文</span><label class="switch" data-page-node-id="aKAaVJbK15lFtg3QlAn3fH"><input id="rag-private" type="checkbox" aria-label="上传登录页面正文" data-page-node-id="G7JABBBCdMmOd2CaRQPrGJ" /><i data-page-node-id="Xh7Qbp0HRyISwvgTKVT0iy"></i></label></div>
+                <p class="automation-note" data-page-node-id="zrGRYz8uIutkQ3W96g4XGL">关闭自动开关会停止后台同步，已同步内容仍可检索。</p>
+                <div class="inline-actions" data-page-node-id="F0LZ0GGDwXYhxXV6w3Qiaz"><button id="rag-test" class="btn-ghost" type="button" data-page-node-id="3idMfCgKByBJy1MDwfE0m0">测试连接</button><button id="pipeline-pause" class="btn-ghost" type="button" data-page-node-id="QopgHPxYmYGwmII1vgya7D">暂停本次同步</button></div>
+                <p id="rag-status" class="hint" role="status" aria-live="polite" data-page-node-id="SATyEu8yfd0Gh9ekWqZUv5"></p>
+              </details>
+            </section>
+            <section id="auto-organize-card" class="automation-card" aria-labelledby="auto-organize-title">
+              <div class="automation-heading">
+                <div><span class="automation-step">收藏归档</span><h3 id="auto-organize-title">按域名记忆自动归档</h3></div>
+                <label class="switch"><input id="auto-organize-enabled" type="checkbox" aria-label="自动归档新收藏" /><i></i></label>
+              </div>
+              <p class="automation-description">同一域名归对一次，之后的新收藏自动进入该目录，子域名同样生效。陌生域名由 AI 建议目录（需配置 AI 接口），确认后写回记忆。</p>
+              <p id="auto-organize-status" class="automation-progress" role="status" aria-live="polite">正在读取归档规则…</p>
+              <div class="inline-actions"><button id="auto-organize-relearn" class="btn-ghost" type="button">从现有书签学习</button></div>
+              <details id="auto-organize-details" class="automation-details">
+                <summary id="auto-organize-summary">域名规则与待确认建议</summary>
+                <div id="auto-organize-body" class="auto-organize-body"></div>
+              </details>
+            </section>
+          </div>
+          <section id="organizer-recovery" class="bookmark-recovery" hidden data-page-node-id="9EnaUI4ErDZaai9HSJm3vW">
+            <div data-page-node-id="SyXq5oeKnbM8WMg7flYcjF"><strong data-page-node-id="IM9HMCZZQyKYavoeQVPb97">恢复之前的目录整理</strong><p data-page-node-id="5KyZLpfcoKMMVzfJoBogQJ">按本机日志恢复上一批原位置；后续人工修改会跳过。新建的空目录保留。</p></div>
+            <button id="organizer-undo" class="btn-ghost" type="button" data-page-node-id="3Udwnxj3oQ4PAs2Dtyl0Gf">撤销上一批移动</button>
+          </section>
+          <p id="organizer-status" class="hint" role="status" aria-live="polite" data-page-node-id="zN44JP06DelwE2P0lcT8wm"></p>
+          <div class="organizer-command-bar" data-page-node-id="NetBmI5kIgWzO18QEBpZsN">
+            <label class="bookmark-folder-label" data-page-node-id="4bznnNQueUmIRIoBMESE0i"><span data-page-node-id="WKr73ej38oy3YHTlp8ScN3">原有目录</span><select id="organizer-folder" aria-label="浏览原有书签目录" data-page-node-id="2hi3dvlMGtZbWc4Xdv9cBQ"><option value="" data-page-node-id="wSrTRVN7caot1KD3BRrW0R">全部书签</option></select></label>
+            <label class="organizer-search-label" data-page-node-id="nOlXWR2D33FHd4H1ZQXOP7">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" data-page-node-id="V2FJzs4pnsiE9csBYQFXyE"><circle cx="10.5" cy="10.5" r="6.5" data-page-node-id="wRbneaLLQoOyFWtbHRqlY2"/><path d="m15.5 15.5 4.5 4.5" data-page-node-id="TKofFYCZ7xz9EUpsUAATzd"/></svg>
+              <input id="organizer-query" type="search" aria-label="搜索书签空间" placeholder="搜索标题、网址或标签" data-page-node-id="isNra4h12M33IhJY1tFJFp" />
+            </label>
+          </div>
+
+          <div class="organizer-body" data-page-node-id="EksORCJDHU1SGBNvibvGAA">
+            <div class="organizer-content" data-page-node-id="aBotvu7LyL2iRePtRc1LUB">
+              <div class="organizer-list-head" data-page-node-id="vw4uE2UKVY8opN6G123eC0"><div data-page-node-id="Fj3kFbgi6NN3oAq2xhOHOt"><strong id="organizer-list-title" data-page-node-id="DJKe0HGDn0eLHUkZzOQ9sx">收集箱</strong><span id="organizer-list-count" data-page-node-id="8OTDmmGoobo1xl0LPo8FP6"></span></div><span data-page-node-id="1x50pi8eDcNq9O2iarkkGf">沿用浏览器目录</span></div>
+              <div id="organizer-list" data-page-node-id="YCG0fjsUb5M4g84DmpG8IE"></div>
+            </div>
+          </div>
+          <footer class="organizer-foot" data-page-node-id="e14tI3JutKFqkqVVklkgPJ"><span class="local-dot" data-page-node-id="bbZI7txaKDHjOQvt4bsC0f"></span> 保留浏览器原有目录；正文缓存在本机，按设置同步到你的 RAG 书签集合。</footer>
+        </section>
+
+        <section class="settings-view" id="workspace-preferences" role="tabpanel" aria-labelledby="workspace-tab-preferences" data-workspace-view="preferences" hidden data-page-node-id="YiBEX6vtsjNGKpgqOOhXSX">
+          <div class="view-heading" data-page-node-id="wG8qL7IEaGRDHFLqsAVrcS"><div data-page-node-id="sFvRwOLWAsuHItaJokr3kz"><p class="view-eyebrow" data-page-node-id="qfatcfONToBa2t1eohF714">PREFERENCES</p><h2 data-page-node-id="qxFUe1bC91x6ivAW115lUF">保留需要的，隐藏其余的</h2><p data-page-node-id="Hni01O2sOe2MbELrJ2xHG1">控制时间格式和首页元素，让注意力回到当下。</p></div></div>
+          <div class="settings-grid preference-grid" data-page-node-id="zRUNBNTOIoJhytQ6KbCY43">
+            <div class="preference-col">
+            <section class="group settings-card" data-page-node-id="3fLUvokLThIovP2sjZKUYq">
+              <h3 data-page-node-id="HFDN8l5mHoi603XhQMiCEo">时间</h3>
+              <div class="switch-row" data-page-node-id="J3z5TDvbkmIkdfg6xgS8Hh"><span class="label" data-page-node-id="TKtEYYkZbNFpAjJqp5QdP1">24 小时制</span><label class="switch" data-page-node-id="OAKPVHtspFRt39NznuivE7"><input id="sw-h24" type="checkbox" data-page-node-id="nwOF48SQtXAGznya9Z7wAz" /><i data-page-node-id="VlGZk6Jq9dhPqSXUGr9PpK"></i></label></div>
+              <div class="switch-row" data-page-node-id="pcpDpRE64Z0OuPZxwL2JY8"><span class="label" data-page-node-id="Codk4gsDgYnMnYJBVbwNWb">显示秒</span><label class="switch" data-page-node-id="4C0Coxhzi24lVRuFAQcvKg"><input id="sw-seconds" type="checkbox" data-page-node-id="IrFjeMAyGo1YjzBQzQxgVm" /><i data-page-node-id="5OG2Ej1uiTI4uJkTiyNUE7"></i></label></div>
+            </section>
+            <section class="group settings-card shortcuts-card" data-page-node-id="chnE5ANBh1Aw5DO1tNg7En">
+              <h3 data-page-node-id="1k4CLukZYnpVXWOLwksrqb">快捷键</h3>
+              <div class="shortcut-list" data-page-node-id="AUir7Fv1TSDoTGNe5P8Rqj"><span data-page-node-id="GFHuX9Iy3kfYx1Qwha4lxV"><kbd data-page-node-id="FbD0DsRtcCfqWbSyw2wIfz">/</kbd> 聚焦搜索或检索书签</span><span data-page-node-id="MdT4isDI408xE8mfjdcQXC"><kbd data-page-node-id="5Ng3BAMeDhiTUWGVfEEAo3">?</kbd> 使用 AI 检索</span><span><kbd>@</kbd> 快捷标签直达</span><span data-page-node-id="ww5pLsK8689ylwWjON3j0r"><kbd data-page-node-id="B1ojhLijJyKRIQSMdxy5aj">Esc</kbd> 关闭面板</span></div>
+            </section>
+            </div>
+            <section class="group settings-card" data-page-node-id="QtNHKovYbLLKt6E8k5hNj2">
+              <h3 data-page-node-id="p2GrCdma5vA0nQPLW1RVyO">首页显示元素</h3>
+              <div class="switch-row" data-page-node-id="cE2lNLWVWzlRKjuQgOk3BI"><span class="label" data-page-node-id="9slspMVhyYpHFHdgHeNzbb">日期</span><label class="switch" data-page-node-id="32Av1hgpnkSLifpGp7PFir"><input id="sw-date" type="checkbox" data-page-node-id="Onoz8rJPXvv9yxADETMOPW" /><i data-page-node-id="EijOcx8LQHPFSVqCoU6aiB"></i></label></div>
+              <div class="switch-row" data-page-node-id="KmvQWRwzczUqTTVeBTWUEr"><span class="label" data-page-node-id="yx62Xu3ydi4ja7LBr3w3oB">农历</span><label class="switch" data-page-node-id="MU29aBve2u9H0pi0SgNCWH"><input id="sw-lunar" type="checkbox" data-page-node-id="dUPOXSYjG2IXR1LIeZGC4I" /><i data-page-node-id="Rat57EB8NsDxHWCe7S01tF"></i></label></div>
+              <div class="switch-row" data-page-node-id="XBfXV6W7MrVFQuRSOy64yu"><span class="label" data-page-node-id="UU7EWGPJuotiXeAJL52zKP">搜索框</span><label class="switch" data-page-node-id="tBcorwWmiWAHA938mL3DFt"><input id="sw-search" type="checkbox" data-page-node-id="Do9szyBUvUwcBaH0Hp81mb" /><i data-page-node-id="Wz9R616uf3yZXaZWbCYROu"></i></label></div>
+              <div class="switch-row"><span class="label">搜索联想</span><label class="switch"><input id="sw-suggest" type="checkbox" aria-label="搜索联想" /><i></i></label></div>
+              <div class="switch-row" data-page-node-id="DmygC9vOAxCzVNfjtlhRF0"><span class="label" data-page-node-id="51YN4jYC0HfBRbEAoXjZMj">底部格言</span><label class="switch" data-page-node-id="MX5OomeSsOTHnGZhDYU6ad"><input id="sw-quote" type="checkbox" data-page-node-id="ZdE0aovf0yQ9aWRTcpCLga" /><i data-page-node-id="IRbIFq16eqHBy7Pe1K9L3H"></i></label></div>
+              <div class="switch-row"><span class="label">快捷标签（@）</span><label class="switch"><input id="sw-tags" type="checkbox" aria-label="启用 @ 快捷标签" /><i></i></label></div>
+            </section>
+          </div>
+          <section class="group settings-card reset-card" data-page-node-id="GHpHN8M1nYAjlP9AEwPFtp">
+            <div data-page-node-id="V3UNw1TWxiCpF3lmnpLmke"><h3 data-page-node-id="EoV55C0tqSWCPV3C5vs0lt">恢复默认设置</h3><p data-page-node-id="8Leci862ifbi5haynzRM7G">重置外观、搜索和显示偏好，不会删除书签或本地内容索引。</p></div>
+            <button class="btn-reset" id="reset-btn" type="button" data-page-node-id="BFantcXhaG1Xj2S0w0xVA8">恢复默认</button>
+          </section>
+        </section>
+
+        <section class="settings-view" id="workspace-tags" role="tabpanel" aria-labelledby="workspace-tab-tags" data-workspace-view="tags" hidden>
+          <div class="view-heading">
+            <div>
+              <p class="view-eyebrow">QUICK TAGS</p>
+              <h2>快捷标签</h2>
+              <p>固定你常用的入口，其余交给系统推荐。所有数据只保存在本机。</p>
+            </div>
+            <span class="view-badge" id="tag-count">还没有固定标签</span>
+          </div>
+
+          <div class="tag-manager-grid">
+            <div class="tag-col is-side">
+              <section class="group settings-card card-pinned">
+                <h3>固定标签<span class="src-link" id="tag-pinned-hint">点击名称可改名</span></h3>
+                <div class="tag-list" id="tag-pinned-list"></div>
+                <div class="tag-more" id="tag-pinned-more"></div>
+                <div class="empty-tip" id="tag-pinned-empty">还没有固定标签。在「系统推荐」里点固定，或在搜索框用 @ 输入网址创建。</div>
+              </section>
+
+              <section class="group settings-card card-ignored">
+                <h3>已忽略<span class="src-link" id="tag-ignored-count"></span></h3>
+                <p class="hint">忽略累计 3 次后不再推荐，可在这里恢复。</p>
+                <div class="tag-list" id="tag-ignored-list"></div>
+                <div class="tag-more" id="tag-ignored-more"></div>
+                <div class="empty-tip" id="tag-ignored-empty">没有忽略任何站点</div>
+              </section>
+
+              <section class="group settings-card card-data">
+                <h3>数据<span class="src-link">只在本机</span></h3>
+                <div class="row">
+                  <button class="btn-ghost" id="tag-export" type="button">导出 JSON</button>
+                  <button class="btn-ghost" id="tag-import" type="button">导入 JSON</button>
+                  <input type="file" id="tag-import-file" accept="application/json,.json" hidden />
+                  <button class="btn-ghost" id="tag-reset" type="button">清空学习数据</button>
+                </div>
+                <p class="hint">导出只包含固定标签；学习数据是忽略记录与使用次数，只影响排序。</p>
+              </section>
+            </div>
+
+            <div class="tag-col is-main">
+              <section class="group settings-card card-cand">
+                <h3>系统推荐<span class="src-link" id="tag-cand-count">0 个候选</span></h3>
+                <p class="hint">来自浏览器常访站点与最近 120 天新增的书签，只作召回，不会自动固定。</p>
+                <div class="tag-list" id="tag-cand-list"></div>
+                <div class="tag-more" id="tag-cand-more"></div>
+                <div class="empty-tip" id="tag-cand-empty">暂无候选，正常使用几天后再来看。</div>
+              </section>
+            </div>
+          </div>
+          <p class="hint tag-status" id="tag-status" role="status" aria-live="polite" hidden></p>
+        </section>
+      </div>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast" data-page-node-id="jrCnOldW1F2WW4HGXi6D2i"></div>
+
+  <script src="js/db.js"></script>
+  <script src="js/bookmarks.js"></script>
+  <script src="js/content-index.js"></script>
+  <script src="js/documents.js"></script>
+  <script src="js/pageinfo.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/organizer.js"></script>
+  <script src="js/rag.js"></script>
+  <script src="js/rag-settings.js"></script>
+  <script src="js/workspace.js"></script>
+  <script src="js/organizer-ui.js"></script>
+  <script src="js/auto-organizer-ui.js"></script>
+  <script src="js/bookmark-answer.js"></script>
+  <script src="js/bookmark-search.js"></script>
+  <script src="js/search-suggest.js"></script>
+  <script src="js/quick-tags.js"></script>
+  <script src="js/tag-manager.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/wallpaper-uhd.js"></script>
+  <script src="js/wallpaper-sources.js"></script>
+  <script src="js/wallpaper-photos.js"></script>
+  <script src="js/wallpaper-pixabay.js"></script>
+  <script src="js/wallpaper-assist.js"></script>
+  <script src="js/wallpaper-cn.js"></script>
+  <script src="js/wallpaper-search.js"></script>
+  <script src="js/wallpaper.js"></script>
+  <script src="js/daily-quote.js"></script>
+  <script src="js/ambient.js"></script>
+  <script src="js/newtab.js"></script>
+</body>
+</html>
