@@ -4,6 +4,11 @@
   var LIMITS = { capture: 500, ai: 200, rag: 500 };
   async function reserve(kind) {
     if (!LIMITS[kind]) throw new Error('未知资源类型');
+    if ((kind === 'capture' || kind === 'rag') && global.Profiles) {
+      await Profiles.ready();
+      var binding = Profiles.cloud();
+      if (binding && binding.unlimited === true) return;
+    }
     var allowed = false;
     var date = new Date();
     var day = [date.getFullYear(), date.getMonth() + 1, date.getDate()].join('-');

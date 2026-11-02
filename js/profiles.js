@@ -13,6 +13,7 @@
   var controllers = new Set();
   var binding = null;
   var checkedAt = 0;
+  var cloudError = null;
   var checking = null;
   var switching = Promise.resolve();
   var receivingVersion = '';
@@ -170,10 +171,10 @@
     await rawWrite({ [SESSION_KEY]: session });
   }
   function initial() { if (!initializing) initializing = init(); return initializing; }
-  async function verify() {
+  async function verify(force) {
     await initial(); assertActive();
     if (!session.user) { binding = null; return null; }
-    if (Date.now() - checkedAt < 60000) return binding;
+    if (!force && Date.now() - checkedAt < 60000) return binding;
     if (checking) return checking;
     var ticket = session;
     checking = (async function () {
@@ -182,11 +183,13 @@
         if (!who || who.kind !== 'session' || String(who.user.id) !== String(ticket.user.id)) throw failure('请重新登录账号', 'unauthorized');
         var conf = await api('/api/rag/config', ticket.token);
         assertActive(ticket);
-        binding = conf && conf.enabled === true && /^chrome_tab_[A-Za-z0-9_-]+$/.test(conf.collection) ? { collection: conf.collection, token: ticket.token, version: ticket.version } : null;
+        binding = conf && conf.enabled === true && /^chrome_tab_[A-Za-z0-9_-]+$/.test(conf.collection) ? { collection: conf.collection, token: ticket.token, version: ticket.version, unlimited: conf.unlimited === true } : null;
+        cloudError = binding ? null : failure('后台尚未配置可用的个人 RAG 集合', 'cloud_unavailable');
         checkedAt = Date.now();
         return binding;
       } catch (e) {
         binding = null;
+        cloudError = e.code === 'unauthorized' ? e : failure('暂时无法确认 RAG 账号服务，请稍后重试', 'service_unavailable');
         if (e.code === 'unauthorized') await rawWrite({ [SESSION_KEY]: guest() });
         return null;
       } finally { checking = null; }
@@ -195,9 +198,9 @@
   }
   async function ready() { await initial(); await transition; await verify(); assertActive(); }
   function canCloud() { return !!(session && session.user && !stale && binding && binding.version === session.version && Date.now() - checkedAt < 60000); }
-  async function requireCloud() {
-    await initial(); assertActive(); await verify(); assertActive();
-    if (!canCloud()) throw failure(session.user ? '个人 RAG 集合尚未就绪，请检查账号服务' : '请先登录并绑定个人 RAG 集合', 'cloud_unavailable');
+  async function requireCloud(force) {
+    await initial(); assertActive(); await verify(force); assertActive();
+    if (!canCloud()) throw (session.user && cloudError) || failure(session.user ? '个人 RAG 集合尚未就绪，请检查账号服务' : '请先登录并绑定个人 RAG 集合', 'cloud_unavailable');
     return binding;
   }
   async function run(operation) {
@@ -254,12 +257,17 @@
     if (!landing || landing.version !== session.version || Date.now() - landing.at > 60000) return;
     var tab = await chrome.tabs.get(landing.tabId).catch(function () { return null; });
     var own = chrome.runtime.getURL('');
-    /* 没有 tabs 权限时读不到 tab.url；本轮切换刚登记过 tabId，按记录直接恢复。
-       能读到 URL 时仍只恢复扩展页或原生新标签页，避免劫持用户已导航的页面。 */
-    var visible = tab ? [tab.url, tab.pendingUrl].filter(Boolean) : [];
-    var allowed = visible.some(function (url) { return url.indexOf(own) === 0 || /^chrome:\/\/newtab\/?$/.test(url); });
-    if (tab && (!visible.length || allowed)) {
-      await chrome.tabs.update(landing.tabId, { url: own + 'newtab.html' }).catch(function () {});
+    /* 扩展重启会关闭原扩展页；还在就导航回去，已被关闭则重新打开工作台。 */
+    if (!tab) {
+      await chrome.tabs.create({ url: own + 'newtab.html' }).catch(function () {});
+    } else {
+      /* 没有 tabs 权限时读不到 tab.url；本轮切换刚登记过 tabId，按记录直接恢复。
+         能读到 URL 时仍只恢复扩展页或原生新标签页，避免劫持用户已导航的页面。 */
+      var visible = [tab.url, tab.pendingUrl].filter(Boolean);
+      var allowed = visible.some(function (url) { return url.indexOf(own) === 0 || /^chrome:\/\/newtab\/?$/.test(url); });
+      if (!visible.length || allowed) {
+        await chrome.tabs.update(landing.tabId, { url: own + 'newtab.html' }).catch(function () {});
+      }
     }
     await rawWrite({ [key]: null });
   }

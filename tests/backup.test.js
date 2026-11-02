@@ -161,3 +161,29 @@ test('collect 只打包白名单 meta，并返回可校验的 sha256', async () 
   assert.match(pack.sha256, /^[a-f0-9]{64}$/);
   assert.ok(pack.sizeBytes > 0);
 });
+
+test('注册仅在请求中携带邀请码，不把邀请码保存进设置或备份；登录不需要邀请码', async () => {
+  const { c, applied, store } = context();
+  const requests = [];
+  c.fetch = async (url, init) => {
+    requests.push({ url, body: JSON.parse(init.body) });
+    return { ok: true, json: async () => ({ ok: true, data: { token: '测试会话', user: { username: 'a@example.com' } } }) };
+  };
+  await c.Backup.authRegister({ serverUrl: 'https://backup.test' }, 'a@example.com', 'test-password', '  test-invite  ');
+  assert.equal(requests[0].body.invite_code, 'test-invite');
+  assert.equal(applied.settings, null);
+  assert.equal(JSON.stringify(store).includes('test-invite'), false);
+  await c.Backup.authLogin({ serverUrl: 'https://backup.test' }, 'a@example.com', 'test-password');
+  assert.equal('invite_code' in requests[1].body, false);
+});
+
+test('个人说明默认不进入远端备份，显式授权后才包含，本地导出包不被改写', async () => {
+  const { c } = context(); const payload = c.Backup.buildPayload({ settings: defaults(), tags: { version: 3, tags: [{ label: '公司平台', url: 'https://portal.example.com/', aliases: ['007'], note: '报销和请假' }] } });
+  const sent = []; c.fetch = async (url, options) => { sent.push(JSON.parse(options.body)); return { ok: true, status: 200, json: async () => ({ ok: true, data: {} }) }; };
+  const pack = { payload, sizeBytes: 1, sha256: 'old' };
+  await c.Backup.push(defaults().backup, pack);
+  assert.equal(sent[0].payload.tags.tags[0].note, undefined); assert.deepEqual(Array.from(sent[0].payload.tags.tags[0].aliases), ['007']);
+  assert.equal(payload.tags.tags[0].note, '报销和请假'); assert.notEqual(sent[0].sha256, 'old');
+  await c.Backup.push({ ...defaults().backup, includePersonalNotes: true }, pack);
+  assert.equal(sent[1].payload.tags.tags[0].note, '报销和请假');
+});

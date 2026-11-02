@@ -1,6 +1,12 @@
 /* 收藏总览：统一以当前书签条目为单位，按最近成功的 RAG 回执计收录，更新状态不抹去已有收录。 */
 (function (global) {
   'use strict';
+  function taskKind(item) {
+    if (item.outcomeUnknown) return 'failed';
+    if (item.status === 'running' || item.status === 'pending' && !item.error) return 'queue';
+    if (item.status === 'failed' || item.status === 'paused' || item.error || item.sync === 'failed' || item.sync === 'paused') return 'failed';
+    return item.status === 'waiting' ? 'queue' : '';
+  }
   async function read(input) {
     input = input || {};
     var rows = input.rows || Bookmarks.flatten(await chrome.bookmarks.getTree());
@@ -19,16 +25,25 @@
     var jobsById = new Map(jobs.map(function (job) { return [job.id, job]; }));
     var pages = await AgentDB.getPages(rows.map(function (row) { return ContentIndex.normUrl(row.url); }));
     var collected = new Set(), queued = new Set(), failed = new Set(), policies = new Map();
+    var details = new Map();
     groups.forEach(function (group, id) {
       var doc = docsById.get(id), job = jobsById.get(id);
       var current = doc && !doc.deleted;
       var receipt = receipts[id];
       var privateDoc = doc && (doc.private || ['capture', 'feishu_api'].includes(doc.source));
-      var written = current && receipt && receipt.docId && !(privateDoc && !cfg.includePrivate);
+      var written = current && receipt && receipt.docId && !['invalid', 'excluded', 'metadata'].includes(doc.admissionState) && receipt.quality !== 'metadata' && !(privateDoc && !cfg.includePrivate);
       group.rows.forEach(function (row) {
         var key = String(row.id);
         if (written) collected.add(key);
-        if (current && job && ['pending', 'running'].includes(job.status)) queued.add(key);
+        if (!written && current) {
+          var kind = taskKind({ status: job && job.status || 'unqueued', error: job && job.error, sync: doc.syncState, outcomeUnknown: doc.outcomeUnknown });
+          var state = kind || (job && job.status === 'done' ? 'manual' : 'unarranged');
+          var reason = kind === 'queue' ? job.status === 'running' ? '正在处理' : job.nextAt > Date.now() ? '已安排，等待执行时间' : '已排队，等待处理'
+            : kind === 'failed' ? job && job.error || doc.syncError || doc.captureNote || '处理失败或等待访问条件恢复'
+            : state === 'manual' ? Documents.captureLabel(doc) + '，尚未取得正文入库回执' : '尚未安排处理任务';
+          details.set(key, { state: state, reason: reason });
+        }
+        if (current && job && (job.status === 'running' || job.status === 'pending' && (job.nextAt || 0) <= Date.now())) queued.add(key);
         if (current && job && ['failed', 'paused'].includes(job.status)) {
           failed.add(key); policies.set(key, RetryPolicy.classify(job.errorCode || doc.captureState || 'unknown', job.attempts));
         }
@@ -59,20 +74,24 @@
       else states.waiting++;
     });
 
+    var uncollectedBreakdown = { queue: 0, failed: 0, manual: 0, unarranged: 0 };
+    var uncollectedItems = rows.filter(function (row) { return !collected.has(String(row.id)); }).map(function (row) {
+      var detail = !ContentIndex.isWeb(row.url) ? { state: 'manual', reason: '此类地址不支持正文收录' }
+        : details.get(String(row.id)) || { state: 'unarranged', reason: '尚未安排处理任务' };
+      uncollectedBreakdown[detail.state]++;
+      return { id: String(row.id), title: row.title || row.url, url: row.url, state: detail.state, reason: detail.reason };
+    });
     return { total: rows.length, collected: collected.size, uncollected: rows.length - collected.size,
+      uncollectedItems: uncollectedItems, uncollectedBreakdown: uncollectedBreakdown,
       queue: states.queued, failed: states.failed, states: states, updates: updates };
   }
   function format(stats) {
-    return '收藏总数 ' + stats.total + ' · 已收录 ' + stats.collected + ' · 未收录 ' + stats.uncollected +
-      ' · 任务队列 ' + stats.queue + ' · 失败 ' + stats.failed;
+    return '总书签 ' + stats.total + ' · 已收录 ' + stats.collected + ' · 未收录 ' + stats.uncollected;
   }
   function breakdown(stats) {
-    var s = stats.states;
-    if (!s) return '';
-    var text = '未收录 ' + stats.uncollected + ' = 队列 ' + s.queued + ' + 失败 ' + s.failed +
-      ' + 需人工处理 ' + s.manual + ' + 暂停 ' + s.paused + ' + 待安排 ' + s.waiting;
-    if (stats.updates && (stats.updates.queued || stats.updates.failed)) text += '；已收录的后续任务：队列 ' + stats.updates.queued + '，异常 ' + stats.updates.failed;
-    return text;
+    var s = stats.uncollectedBreakdown;
+    return s ? '未收录 ' + stats.uncollected + ' 个书签 = 处理中 ' + s.queue + ' + 处理失败 ' + s.failed + ' + 需补充条件 ' + s.manual + ' + 未安排 ' + s.unarranged
+      : '总书签 ' + stats.total + ' = 已收录 ' + stats.collected + ' + 未收录 ' + stats.uncollected;
   }
-  global.CollectionStats = { read: read, format: format, breakdown: breakdown };
+  global.CollectionStats = { read: read, format: format, breakdown: breakdown, taskKind: taskKind };
 })(typeof self !== 'undefined' ? self : window);

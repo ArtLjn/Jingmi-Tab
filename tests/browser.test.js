@@ -16,6 +16,13 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
   const cloudDocs = new Map();
   const fullWallpaper = png(3840, 2160); const thumbnail = png(320, 180); let originalDownloads = 0;
   const server = http.createServer(async (req, res) => {
+    // 账号与 RAG 代理均为本地替身，整页回归不接触真实服务。
+    if (req.url === '/api/auth/me' || req.url === '/api/rag/config' || req.url === '/api/backup/meta') {
+      const data = req.url === '/api/auth/me' ? { kind: 'session', user: { id: 2, username: 'browser@example.invalid' } }
+        : req.url === '/api/rag/config' ? { enabled: true, collection: 'chrome_tab_browser' } : null;
+      res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ ok: true, data })); return;
+    }
+    const ragPath = req.url.replace(/^\/api\/rag\//, '/');
     if (req.url === '/article') {
       res.setHeader('content-type', 'text/html; charset=utf-8');
       res.end('<html><head><title>项目说明</title></head><body><article><h1>系统对接</h1><p>应收凭证支持订单同步。</p></article></body></html>');
@@ -30,19 +37,19 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
       const classify = system.includes('分类助手');
       const answer = system.includes('私人书签库的问答助手');
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ choices: [{ message: { content: classify ? '{"items":[{"id":"1","category":"工作","type":"文档","tags":["接口"]}]}' : malformed ? '无效响应' : answer ? '这是应收凭证订单同步的项目文档。[1]' : rewrite ? '{"k":["应收凭证"]}' : '{"picks":[{"id":"1","why":"正文提到应收凭证"}]}' } }] }));
+      res.end(JSON.stringify({ choices: [{ message: { content: classify ? '{"items":[{"id":"1","category":"工作","type":"文档","tags":["接口"]}]}' : malformed ? '{"picks":[{"id":"1"}]}' : answer ? '这是应收凭证订单同步的项目文档。[1]' : rewrite ? '{"k":["应收凭证"]}' : '{"picks":[{"id":"1","why":"正文提到应收凭证"}]}' } }] }));
       return;
     }
-    if (req.url === '/collections' || req.url === '/ingest' || req.url === '/retrieve' || req.method === 'DELETE') {
+    if (ragPath === '/collections' || ragPath === '/ingest' || ragPath === '/retrieve' || req.method === 'DELETE') {
       let body = Buffer.alloc(0);
       for await (const part of req) body = Buffer.concat([body, part]);
       let data = {};
-      if (req.url === '/ingest') {
+      if (ragPath === '/ingest') {
         const request = new Request('http://localhost/ingest', { method: 'POST', headers: req.headers, body });
         const form = await request.formData();
         cloudDocs.set(form.get('doc_id'), { content: form.get('text'), meta: JSON.parse(form.get('metadata_json')) });
         data = { doc_id: form.get('doc_id') };
-      } else if (req.url === '/retrieve') data = { results: Array.from(cloudDocs).map(([id, doc]) => ({ doc_id: id, content: doc.content, score: 1, chunk_index: 0, metadata: { extra: doc.meta } })) };
+      } else if (ragPath === '/retrieve') data = { results: Array.from(cloudDocs).map(([id, doc]) => ({ doc_id: id, content: doc.content, score: 1, chunk_index: 0, metadata: { extra: doc.meta } })) };
       else if (req.method === 'DELETE') cloudDocs.delete(decodeURIComponent(req.url.split('/').pop()));
       res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ code: 'OK', data })); return;
     }
@@ -58,9 +65,10 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
   try {
     browser = await chromium.launch({ executablePath, headless: true });
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-    await context.route('**/*', route => {
+    await context.route('**/*', async route => {
       const url = new URL(route.request().url()); const headers = { 'access-control-allow-origin': '*' };
       if (url.origin === origin) return route.continue();
+      if (url.hostname === 'api.jingmi.lllcnm.cn') return route.fulfill({ response: await route.fetch({ url: origin + url.pathname }) });
       if (url.hostname === 'api.bing.com') {
         const q = url.searchParams.get('query') || '';
         const list = q.includes('普通') ? [] : ['项目文档 - 财务接口', '项目文档在线预览'];
@@ -110,6 +118,9 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     ] }] });
     await context.exposeBinding('bookmarkAPI', async (_, { method, args }) => model.bookmarks[method](...args));
     await context.addInitScript(({ origin }) => {
+      window.__BACKUP_SERVER__ = origin;
+      localStorage.setItem('newtab.session.v1', JSON.stringify({ version: 'browser-session', user: { id: 2, username: 'browser@example.invalid' }, token: 'browser-test-session' }));
+      localStorage.setItem('newtab.profile.user-2:initialized', JSON.stringify({ at: 1 }));
       window.__enrichState = {
         collection: { total: 400, collected: 185, uncollected: 215, queue: 0, failed: 1 }, enabled: true, aiReady: true, totalPending: 0, pending: [], queue: 0,
         captured: 15, totalFailed: 3, totalWeb: 400, withBody: 215,
@@ -145,7 +156,7 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
         } catch (e) { return { ok: false, error: e.message }; }
       } };
       window.chrome.permissions = { request: async () => true, contains: async () => true };
-      if (!localStorage.getItem('newtab.settings.v1')) localStorage.setItem('newtab.settings.v1', JSON.stringify({ ai: { enabled: true, baseUrl: origin + '/v1', apiKey: 'test-key', model: 'test' }, organizer: { autoMove: false }, rag: { enabled: true, baseUrl: origin, apiKey: 'test-key', collection: 'chrome_tab_browser', autoSync: false } }));
+      if (!localStorage.getItem('newtab.profile.user-2:newtab.settings.v1')) localStorage.setItem('newtab.profile.user-2:newtab.settings.v1', JSON.stringify({ ai: { enabled: true, baseUrl: origin + '/v1', apiKey: 'test-key', model: 'test' }, organizer: { autoMove: false }, rag: { enabled: true, baseUrl: origin, apiKey: 'test-key', collection: 'chrome_tab_browser', autoSync: false } }));
     }, { origin });
     const page = await context.newPage();
     const errors = [];
@@ -158,9 +169,21 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     await page.locator('#organizer-open').click();
     await page.waitForSelector('.organizer-item');
     assert.equal(await page.locator('#organizer-dialog .automation-card').count(), 0);
+    assert.equal(await page.locator('.organizer-note-btn').count(), await page.locator('.organizer-item').count());
+    await page.locator('.organizer-note-btn').first().click();
+    await page.locator('.tag-editor').waitFor();
+    await page.getByLabel('个人说明', { exact: true }).fill('书签空间直接编辑备注');
+    await page.locator('.tag-editor').getByRole('button', { name: '保存', exact: true }).click();
+    await page.locator('.tag-editor').waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => document.querySelector('#organizer-list').textContent.includes('备注：书签空间直接编辑备注'));
+    assert.equal(await page.evaluate(() => QuickTags.list().some(t => t.note === '书签空间直接编辑备注')), true);
+    await page.locator('#organizer-query').fill('书签空间直接编辑备注');
+    await page.waitForFunction(() => document.querySelectorAll('.organizer-item').length === 1);
+    await page.locator('#organizer-query').fill('');
     await page.locator('#organizer-sync-settings').click();
     /* 概览进入功能子页，业务操作继续使用原控件。 */
     await page.waitForSelector('#workspace-search:not([hidden])');
+    /* 失败任务已合并为同一张卡片内的标签页。 */
     assert.equal(await page.locator('#workspace-search .automation-card').count(), 4);
     assert.equal(await page.locator('#workspace-automation').count(), 0);
     assert.equal(await page.locator('#workspace-crumbs').count(), 0);
@@ -207,6 +230,10 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     await page.locator('#search-input').fill(' ？项目文档');
     assert.equal(await page.locator('#search-form').evaluate(el => el.classList.contains('is-ai')), true);
     assert.equal(await page.locator('#engine-chip').innerText(), 'AI');
+    await page.locator('#search-input').press('Enter');
+    await page.waitForSelector('.ac-answer:not(.is-streaming)');
+    assert.equal(await page.locator('.ac-answer-label').innerText(), 'AI 回答');
+    assert.match(await page.locator('.ac-answer-text').innerText(), /订单同步/);
     await page.locator('#search-input').fill('／项目文档');
     assert.equal(await page.locator('#search-form').evaluate(el => el.classList.contains('is-bookmarks')), true);
     await page.locator('#search-input').fill('＠项目');
@@ -216,9 +243,13 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     malformed = true;
     await page.evaluate(() => AI.clearCache());
     await page.locator('#search-input').fill('?应收凭证接口');
+    const callsBeforeMalformed = aiCalls;
     await page.locator('#search-input').press('Enter');
-    await page.waitForFunction(() => document.querySelector('#ac-panel').textContent.includes('已按本地排序显示'));
+    await page.waitForFunction(() => document.querySelector('#ac-panel').textContent.includes('AI 回答暂不可用'));
     assert.equal(await page.locator('.ac-item').count(), 1);
+    assert.equal(await page.locator('.ac-answer-label').innerText(), '检索说明');
+    assert.doesNotMatch(await page.locator('.ac-answer-text').innerText(), /picks/);
+    assert.equal(aiCalls - callsBeforeMalformed, 2);
     malformed = false;
     await page.locator('#organizer-open').click();
     await page.waitForSelector('.organizer-item');
@@ -254,7 +285,7 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     const cloud = await page.evaluate(async () => {
       const cfg = await Settings.load(); const rows = Bookmarks.flatten(await chrome.bookmarks.getTree());
       await ContentIndex.hydrate(rows);
-      return { hits: (await Rag.retrieve(cfg.rag, '应收凭证', rows)).length, local: Bookmarks.query(rows, '应收凭证').length };
+      return { hits: (await Rag.retrieve(await Rag.resolve(cfg.rag, cfg.backup), '应收凭证', rows)).length, local: Bookmarks.query(rows, '应收凭证').length };
     });
     assert.equal(cloud.hits, 1); assert.equal(cloud.local, 1);
     await page.screenshot({ path: '/tmp/chrome-tab-rag-bookmarks-enabled.png', animations: 'disabled' });
@@ -284,7 +315,7 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     assert.equal(await page.locator('#wp-hao-settings').isVisible(), false);
     await page.locator('.wp-item').first().click();
     await page.waitForFunction(() => document.querySelector('#wp-quality').textContent.includes('UHD Paper') && document.querySelector('#wp-quality').textContent.includes('3840×2160'));
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('newtab.settings.v1') || '{}').bg?.online?.provider === 'uhdpaper');
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('newtab.profile.user-2:newtab.settings.v1') || '{}').bg?.online?.provider === 'uhdpaper');
     const downloadsAfterOnline = originalDownloads;
     const onlineWallpaper = await page.evaluate(async () => ({ count: (await ImageStore.list()).length, settings: await Settings.load() }));
     assert.equal(onlineWallpaper.count, 0); assert.equal(onlineWallpaper.settings.bg.mode, 'url', JSON.stringify(onlineWallpaper));

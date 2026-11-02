@@ -21,7 +21,18 @@
     searchView.querySelectorAll('[data-search-page]').forEach(function (node) { node.hidden = node !== page; });
     if (page) {
       var entry = overview.querySelector('[data-search-target="' + name + '"]');
-      document.getElementById('search-page-name').textContent = entry.querySelector('strong').textContent;
+      var pageName = document.getElementById('search-page-name');
+      pageName.textContent = page.dataset.pageTitle || (entry && entry.querySelector('strong').textContent) || '';
+      pageName.setAttribute('aria-current', page.dataset.pageDetail ? 'false' : 'page');
+      /* 状态列表作为子页挂在同一个功能下，面包屑保留上一级名称。 */
+      var detailWrap = document.getElementById('search-page-detail-wrap');
+      var detailName = document.getElementById('search-page-detail');
+      var detail = page.dataset.pageDetail || '';
+      if (detailWrap) detailWrap.hidden = !detail;
+      if (detailName) {
+        detailName.textContent = detail;
+        if (detail) detailName.setAttribute('aria-current', 'page'); else detailName.removeAttribute('aria-current');
+      }
       /* 次要设置默认保持折叠，避免展开内容挤占首屏主任务。 */
       page.querySelectorAll('details:not([data-collapsed])').forEach(function (details) { details.open = true; });
     }

@@ -28,6 +28,8 @@ test('浏览器回归：AI 推荐只发标题/域名，缓存后不重复请求'
     await context.route('**/*', route => {
       const url = route.request().url();
       if (new URL(url).origin === origin) return route.continue();
+      if (url.endsWith('/api/auth/me')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: { kind: 'session', user: { id: 1, username: 'test' } } }) });
+      if (url.endsWith('/api/rag/config')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: { enabled: true, collection: 'chrome_tab_test' } }) });
       if (url.endsWith('/chat/completions')) {
         aiCalls++;
         aiBody = route.request().postData() || '';
@@ -47,8 +49,10 @@ test('浏览器回归：AI 推荐只发标题/域名，缓存后不重复请求'
       const save = () => localStorage.setItem('__stub', JSON.stringify(store));
       const store = load();
       window.__store = store;
-      if (!store['newtab.settings.v1']) {
-        store['newtab.settings.v1'] = {
+      store['newtab.session.v1'] = { version: 'test-user-session', user: { id: 1, username: 'test' }, token: 'test-session-token' };
+      save();
+      if (!store['newtab.profile.user-1:newtab.settings.v1']) {
+        store['newtab.profile.user-1:newtab.settings.v1'] = {
           ai: { enabled: true, apiKey: 'k', baseUrl: 'https://ai.test/v1', model: 'm', timeout: 8000 },
           tags: { enabled: true, aiSuggest: true }
         };

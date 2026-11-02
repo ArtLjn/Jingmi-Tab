@@ -72,7 +72,11 @@
             private: !!page.private || page.source === 'capture' || page.source === 'feishu_api',
             coverage: page.coverage || (page.text ? 'partial' : 'metadata'), headings: page.headings || [],
             sourceRevision: page.sourceRevision || '', contentHash: pageHash,
-            captureState: page.text ? 'partial' : 'metadata', captureNote: page.captureNote || '公开 HTML 提取；动态内容、附件可能缺失' };
+            captureError: '', accessCondition: '', invalidCandidate: null, captureState: page.text ? 'partial' : 'metadata', captureNote: page.captureNote || '公开 HTML 提取；动态内容、附件可能缺失' };
+          if (doc.text && !incoming.text) {
+            ['title', 'text', 'desc', 'source', 'private', 'coverage', 'headings', 'sourceRevision', 'contentHash', 'fetchedAt'].forEach(function (key) { incoming[key] = doc[key]; });
+            incoming.captureError = 'no_content'; incoming.captureState = 'waiting_open'; incoming.captureNote = '本次只有页面描述，保留历史正文';
+          }
           if (contentVersion(doc) !== contentVersion(Object.assign({}, doc, incoming))) changed = true;
           Object.assign(doc, incoming);
         }
@@ -89,7 +93,11 @@
   async function capture(id, info) {
     var previous = await get(id);
     if (!previous) throw new Error('文档已不存在');
-    info = Object.assign({}, info);
+    info = Object.assign({}, info, { captureError: '', accessCondition: '', invalidCandidate: null });
+    if (previous.text && Object.prototype.hasOwnProperty.call(info, 'text') && !String(info.text || '').trim()) {
+      ['title', 'text', 'desc', 'source', 'private', 'coverage', 'headings', 'sourceRevision', 'fetchedAt'].forEach(function (key) { info[key] = previous[key]; });
+      info.captureError = 'no_content'; info.captureState = 'waiting_open'; info.captureNote = '本次只有页面描述，保留历史正文';
+    }
     if (Object.prototype.hasOwnProperty.call(info, 'title') && !info.title) info.title = previous.title || previous.bookmarks && previous.bookmarks[0] && previous.bookmarks[0].title || '';
     var merged = Object.assign({}, previous, info);
     var contentHash = await hash(merged.text || merged.desc || '');
@@ -112,7 +120,12 @@
     if (!doc) return '仅标题';
     return ({ pending: '等待采集', metadata: '仅元数据', partial: '部分正文', ready: '正文已采集', waiting_open: '待打开文档', waiting_auth: '待页面授权', waiting_permission: '待站点授权', failed: '采集失败' })[doc.captureState] || '仅标题';
   }
-  function syncLabel(doc) { return ({ pending: '待同步', synced: '已入库', excluded: '未上传登录内容', failed: '同步失败', deleted: '已移除', paused: '已暂停' })[doc && doc.syncState] || '未入库'; }
+  function syncLabel(doc) {
+    if (doc && doc.admissionState === 'invalid') return doc.syncState === 'deleted' ? '页面已失效，已从知识库移除' : '页面已失效，等待云端清理';
+    if (doc && doc.admissionState === 'metadata' && doc.syncState !== 'synced') return '仅保存入口，未收录正文';
+    if (doc && doc.captureError && doc.syncState === 'synced') return '使用历史正文，本次采集失败';
+    if (doc && doc.admissionState === 'deferred' && doc.syncState !== 'synced') return '暂未收录，等待重试或条件恢复';
+    return ({ pending: '待同步', synced: '已入库', excluded: '未上传登录内容', failed: '同步失败', deleted: '已移除', paused: '已暂停', deleting: '云端清理中' })[doc && doc.syncState] || '未入库'; }
   async function hydrate(rows) {
     for (var row of rows) {
       if (!ContentIndex.isWeb(row.url)) continue;
@@ -121,8 +134,9 @@
       var doc = await get(info.id);
       row.documentId = info.id;
       if (!doc || doc.deleted) continue;
-      if ((doc.text || doc.desc) && (doc.fetchedAt || 0) >= (row.contentAt || 0)) { row.text = doc.text || ''; row.desc = doc.desc || ''; row.pageTitle = doc.title || ''; }
+      if ((doc.text || doc.desc) && ((doc.fetchedAt || 0) >= (row.contentAt || 0) || doc.captureError)) { row.text = doc.text || ''; row.desc = doc.desc || ''; row.pageTitle = doc.title || ''; }
       row.contentStatus = captureLabel(doc); row.syncStatus = syncLabel(doc); row.contentAt = doc.fetchedAt || 0;
+      row.admissionState = doc.admissionState || '';
       row.captureNote = doc.captureNote || ''; row.captureSource = doc.source || ''; row.sourceUpdatedAt = doc.sourceUpdatedAt || 0;
       row.hay = [row.title, row.url, row.folder, row.site, row.pageTitle, row.desc, row.text].join(' ').toLowerCase();
     }

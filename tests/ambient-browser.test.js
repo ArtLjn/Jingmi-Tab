@@ -89,7 +89,7 @@ test('浏览器回归：背景动效、指针视差与减少动态效果降级',
     assert.equal(await page.locator('#bg-image').evaluate(el => getComputedStyle(el).animationName), 'none');
     /* waitForFunction 不会等待异步谓词，直接检查已落盘的存储值。 */
     await page.waitForFunction(() => {
-      try { return JSON.parse(localStorage.getItem('__ambient_stub') || '{}')['newtab.settings.v1'].bg.motion === false; }
+      try { return JSON.parse(localStorage.getItem('__ambient_stub') || '{}')['newtab.profile.guest:newtab.settings.v1'].bg.motion === false; }
       catch (e) { return false; }
     });
     await page.reload();

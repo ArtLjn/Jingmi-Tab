@@ -155,6 +155,8 @@
   var tagTopSites = [];          // chrome.topSites 结果，浏览器自己统计的常访站点
   var tagGroups = { pinned: [], ai: [], candidates: [] };
   var tagCreate = null;          // URL 形态查询对应的「新建标签」条目
+  var tagLoadError = '';
+  var tagSelectionExplicit = false;
   var tagReady = false;          // QuickTags 已加载完成
   var creatingTag = false;       // 新建防重入
   var tagManager = null;         // 工作台「快捷标签」页实例
@@ -1202,7 +1204,7 @@
       bmRows = Bookmarks.flatten(tree);
       await ContentIndex.hydrate(bmRows);
       var classes = await Organizer.records(bmRows);
-      bmRows.forEach(function (row) { if (classes[row.id]) row.hay += ' ' + classes[row.id].tags.join(' ').toLowerCase(); });
+      bmRows.forEach(function (row) { if (classes[row.id]) { row.classTags = classes[row.id].tags; row.hay += ' ' + classes[row.id].tags.join(' ').toLowerCase(); } });
       if (typeof BookmarkEnrich !== 'undefined') await BookmarkEnrich.applySummaries(bmRows);
       bmReady = true;
       if (suggest) suggest.invalidate();      /* 书签变了，旧的联想缓存不能再用 */
@@ -1554,6 +1556,8 @@
 
   function refreshTagPanel(options) {
     options = options || {};
+    if (!options.preserveSelection) tagSelectionExplicit = false;
+    var previousTag = options.preserveSelection && tagSelectionExplicit && acHits[acIndex] && acHits[acIndex].tag;
     aiSeq++;
     cancelAI();
     resetAnswer();
@@ -1566,7 +1570,7 @@
       acHits = [];
       tagCreate = null;
       tagGroups = { pinned: [], ai: [], candidates: [] };
-      acBanner = '标签加载中…';
+      acBanner = tagLoadError || '标签加载中…';
       acIndex = -1;
       renderTagPanel();
       return;
@@ -1579,12 +1583,13 @@
       ? TagSuggest.entries(ctx, aiCfg)
       : [];
 
-    var prev = options.preserveSelection && acHits[acIndex] && acHits[acIndex].tag;
+    var prev = previousTag;
     var prevId = prev ? prev.id : '';
     var prevUrl = prev ? prev.url : '';
 
     tagGroups = QuickTags.search(q, ctx, extras);
     tagCreate = QuickTags.createCandidate(q);
+    if (tagGroups.ambiguous) acBanner = '多个入口使用此称呼，请选择';
 
     /* 复用现有 acHits 管线：视觉顺序与键盘顺序必须一致 */
     acHits = tagGroups.pinned.concat(tagGroups.ai).concat(tagGroups.candidates).map(function (e) {
@@ -1608,7 +1613,7 @@
     }
     if (acIndex < 0 || acIndex >= acHits.length) {
       /* 输入完整地址 = 明确想创建，默认选中新建条目；否则选第一条 */
-      acIndex = tagCreate ? acHits.length - 1 : (acHits.length ? 0 : -1);
+      acIndex = tagGroups.ambiguous ? -1 : tagCreate ? acHits.length - 1 : (acHits.length ? 0 : -1);
     }
 
     renderTagPanel();
@@ -1633,13 +1638,14 @@
     if (tagGroups.pinned.length) {
       html += '<div class="ac-head">固定 · 按使用频率</div>';
       tagGroups.pinned.forEach(function (e) {
-        var sub = e.host + (e.hits ? ' · 用过 ' + e.hits + ' 次' : '');
+        var sub = e.host + (tagGroups.ambiguous ? new URL(e.url).pathname : '') + (e.hits ? ' · 用过 ' + e.hits + ' 次' : '');
         html += '<div class="ac-item' + (idx === acIndex ? ' is-sel' : '') + '" data-i="' + idx + '" role="option">' +
           '<span class="ac-idx">' + (idx + 1) + '</span>' +
           '<div class="ac-body">' +
             '<div class="ac-title">' + esc(e.label) + '</div>' +
             '<div class="ac-sub">' + esc(sub) + '</div>' +
           '</div>' +
+          '<span class="ac-pill" role="button" title="编辑别名和说明" data-act="edit" data-id="' + esc(e.id) + '">编辑</span>' +
           '<span class="ac-pill is-icon" role="button" title="删除这个标签" data-act="del" data-id="' + esc(e.id) + '">×</span>' +
         '</div>';
         idx++;
@@ -1694,10 +1700,10 @@
 
     if (!tagCreate) {
       html += '<div class="ac-sep"></div>';
-      html += '<div class="ac-act" data-new="1">' +
+      html += '<div class="ac-act" data-act="bind">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
           '<path d="M12 5v14M5 12h14"/></svg>' +
-        '<span>' + (q ? '把「' + esc(q) + '」创建为快捷标签需要完整网址' : '输入网址即可创建，例如 oa.hongdi.com') + '</span>' +
+        '<span>' + (q ? '为「' + esc(q) + '」绑定一个入口' : '新建入口，添加自己的名称和别名') + '</span>' +
       '</div>';
     }
 
@@ -1713,6 +1719,10 @@
 
   /* 面板内的鼠标动作：固定 / 删除 / 新建，不打断输入框焦点 */
   function tagAction(act, id) {
+    if (act === 'edit' || act === 'bind') {
+      var record = QuickTags.list().find(function (t) { return t.id === id; });
+      TagEditor.open({ tag: record, alias: act === 'bind' ? queryText() : '', rows: bmRows, saved: function () { if (isTagMode()) refreshTagPanel(); if (tagManager) tagManager.refresh(); } }); return;
+    }
     if (act === 'create') { createTagFromQuery(); return; }
 
     var entry = tagEntryById(id);
@@ -1743,7 +1753,7 @@
   async function createTagFromQuery() {
     if (creatingTag) return;
     var q = queryText();
-    if (!q) { toast('在 @ 后面输入网址'); return; }
+    if (!q) { TagEditor.open({ rows: bmRows }); return; }
 
     creatingTag = true;
     try {
@@ -1770,13 +1780,6 @@
     }
   }
 
-  /** 当前账号的 RAG 代理配置：固定后台地址 + 会话令牌 + 服务端集合 */
-  function ragCfg() {
-    return (typeof Rag !== 'undefined' && Rag.withAuth)
-      ? Rag.withAuth(settings.rag, settings.backup)
-      : settings.rag;
-  }
-
   async function runAI() {
     if (aiBusy) return;
     var q = queryText();
@@ -1786,15 +1789,6 @@
       return;
     }
     var cfg = settings.ai;
-    if (!AI.available(cfg) && !(typeof Rag !== 'undefined' && Rag.available(ragCfg()))) {
-      acHits = Bookmarks.query(bmRows, q, AC_LIMIT);
-      acActions = [{ q: q }];
-      acIndex = 0;
-      acBanner = '请先在左下角登录账号（启用 RAG），或在设置里配置 AI';
-      resetAnswer();
-      renderPanel();
-      return;
-    }
     var seq = ++aiSeq;
     cancelAI();
     aiController = new AbortController();
@@ -1803,13 +1797,25 @@
     resetAnswer();
     acActions = [{ q: q }];
     try {
+      var resolvedRag;
+      var ragError = '';
+      try { resolvedRag = await Rag.resolve(settings.rag, settings.backup); }
+      catch (e) { ragError = e.message; }
+      if (seq !== aiSeq) return;
+      if (!AI.available(cfg) && !Rag.available(resolvedRag)) {
+        acHits = Bookmarks.query(bmRows, q, AC_LIMIT);
+        acIndex = 0;
+        acBanner = (ragError || 'RAG 检索未启用，请在设置中开启，或配置 AI') + ' · 已显示本地结果';
+        aiAnswer = { text: acBanner, sources: [], notice: true };
+        return;
+      }
       var mid = await memoryPick(q);
       if (seq !== aiSeq) return;
       if (AI.available(cfg) && typeof AgentDB !== 'undefined') {
         await AgentDB.setMeta('ai:foreground', { seq: seq, until: Date.now() + 25000 });
       }
       var result = await BookmarkSearch.run({
-        rows: bmRows, query: q, cfg: cfg, rag: ragCfg(), signal: signal, memoryId: mid,
+        rows: bmRows, query: q, cfg: cfg, rag: resolvedRag, signal: signal, memoryId: mid, answer: true,
         current: function () { return seq === aiSeq; },
         onAnswer: function (partial) { if (seq === aiSeq) applyStreamingAnswer(partial); },
         progress: function (message, hits) {
@@ -1838,6 +1844,7 @@
       acIndex = 0;
       acBanner = 'AI 暂不可用 · 已按本地排序显示';
       resetAnswer();
+      aiAnswer = { text: acBanner, sources: [], notice: true };
     } finally {
       if (typeof AgentDB !== 'undefined') AgentDB.updateMeta('ai:foreground', function (active) {
         return active && active.seq === seq ? null : active;
@@ -1974,11 +1981,11 @@
 
     if (aiAnswer && aiAnswer.text) {
       var answerSources = aiAnswer.sources || [];
-      var answerMeta = aiAnswer.streaming ? '生成中…'
+      var answerMeta = aiAnswer.notice ? '未生成回答' : aiAnswer.streaming ? '生成中…'
         : aiAnswer.incomplete ? '回答可能不完整'
-          : answerSources.length ? '引用 ' + answerSources.length + ' 条收藏' : '基于本地正文';
+          : answerSources.length ? '引用 ' + answerSources.length + ' 条收藏' : '基于收藏资料';
       html += '<div class="ac-answer' + (aiAnswer.streaming ? ' is-streaming' : '') + '">' +
-        '<div class="ac-answer-head"><span class="ac-answer-label">AI 回答</span><span>' + answerMeta + '</span></div>' +
+        '<div class="ac-answer-head"><span class="ac-answer-label">' + (aiAnswer.notice ? '检索说明' : 'AI 回答') + '</span><span>' + answerMeta + '</span></div>' +
         '<div class="ac-answer-text">' + esc(aiAnswer.text) + '</div>';
       if (answerSources.length) {
         html += '<div class="ac-answer-sources">' + answerSources.map(function (source, i) {
@@ -2094,6 +2101,7 @@
   }
 
   function moveSel(delta) {
+    if (isTagMode()) tagSelectionExplicit = true;
     var total = acHits.length + acActions.length;
     if (!total) return;
     /* 联想模式默认不选中（-1）：向下选第一条，向上选最后一条 */
@@ -2132,7 +2140,8 @@
     }
     if (isTagMode()) {
       /* 有候选就跳转；没有候选时把输入当作网址新建标签，不做二次确认 */
-      if (open && acHits.length) activate(acIndex);
+      if (open && acHits.length) { if (tagGroups.ambiguous && acIndex < 0) toast('多个入口使用此称呼，请先选择'); else activate(acIndex); }
+      else if (!QuickTags.normalizeUrl(queryText())) tagAction('bind');
       else createTagFromQuery();
       return;
     }
@@ -2604,7 +2613,7 @@
       if (typeof BookmarkHealthUI !== 'undefined') BookmarkHealthUI.mount();
       if (typeof TagManager !== 'undefined') {
         tagManager = TagManager.mount({
-          ctx: function () { return { rows: bmRows, topSites: tagTopSites }; }
+          ctx: function () { return { rows: bmRows, topSites: tagTopSites }; }, settings: function () { return settings; }
         });
       }
       if (typeof BackupUI !== 'undefined') {
@@ -2641,6 +2650,19 @@
           if (isBookmarkMode() && document.activeElement === els.searchInput) refreshPanel();
         });
       });
+      QuickTags.onChange(function () { document.dispatchEvent(new CustomEvent('quick-tags:updated')); });
+      QuickTags.onError(function (message) { toast(message); });
+      document.addEventListener('quick-tags:updated', function () {
+        if (globalThis.PersonalTargets) PersonalTargets.hydrate(bmRows).then(function () { if (isBookmarkMode() && document.activeElement === els.searchInput) refreshPanel(); });
+        if (isTagMode() && document.activeElement === els.searchInput) refreshTagPanel({ preserveSelection: true });
+        if (isBookmarkMode() && document.activeElement === els.searchInput) refreshPanel();
+      });
+      if (chrome.storage && chrome.storage.onChanged) chrome.storage.onChanged.addListener(function (changes, area) {
+        var key; try { key = typeof Profiles !== 'undefined' ? Profiles.key('newtab.tags.v1') : 'newtab.tags.v1'; } catch (e) { return; }
+        if (area !== 'local' || !changes[key]) return;
+        if (QuickTags.hasPending()) return;
+        QuickTags.reload().then(function () { document.dispatchEvent(new CustomEvent('quick-tags:updated')); }).catch(function () {});
+      });
       loadBookmarks();
 
       /* 快捷标签：手动标签从本机读，候选在输入时即时重算。
@@ -2649,8 +2671,9 @@
       if (typeof QuickTags !== 'undefined') {
         QuickTags.load().then(function () {
           tagReady = true;
+          if (typeof PersonalTargets !== 'undefined') PersonalTargets.apply(bmRows);
           if (isTagMode() && document.activeElement === els.searchInput) refreshTagPanel();
-        });
+        }).catch(function (e) { tagLoadError = e.message; if (isTagMode()) refreshTagPanel(); });
       }
       if (typeof TagSuggest !== 'undefined') {
         TagSuggest.load().then(function () {

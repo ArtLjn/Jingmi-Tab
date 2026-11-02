@@ -64,6 +64,26 @@ test('删除一个收藏保留文档，删除最后一个入口才移除云端�
   assert.equal(f.docs.size, 0);
 });
 
+test('确认删除失败任务时移除书签并清理云端文档', async () => {
+  const f = setup(); await f.c.SyncEngine.request();
+  const doc = (await f.c.AgentDB.allRecords('documents'))[0];
+  assert.ok(doc);
+  assert.equal(doc.bookmarks.length, 2);
+  const result = await f.c.SyncEngine.deleteFailed([doc.id]);
+  assert.equal(result.deleteBatch.removed, 2);
+  assert.equal(result.deleteBatch.failed.length, 0);
+  assert.equal(result.deleteBatch.cloudRemoved, 1);
+  assert.equal(result.deleteBatch.cloudQueued, 0);
+  assert.equal(f.calls().publicCalls, 1, '删除收藏不应重新采集其他页面');
+  assert.equal(f.calls().ingests, 1, '删除收藏不应重新入库其他文档');
+  assert.equal(f.node('3'), undefined);
+  assert.equal(f.node('4'), undefined);
+  assert.equal(f.node('1').children.length, 0);
+  assert.equal(f.docs.size, 0);
+  const after = await f.c.AgentDB.allRecords('documents');
+  assert.equal(after.every(item => item.deleted), true);
+});
+
 test('断网重试持久化，五次失败后停止自动尝试', async () => {
   const f = setup({ failIngest: true });
   await f.c.SyncEngine.request();
@@ -92,13 +112,14 @@ test('过期运行租约由新后台恢复，活动租约阻止并发处理', as
   assert.equal(first.docs.size, 0);
 });
 
-test('权限缺失只同步元数据，显示待授权，显式重试后采集正文', async () => {
+test('权限缺失不入库，显示待授权，显式重试后采集正文', async () => {
   const f = setup({ permission: false });
   const result = await f.c.SyncEngine.request();
   assert.equal(result.jobs.paused, 1); assert.equal(f.calls().publicCalls, 0);
   let document = (await f.c.AgentDB.allRecords('documents'))[0];
   assert.equal(document.captureState, 'waiting_permission');
-  assert.doesNotMatch(Array.from(f.docs.values())[0].content, /订单会自动生成/);
+  assert.equal(f.docs.size, 0);
+  assert.equal(document.admissionState, 'deferred');
   f.c.chrome.permissions.contains = async () => true;
   await f.c.SyncEngine.retry(document.id);
   document = await f.c.Documents.get(document.id);
@@ -295,7 +316,7 @@ test('无网页标题时沿用收藏标题，重建索引不来回修改版本',
   assert.equal(f.calls().ingests, 1);
 });
 
-test('关闭正文采集的元数据记录成功后，不因没有 fetchedAt 每次重载都重做', async () => {
+test('关闭正文采集时只保存本地入口，完成后不反复入队', async () => {
   const f = setup(); f.config.rag.autoCapture = false;
   await f.c.SyncEngine.request();
   const job = (await f.c.AgentDB.allRecords('jobs'))[0];
@@ -304,5 +325,192 @@ test('关闭正文采集的元数据记录成功后，不因没有 fetchedAt 每
   assert.equal(current.generation, job.generation);
   assert.equal(current.status, 'done');
   assert.equal(f.calls().publicCalls, 0);
-  assert.equal(f.calls().ingests, 1);
+  assert.equal(f.calls().ingests, 0);
+});
+
+test('首次本地网络失败不上传骨架、不删云端、不消耗站点短重试次数', async () => {
+  const f = setup({ failCapture: true }); await f.c.SyncEngine.request();
+  const doc = (await f.c.AgentDB.allRecords('documents'))[0]; const job = await f.c.AgentDB.getRecord('jobs', doc.id);
+  assert.equal(f.calls().ingests, 0); assert.equal(f.docs.size, 0); assert.equal(doc.admissionState, 'deferred');
+  assert.equal(job.attempts, 0); assert.ok(job.nextAt > Date.now()); assert.equal(doc.captureError, 'network');
+});
+
+test('404 双次复核清理与主动恢复组成闭环，不依赖缓存自己更新', async () => {
+  const f = setup(); f.config.rag.cleanupEnabled = true; await f.c.SyncEngine.request();
+  const id = (await f.c.AgentDB.allRecords('documents'))[0].id; const original = f.c.fetch;
+  f.c.fetch = (url, options) => url.startsWith(f.config.rag.baseUrl) ? original(url, options) : Promise.resolve(new Response('', { status: 404 }));
+  await f.c.SyncEngine.retry(id); assert.equal(f.docs.size, 1); assert.equal((await f.c.Documents.get(id)).admissionState, 'deferred');
+  await f.c.Documents.update(id, d => ({ ...d, invalidCandidate: { ...d.invalidCandidate, firstSeenAt: Date.now() - 86400001, lastSeenAt: Date.now() - 1000 } }));
+  await f.c.AgentDB.updateRecord('jobs', id, j => ({ ...j, nextAt: 0, force: true })); await f.c.SyncEngine.run();
+  assert.equal(f.docs.size, 0); assert.equal((await f.c.Documents.get(id)).admissionState, 'invalid'); assert.equal((await f.c.Documents.get(id)).syncState, 'deleted');
+  f.c.fetch = original; await f.c.AgentDB.updateRecord('jobs', id, j => ({ ...j, nextAt: 0 })); await f.c.SyncEngine.run();
+  assert.equal(f.docs.size, 1); assert.equal((await f.c.Documents.get(id)).admissionState, 'eligible');
+});
+
+test('默认关闭自动失效删除，但立即隔离失效证据并保留恢复计划', async () => {
+  const f = setup(); await f.c.SyncEngine.request(); const id = (await f.c.AgentDB.allRecords('documents'))[0].id;
+  const original = f.c.fetch; f.c.fetch = (url, options) => url.startsWith(f.config.rag.baseUrl) ? original(url, options) : Promise.resolve(new Response('', { status: 410 }));
+  await f.c.SyncEngine.retry(id); assert.equal(f.docs.size, 1); assert.equal((await f.c.Documents.get(id)).admissionState, 'invalid');
+  const rows = f.c.Bookmarks.flatten(f.tree); assert.equal((await f.c.Rag.retrieve(f.config.rag, '凭证', rows)).length, 0);
+  assert.ok((await f.c.AgentDB.getRecord('jobs', id)).nextAt > Date.now());
+});
+
+test('客户端写入中断后服务器可能已完成，核验前不重发；确切版本可确认', async () => {
+  const f = setup(); const original = f.c.fetch; let writes = 0;
+  f.c.fetch = async (url, options) => {
+    const response = await original(url, options);
+    if (url.endsWith('/ingest')) { writes++; const error = new Error('客户端先停止等待'); error.name = 'AbortError'; throw error; }
+    return response;
+  };
+  await f.c.SyncEngine.request(); const doc = (await f.c.AgentDB.allRecords('documents'))[0];
+  assert.equal(doc.outcomeUnknown, true); assert.equal(writes, 1); assert.equal(f.docs.size, 1);
+  await f.c.SyncEngine.request({ force: true }); assert.equal(writes, 1);
+  f.c.fetch = original; await f.c.SyncEngine.verify(doc.id);
+  assert.equal((await f.c.Documents.get(doc.id)).outcomeUnknown, false); assert.equal(f.calls().ingests, 1);
+});
+
+test('删除失败保留实际 docId 与清理意图，确认删除前不标已清', async () => {
+  const f = setup(); await f.c.SyncEngine.request(); const doc = (await f.c.AgentDB.allRecords('documents'))[0]; const original = f.c.fetch;
+  f.node('1').children.splice(0);
+  f.c.fetch = (url, options) => options && options.method === 'DELETE' ? Promise.resolve(new Response('', { status: 503 })) : original(url, options);
+  await f.c.SyncEngine.request(); const failed = await f.c.Documents.get(doc.id);
+  assert.notEqual(failed.syncState, 'deleted'); assert.ok(failed.deleteIntent); assert.equal(f.docs.size, 1);
+  f.c.fetch = original; await f.c.AgentDB.updateRecord('jobs', doc.id, j => ({ ...j, nextAt: 0 })); await f.c.SyncEngine.run();
+  assert.equal(f.docs.size, 0); assert.equal((await f.c.Documents.get(doc.id)).syncState, 'deleted');
+});
+
+test('删除期间生成新正文，旧删除完成不能冒充新版本已清理，随后重建', async () => {
+  const f = setup(); f.config.rag.cleanupEnabled = true; await f.c.SyncEngine.request(); const doc = (await f.c.AgentDB.allRecords('documents'))[0]; const original = f.c.fetch; let changed = false;
+  f.c.fetch = async (url, options) => {
+    if (options && options.method === 'DELETE' && !changed) {
+      changed = true; await f.c.Documents.capture(doc.id, { text: '删除期间出现的新正文', captureState: 'ready', source: 'public' }); f.config.rag.autoCapture = false;
+    }
+    return original(url, options);
+  };
+  await f.c.Documents.update(doc.id, d => ({ ...d, captureError: 'http_410' })); await f.c.SyncEngine.request({ force: true });
+  /* force 采集会清错误，直接以历史空记录清理任务验证版本竞争。 */
+  await f.c.Documents.update(doc.id, d => ({ ...d, captureError: 'http_410' })); f.config.rag.autoCapture = false;
+  await f.c.SyncEngine.request({ force: true }); await f.c.SyncEngine.run();
+  assert.match(Array.from(f.docs.values())[0].content, /新正文/); assert.equal((await f.c.Documents.get(doc.id)).syncState, 'synced');
+});
+
+test('历史审计先预览，只有显式选择且仍为空的记录才清理', async () => {
+  const f = setup(); f.config.rag.autoCapture = false; await f.c.SyncEngine.reconcile(false);
+  const doc = (await f.c.AgentDB.allRecords('documents'))[0]; const key = await f.c.Rag.stateKey(f.config.rag);
+  const cloudId = 'legacy-empty'; f.docs.set(cloudId, { content: '仅标题', metadata: {} });
+  await f.c.AgentDB.setMeta(key, { [doc.id]: { pageId: doc.id, docId: cloudId, quality: 'metadata' } });
+  const preview = await f.c.SyncEngine.audit(); assert.equal(preview[0].selectable, true); assert.equal(f.docs.size, 1);
+  await f.c.SyncEngine.clean([doc.id]); assert.equal(f.docs.size, 0); assert.equal((await f.c.Documents.get(doc.id)).admissionState, 'metadata');
+});
+
+test('仅描述的新采集不覆盖旧成功正文，保持正文版本并显示历史状态', async () => {
+  const f = setup(); await f.c.SyncEngine.request(); const doc = (await f.c.AgentDB.allRecords('documents'))[0];
+  const updated = await f.c.Documents.capture(doc.id, { text: '', desc: '只有描述', captureState: 'metadata', source: 'public' });
+  assert.equal(updated.text, doc.text); assert.equal(updated.contentHash, doc.contentHash); assert.equal(updated.revision, doc.revision);
+  await f.c.SyncEngine.reconcile(false); f.config.rag.autoCapture = false; await f.c.SyncEngine.request({ force: true });
+  assert.equal(f.docs.size, 1); assert.equal((await f.c.Documents.get(doc.id)).syncState, 'synced');
+});
+
+test('网络恢复只唤醒网络类任务，不复活未确认写入或其他失效任务', async () => {
+  const f = setup({ failCapture: true }); await f.c.SyncEngine.request(); const doc = (await f.c.AgentDB.allRecords('documents'))[0];
+  await f.c.AgentDB.updateRecord('jobs', doc.id, j => ({ ...j, errorCode: 'outcome_unknown', status: 'paused' }));
+  await f.c.Documents.update(doc.id, d => ({ ...d, outcomeUnknown: true }));
+  await f.c.SyncEngine.networkRetry(); assert.equal((await f.c.AgentDB.getRecord('jobs', doc.id)).status, 'paused'); assert.equal(f.calls().ingests, 0);
+});
+
+test('补全采集的新正文会通知协调器，元数据完成态可升级入库', async () => {
+  const f = setup(); f.config.rag.autoCapture = false; await f.c.SyncEngine.request(); const id = (await f.c.AgentDB.allRecords('documents'))[0].id;
+  assert.equal(f.calls().ingests, 0);
+  await f.c.AgentDB.putPage({ url: 'https://example.com/a?utm_source=test', version: f.c.ContentIndex.VERSION, status: 'ok', source: 'public', text: '后来补采得到的正文', fetchedAt: Date.now() + 1000 });
+  await f.c.SyncEngine.request(); assert.equal(f.calls().ingests, 1); assert.equal((await f.c.Documents.get(id)).admissionState, 'eligible');
+});
+
+test('已知登录条件后的匿名 404 不自动判死', async () => {
+  const f = setup(); f.config.rag.cleanupEnabled = true; await f.c.SyncEngine.request(); const id = (await f.c.AgentDB.allRecords('documents'))[0].id; const original = f.c.fetch;
+  f.c.fetch = (url, options) => url.startsWith(f.config.rag.baseUrl) ? original(url, options) : Promise.resolve(new Response('', { status: 403 }));
+  await f.c.SyncEngine.retry(id);
+  f.c.fetch = (url, options) => url.startsWith(f.config.rag.baseUrl) ? original(url, options) : Promise.resolve(new Response('', { status: 404 }));
+  await f.c.SyncEngine.recapture(id); assert.equal(f.docs.size, 1); assert.equal((await f.c.Documents.get(id)).admissionState, 'deferred');
+  assert.equal((await f.c.Documents.get(id)).admissionReason, 'waiting_auth');
+});
+
+test('后台重建后读取逐项保存的当前任务与失败原因，不依赖设置页保活', async () => {
+  const first = setup({ failIngest: true });
+  await first.c.SyncEngine.request();
+  const before = await first.c.SyncEngine.summary();
+  assert.equal(before.records.length, 1);
+  assert.equal(before.records[0].sync, 'failed');
+  const restored = setup({ db: first.c.indexedDB, tree: first.tree });
+  const after = await restored.c.SyncEngine.summary();
+  assert.equal(after.records[0].id, before.records[0].id);
+  assert.equal(after.records[0].status, before.records[0].status);
+  assert.equal(after.records[0].error, before.records[0].error);
+  assert.ok(after.records[0].error);
+  assert.equal(restored.calls().ingests, 0);
+});
+
+test('显式批量重试重置临时错误上限和退避，跳过访问门槛、不确定写入、运行及删除项', async () => {
+  const f = setup();
+  await f.c.SyncEngine.reconcile(false);
+  const template = (await f.c.AgentDB.allRecords('documents'))[0];
+  const cases = [
+    ['network', 'failed', 2, {}], ['http_503', 'pending', 3, {}],
+    ['login_wall', 'paused', 1, {}], ['network', 'failed', 2, { outcomeUnknown: true }],
+    ['daily_limit', 'paused', 1, {}], ['http_404', 'failed', 1, {}],
+    ['network', 'running', 1, {}], ['network', 'failed', 2, { deleted: true }]
+  ];
+  for (const [index, [code, status, attempts, extra]] of cases.entries()) {
+    const id = 'batch-' + index;
+    await f.c.AgentDB.updateRecord('documents', id, () => ({ ...template, ...extra, id }));
+    await f.c.AgentDB.updateRecord('jobs', id, () => ({ id, generation: 1, documentRevision: template.revision, status, attempts, errorCode: code, error: code, nextAt: Date.now() + 999999 }));
+  }
+  // 保持另一个后台的租约，以便直接核对入队结果及持久化状态。
+  await f.c.AgentDB.setMeta('pipeline:lease', { owner: 'active-worker', until: Date.now() + 60000 });
+  assert.equal((await f.c.SyncEngine.summary()).retryableJobs, 2);
+  const result = await f.c.SyncEngine.retryFailed();
+  assert.equal(result.retryBatch.queued, 2);
+  assert.equal(result.retryBatch.skipped, 4);
+  for (let index = 0; index < cases.length; index++) {
+    const job = await f.c.AgentDB.getRecord('jobs', 'batch-' + index);
+    assert.equal(job.generation, index < 2 ? 2 : 1);
+    assert.equal(job.status, index < 2 ? 'pending' : cases[index][1]);
+    if (index < 2) { assert.equal(job.attempts, 0); assert.equal(job.error, undefined); assert.ok(job.nextAt <= Date.now()); }
+  }
+});
+
+test('无可重试项时批量操作不启动队列', async () => {
+  const f = setup();
+  await f.c.SyncEngine.reconcile(false);
+  const result = await f.c.SyncEngine.retryFailed();
+  assert.equal(result.retryBatch.queued, 0);
+  assert.equal(result.manual, false);
+  assert.equal(f.calls().ingests, 0);
+});
+
+test('所选失败任务按 ID 去重重试，服务端排除不可重试项且不改动未选任务', async () => {
+  const f = setup(); await f.c.SyncEngine.reconcile(false);
+  const template = (await f.c.AgentDB.allRecords('documents'))[0];
+  const cases = [['selected', 'login_wall', {}], ['unselected', 'network', {}], ['uncertain', 'network', { outcomeUnknown: true }], ['quota', 'daily_limit', {}]];
+  for (const [id, code, extra] of cases) {
+    await f.c.AgentDB.updateRecord('documents', id, () => ({ ...template, ...extra, id }));
+    await f.c.AgentDB.updateRecord('jobs', id, () => ({ id, generation: 1, status: 'failed', attempts: 5, errorCode: code, error: code, nextAt: 0 }));
+  }
+  await f.c.AgentDB.setMeta('pipeline:lease', { owner: 'active-worker', until: Date.now() + 60000 });
+  const summary = await f.c.SyncEngine.summary();
+  assert.equal(summary.records.find(row => row.id === 'selected').selectableRetry, true);
+  assert.equal(summary.records.find(row => row.id === 'selected').errorCategory.key, 'login');
+  assert.equal(summary.records.find(row => row.id === 'uncertain').selectableRetry, false);
+  const result = await f.c.SyncEngine.retryFailed(['selected', 'selected', 'uncertain', 'quota', 'missing']);
+  assert.equal(result.retryBatch.queued, 1); assert.equal(result.retryBatch.skipped, 3);
+  assert.equal((await f.c.AgentDB.getRecord('jobs', 'selected')).status, 'pending');
+  for (const id of ['unselected', 'uncertain', 'quota']) assert.equal((await f.c.AgentDB.getRecord('jobs', id)).generation, 1);
+  const empty = await f.c.SyncEngine.retryFailed([]);
+  assert.equal(empty.retryBatch.queued, 0);
+});
+
+test('没有持久化任务的收藏不冒充待处理队列', async () => {
+  const f = setup(); await f.c.SyncEngine.reconcile(false);
+  const job = (await f.c.AgentDB.allRecords('jobs'))[0];
+  await f.c.AgentDB.updateRecord('jobs', job.id, () => null);
+  assert.equal((await f.c.SyncEngine.summary()).records[0].status, 'unqueued');
 });

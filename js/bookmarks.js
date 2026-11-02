@@ -171,13 +171,15 @@
   };
 
   function score(row, q, now) {
-    var ql = q.toLowerCase();
+    var ql = q.normalize('NFKC').toLowerCase();
     var title = (row.title || '').toLowerCase();
     var folder = (row.folder || '').toLowerCase();
     var url = (row.url || '').toLowerCase();
     var host = (row.host || '').toLowerCase();
     var hay = row.hay || '';
     var s = 0;
+    if (String(row.personalNote || '').normalize('NFKC').toLowerCase().includes(ql)) s += 3;
+    if ((row.personalNames || []).some(function (v) { return String(v).normalize('NFKC').toLowerCase() === ql; })) s += 24;
 
     if (title.indexOf(ql) !== -1) s += W.titleExact;
     if (url.indexOf(ql) !== -1) s += W.urlExact;
@@ -230,7 +232,7 @@
 
   function query(rows, q, limit, now) {
     now = now || Date.now();
-    var ql = (q || '').trim().toLowerCase();
+    var ql = (q || '').normalize('NFKC').trim().toLowerCase();
     if (!ql || !rows || !rows.length) return [];
 
     var terms = termsOf(ql);

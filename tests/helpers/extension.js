@@ -46,12 +46,21 @@ function fixture(options = {}) {
       source.children.splice(source.children.findIndex(n => n.id === id), 1);
       target.children.splice(Math.min(data.index === undefined ? target.children.length : data.index, target.children.length), 0, current);
       normalize(tree); return clone(current);
+    },
+    remove: async id => {
+      const found = node(String(id));
+      if (!found) throw new Error('书签不存在');
+      if (found.children) throw new Error('不能删除目录');
+      const parent = node(found.parentId);
+      if (!parent || !parent.children) throw new Error('父目录不存在');
+      parent.children.splice(parent.children.findIndex(n => n.id === String(id)), 1);
+      normalize(tree);
     }
   };
   const c = { URL, crypto: webcrypto, TextEncoder, TextDecoder, FormData, Response, AbortController, setTimeout, clearTimeout,
     indexedDB: options.db || new IDBFactory(), chrome: { bookmarks }, fetch: options.fetch };
   c.self = c; vm.createContext(c);
-  for (const name of ['db', 'bookmarks', 'content-index', 'resource-gate', 'retry-policy', 'collection-stats', 'documents', 'pageinfo', 'capture-adapters', 'ai', 'organizer', 'organizer-moves', 'rag', 'sync-engine', 'bookmark-answer', 'bookmark-enrich', 'bookmark-search']) vm.runInContext(fs.readFileSync(path.join(root, 'js', name + '.js'), 'utf8'), c);
+  for (const name of ['db', 'bookmarks', 'content-index', 'resource-gate', 'retry-policy', 'collection-stats', 'documents', 'quick-tags', 'personal-targets', 'network-status', 'ingest-policy', 'pageinfo', 'capture-adapters', 'ai', 'organizer', 'organizer-moves', 'rag', 'sync-engine', 'bookmark-answer', 'bookmark-enrich', 'bookmark-search']) vm.runInContext(fs.readFileSync(path.join(root, 'js', name + '.js'), 'utf8'), c);
   return { c, node, tree, bookmarks };
 }
 module.exports = { fixture };

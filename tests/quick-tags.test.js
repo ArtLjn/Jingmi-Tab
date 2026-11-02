@@ -40,7 +40,7 @@ function storageContext(initial, delayRead) {
   c.self = c;
   vm.createContext(c);
   vm.runInContext(fs.readFileSync(path.join(root, 'js', 'quick-tags.js'), 'utf8'), c);
-  return { c, store, release: () => pending.splice(0).forEach(fn => fn()) };
+  return { c, store, release: () => { delayRead = false; pending.splice(0).forEach(fn => fn()); } };
 }
 
 test('地址归一：补协议、拒非 http、保留路径', () => {
@@ -213,7 +213,7 @@ test('已忽略可恢复：恢复后重新进入候选', () => {
 test('导出只带固定标签，导入按地址去重', () => {
   const c = seeded([{ id: 'a', label: '打卡', url: 'https://oa.hongdi.com/', pin: 0 }]);
   const dump = c.QuickTags.exportData();
-  assert.equal(dump.version, 1);
+  assert.equal(dump.version, 2);
   assert.equal(dump.tags.length, 1);
   assert.equal(dump.tags[0].label, '打卡');
   assert.equal(dump.tags[0].host, undefined, '导出不包含派生字段');
@@ -316,4 +316,67 @@ test('备份快照：replace 整体替换，merge 按 URL 合并', async () => {
 
   await c.QuickTags.restoreState(snap, { mode: 'merge' });
   assert.deepEqual(Array.from(c.QuickTags.list(), t => t.label).sort(), ['A', 'B']);
+});
+
+test('个人称呼：007 精确别名高于高频域名，前导零不被丢弃', () => {
+  const c = seeded([
+    { id: 'portal', label: '公司平台', url: 'https://portal.example.com/', aliases: ['007', 'OA'], note: '报销和请假' },
+    { id: 'noise', label: '高频网站', url: 'https://007.example.com/', hits: 99999, lastUsed: Date.now() }
+  ]);
+  assert.equal(c.QuickTags.search('００７', {}).pinned[0].id, 'portal');
+  assert.equal(c.QuickTags.search('007', {}).pinned[0].match, 120);
+  assert.equal(c.QuickTags.search('7', {}).pinned.find(t => t.id === 'portal').match < 120, true);
+  assert.equal(c.QuickTags.search('报销', {}).pinned[0].id, 'portal');
+});
+
+test('个人称呼：所有精确冲突可见，同域不同路径不合并', () => {
+  const c = seeded(Array.from({ length: 12 }, (_, i) => ({ id: 't' + i, label: '入口' + i, aliases: ['007'], url: 'https://portal.example.com/p' + i })));
+  const groups = c.QuickTags.search('007', {});
+  assert.equal(groups.ambiguous, true);
+  assert.equal(groups.pinned.length, 12);
+});
+
+test('完整编辑落盘并保留人工信息，过期表单不能覆盖', async () => {
+  const { c, store } = storageContext({ version: 2, tags: [{ id: 'a', label: '旧名称', url: 'https://portal.example.com/', hits: 6, pin: 0 }] });
+  await c.QuickTags.load();
+  const result = await c.QuickTags.save({ label: '公司平台', url: 'https://portal.example.com/', aliases: ['007', ' OA ', 'oa'], note: '报销与请假' }, 'a', 0);
+  assert.equal(result.ok, true); assert.equal(store['newtab.tags.v1'].tags[0].note, '报销与请假');
+  assert.equal(result.tag.hits, 6); assert.deepEqual(Array.from(result.tag.aliases), ['007', 'OA']);
+  const stale = await c.QuickTags.save({ label: '旧表单', url: result.tag.url }, 'a', 0);
+  assert.equal(stale.ok, false); assert.equal(c.QuickTags.list()[0].label, '公司平台');
+  const dump = c.QuickTags.exportData(); assert.equal(dump.tags[0].note, '报销与请假');
+  c.QuickTags.resetLearned(); await c.QuickTags.flush(); assert.equal(c.QuickTags.list()[0].note, '报销与请假');
+});
+
+test('保存失败不发布新状态；不支持的新版拒绝写回', async () => {
+  const { c, store } = storageContext({ version: 2, tags: [] }); await c.QuickTags.load();
+  c.chrome.runtime = { lastError: { message: '磁盘写失败' } };
+  const saved = await c.QuickTags.save({ label: '公司平台', url: 'https://portal.example.com/', aliases: ['007'] });
+  assert.equal(saved.ok, false); assert.equal(c.QuickTags.list().length, 0); delete c.chrome.runtime.lastError;
+  assert.equal(c.QuickTags.importData({ version: 999, tags: [] }).ok, false);
+  store['newtab.tags.v1'] = { version: 999, tags: [] }; await assert.rejects(c.QuickTags.reload(), /新版/);
+});
+
+test('字段限制不静默截断，拒绝凭据网址与冲突 URL', async () => {
+  const c = seeded([{ id: 'a', label: '公司平台', url: 'https://portal.example.com/', note: '原说明' }]);
+  assert.equal(c.QuickTags.validate({ label: '名'.repeat(41), url: 'https://example.com' }).ok, false);
+  assert.equal(c.QuickTags.validate({ label: '名称', note: '字'.repeat(501), url: 'https://example.com' }).ok, false);
+  assert.equal(c.QuickTags.normalizeUrl('https://user:password@example.com/'), '');
+  assert.equal((await c.QuickTags.save({ label: '重复入口', url: 'https://portal.example.com/' })).ok, false);
+});
+
+test('另一页面先提交时，旧页面的频率写入不能覆盖新别名与说明', async () => {
+  const a = storageContext({ version: 2, tags: [{ id: 'a', label: '公司', url: 'https://portal.example.com/' }] });
+  const b = context(); b.chrome = a.c.chrome; await a.c.QuickTags.load(); await b.QuickTags.load();
+  assert.equal((await b.QuickTags.save({ label: '公司', url: 'https://portal.example.com/', aliases: ['007'], note: '新说明' }, 'a', 0)).ok, true);
+  a.c.QuickTags.touch({ kind: 'manual', id: 'a' }); await assert.rejects(a.c.QuickTags.flush(), /其他页面/);
+  assert.deepEqual(a.store['newtab.tags.v1'].tags[0].aliases, ['007']); assert.equal(a.store['newtab.tags.v1'].tags[0].note, '新说明');
+});
+
+test('Unicode 名称按字符计数，保存与重载不截断合法的表情名称', async () => {
+  const { c, store } = storageContext({ tags: [] }); await c.QuickTags.load();
+  const label = '😀'.repeat(40); const added = c.QuickTags.add({ label, url: 'https://example.com/' });
+  assert.equal(added.ok, true); assert.equal(added.tag.label, label);
+  await c.QuickTags.flush(); await c.QuickTags.reload(); assert.equal(c.QuickTags.list()[0].label, label);
+  assert.equal(store['newtab.tags.v1'].tags[0].label, label);
 });

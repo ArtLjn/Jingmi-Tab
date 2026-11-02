@@ -48,6 +48,17 @@ test('批量重试跳过超时耗尽、权限与永久失败，只登记可重�
   await assert.rejects(f.c.BookmarkEnrich.retry(rows[1].id), /停止/);
 });
 
+test('补全异常按原因归类，标签文案稳定', () => {
+  const { c } = fixture();
+  assert.equal(c.RetryPolicy.category('network').label, '网络');
+  assert.equal(c.RetryPolicy.category('timeout').label, '网络');
+  assert.equal(c.RetryPolicy.category('http_502').label, '服务端');
+  assert.equal(c.RetryPolicy.category('http_403').label, '需登录');
+  assert.equal(c.RetryPolicy.category('daily_limit').label, '额度');
+  assert.equal(c.RetryPolicy.category('ai_config').label, 'AI 配置');
+  assert.equal(c.RetryPolicy.category('something_new').label, '其他');
+});
+
 test('额度等待跨日恢复，不通过重试清空配额；不确定写入不自动恢复', () => {
   const { c } = fixture();
   const previous = new Date(2026, 10, 1, 23, 50).getTime();

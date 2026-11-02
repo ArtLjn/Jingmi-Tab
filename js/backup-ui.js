@@ -37,7 +37,8 @@
       serverUrl: serverUrl(),
       token: backupCfg().authToken || '',
       deviceId: 'default',
-      auto: true
+      auto: true,
+      includePersonalNotes: !!(settings() && settings().tags && settings().tags.backupNotes)
     };
   }
 
@@ -60,7 +61,11 @@
       unauthorized: '登录已过期，请重新登录',
       http_401: '登录已过期，请重新登录',
       http_403: '没有访问权限',
-      forbidden: '暂时无法注册，请稍后再试',
+      forbidden: '没有注册权限，请联系维护者',
+      invite_required: '注册需要邀请码，请联系维护者获取',
+      invalid_invite: '邀请码无效，请联系维护者确认',
+      registration_closed: '暂未开放邀请注册，请联系维护者',
+      registration_rate_limited: '注册尝试过于频繁，请 10 分钟后再试',
       conflict: '该账号已注册，请直接登录',
       rate_limited: '登录失败次数过多，请稍后再试',
       invalid_credentials: '账号或密码错误',
@@ -140,7 +145,7 @@
   /* 弹窗说明随登录状态与登录/注册模式切换，避免注册时仍写“登录后”。 */
   function introText() {
     if (backupCfg().authToken && backupCfg().username) return '已开启自动备份，设置变化会自动同步到账号。';
-    return registering ? '注册后自动备份设置，换设备或重装后可用同一账号恢复。' : '登录后自动备份设置，换设备或重装后可用同一账号恢复。';
+    return registering ? '托管 API 采用邀请注册，请向维护者获取邀请码。已有账号可直接登录。' : '登录后自动备份设置，换设备或重装后可用同一账号恢复。';
   }
 
   function renderIntro() {
@@ -186,6 +191,7 @@
   function clearPasswords() {
     if (els.password) els.password.value = '';
     if (els.confirmPassword) els.confirmPassword.value = '';
+    if (els.invite) els.invite.value = '';
   }
 
   function setAuthMode(value) {
@@ -193,6 +199,8 @@
     clearPasswords();
     status('');
     els.confirmField.hidden = !value;
+    els.inviteField.hidden = !value;
+    els.invite.required = value;
     els.confirmPassword.required = value;
     els.username.type = value ? 'email' : 'text';
     els.usernameLabel.textContent = value ? '邮箱账号' : '账号';
@@ -217,6 +225,7 @@
     if (!user || !pass) { status('请输入账号和密码', true); return; }
     if (isRegister) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user)) { status('请输入有效的邮箱地址', true); return; }
+      if (!els.invite.value.trim()) { status('请输入邀请码，请联系维护者获取', true); return; }
       if (pass.length < 8 || pass.length > 128) { status('密码需要 8～128 位', true); return; }
       if (pass !== els.confirmPassword.value) { status('两次输入的密码不一致', true); return; }
     }
@@ -228,8 +237,10 @@
       var granted = await perm;
       if (permDenied(granted)) { status('未获得服务地址访问权限，请重试并允许', true); return; }
       status(isRegister ? '正在注册…' : '正在登录…');
+      var invite = isRegister ? els.invite.value : '';
+      if (isRegister) els.invite.value = '';
       var data = isRegister
-        ? await global.Backup.authRegister(authCfg(), user, pass)
+        ? await global.Backup.authRegister(authCfg(), user, pass, invite)
         : await global.Backup.authLogin(authCfg(), user, pass);
       if (global.Profiles) { await Profiles.activate(data); return; }
       var s = settings();
@@ -360,6 +371,8 @@
       usernameLabel: $('#backup-username-label'),
       confirmField: $('#backup-confirm-field'),
       confirmPassword: $('#backup-confirm-password'),
+      inviteField: $('#backup-invite-field'),
+      invite: $('#backup-invite'),
       backLogin: $('#backup-back-login'),
       note: $('#backup-note'),
       login: $('#backup-login'),

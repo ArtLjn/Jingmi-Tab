@@ -1,9 +1,9 @@
 /* ============================================================
    bookmark-answer.js —— 基于书签正文与 RAG 片段的问答
    设计约束：
-     1. 只把候选里真实存在的正文片段交给模型，答案必须引用证据 id；
-     2. 没有正文证据时直接放弃，由上层退回书签重排，不凭空回答；
-     3. 证据不足、模型失败都返回结构化错误，界面保留本地结果。
+     1. 只把候选里真实存在的片段和元信息交给模型，来源必须命中候选；
+     2. 没有正文时只能解释可核实的标题、站点和目录，不凭空回答；
+     3. 空返回或格式异常最多补试一次；模型失败时界面说明原因并保留本地结果。
    ============================================================ */
 (function (global) {
   'use strict';
@@ -36,6 +36,7 @@
     '- 证据标题和 host 也可用于识别收藏的网站；若问题中的编号或名称出现在标题/host，优先解释这条收藏，不要被无关正文带偏',
     '- 正文为空时只能说明标题、站点和目录可核实的信息，不要猜测网站用途',
     '- 用户问网站是做什么的时，结合标题、host 和正文概括用途；没有用途证据时只说明网站身份并指出用途信息不足',
+    '- 用户只输入关键词、名称或简短指令时，也要用文字概括相关收藏及匹配依据，不能只列书签或标签',
     '- 在关键结论后用 [1][2] 标注引用的证据编号，编号只能来自证据列表',
     '- 用简体中文，先给结论，再给必要细节，不超过 180 字',
     '- 不要输出 JSON、标题、来源列表或 Markdown',
@@ -82,6 +83,7 @@
     var seen = {};
     (cands || []).forEach(function (hit) {
       var row = hit.row || hit;
+      if (['invalid', 'excluded', 'metadata'].includes(row.admissionState)) return;
       var id = String(row.id || '');
       if (!id || seen[id]) return;
       var text = rawText(row);
@@ -156,6 +158,7 @@
     options = options || {};
     var cfg = options.cfg || {};
     var query = String(options.query || '').trim();
+    if (cancelled(options)) return { ok: false, error: 'cancelled' };
     if (!available(cfg)) return { ok: false, error: 'not_configured' };
     if (!query) return { ok: false, error: 'empty_query' };
 
@@ -183,20 +186,70 @@
       return head + '\n' + item.text;
     }).join('\n\n');
 
+    var started = Date.now();
+    var timeout = options.timeout || 20000;
     var result = await AI.chatStream(cfg, STREAM_SYSTEM, body, {
       maxTokens: 700,
       temperature: 0.2,
-      timeout: options.timeout || 20000,
-      onDelta: options.onDelta,
+      timeout: timeout,
+      onDelta: function (delta, full) {
+        // JSON 选择列表不是回答，先缓冲，避免在界面闪现原始结构。
+        if (!cancelled(options) && String(full || '').trim() && !structured(full) && options.onDelta) options.onDelta(delta, full);
+      },
       shouldContinue: options.shouldContinue,
       signal: options.signal,
       task: 'strong'
     });
+    if (cancelled(options)) return { ok: false, error: 'cancelled' };
     if (!result.ok) return result;
 
-    var answer = String(result.content || '').trim();
-    if (!answer) return { ok: false, error: 'bad_response' };
-    if (answer.charAt(0) === '{' && parseLoose(answer)) return { ok: false, error: 'bad_response' };
+    var normalized = normalizeAnswer(result.content, evidence);
+    var remaining = timeout - (Date.now() - started);
+    if (!normalized.ok && !result.incomplete && remaining > 0) {
+      // 只修复空返回与格式错误；总等待受原超时约束，不重试网络、限流或鉴权错误。
+      result = await AI.chat(cfg, STREAM_SYSTEM, body, {
+        maxTokens: 700, temperature: 0.2, task: 'strong',
+        timeout: Math.min(12000, remaining), signal: options.signal
+      });
+      if (cancelled(options)) return { ok: false, error: 'cancelled' };
+      if (!result.ok) return result;
+      normalized = normalizeAnswer(result.content, evidence);
+    }
+    if (!normalized.ok) return { ok: false, error: result.error || 'bad_response' };
+
+    var output = {
+      ok: true,
+      answer: normalized.answer,
+      sources: normalized.sources,
+      enough: normalized.enough,
+      incomplete: !!result.incomplete,
+      streamed: true,
+      ms: Date.now() - started
+    };
+    if (!output.incomplete) {
+      if (answerCache.size >= 50) answerCache.delete(answerCache.keys().next().value);
+      answerCache.set(key, { at: Date.now(), value: output });
+    }
+    return output;
+  }
+
+  function cancelled(options) {
+    return !!((options.signal && options.signal.aborted) || (options.shouldContinue && !options.shouldContinue()));
+  }
+
+  function structured(text) {
+    return /^(?:\{|\[(?!\d{1,2}\])|`)/.test(String(text || '').trim());
+  }
+
+  function normalizeAnswer(content, evidence) {
+    var answer = typeof content === 'string' ? content.trim() : '';
+    var parsed = structured(answer) ? parseLoose(answer) : null;
+    if (structured(answer)) {
+      if (!parsed || (!parsed.answer && parsed.enough !== false)) return { ok: false };
+      answer = parsed.enough === false ? '当前收藏里没有足够的信息来回答这个问题。'
+        : typeof parsed.answer === 'string' ? parsed.answer.trim() : '';
+    }
+    if (!answer.replace(/\[\d{1,2}\]/g, '').trim()) return { ok: false };
 
     /* 模型没标引用时保留回答但不造来源；标了就按编号还原真实候选。 */
     var sources = [];
@@ -210,21 +263,13 @@
       seen[item.id] = 1;
       sources.push({ id: item.id, marker: index + 1, why: '' });
     }
-
-    var output = {
-      ok: true,
-      answer: answer,
-      sources: sources.slice(0, MAX_SOURCES),
-      enough: true,
-      incomplete: !!result.incomplete,
-      streamed: true,
-      ms: result.ms
-    };
-    if (!output.incomplete) {
-      if (answerCache.size >= 50) answerCache.delete(answerCache.keys().next().value);
-      answerCache.set(key, { at: Date.now(), value: output });
-    }
-    return output;
+    if (parsed && parsed.enough !== false && Array.isArray(parsed.sources)) parsed.sources.forEach(function (source) {
+      var item = source && evidence.find(function (entry) { return entry.id === String(source.id); });
+      if (!item || seen[item.id]) return;
+      seen[item.id] = 1;
+      sources.push({ id: item.id, why: '' });
+    });
+    return { ok: true, answer: answer, sources: sources.slice(0, MAX_SOURCES), enough: !parsed || parsed.enough !== false };
   }
 
   var answerCache = new Map();

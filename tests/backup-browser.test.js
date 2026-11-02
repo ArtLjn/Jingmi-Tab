@@ -44,7 +44,7 @@ test('浏览器回归：账号注册/登录、备份与两步恢复', { skip: !f
     if (url.pathname === '/health') { send(200, { ok: true, service: 'test', version: '1.1.0' }); return; }
     if (url.pathname === '/api/auth/register' && req.method === 'POST') {
       readBody(body => {
-        if (!body || !body.username.includes('@') || 'invite_code' in body) {
+        if (!body || !body.username.includes('@') || body.invite_code !== 'browser-test-invite') {
           send(422, { ok: false, error: { code: 'invalid_payload', message: '邮箱格式不正确' } });
           return;
         }
@@ -121,6 +121,7 @@ test('浏览器回归：账号注册/登录、备份与两步恢复', { skip: !f
   try {
     browser = await chromium.launch({ executablePath, headless: true });
     const context = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    await context.route('**/*', route => new URL(route.request().url()).origin === originHolder.origin ? route.continue() : route.fulfill({ status: 200, body: '' }));
     await context.addInitScript(({ serverOrigin }) => {
       window.__BACKUP_SERVER__ = serverOrigin;
       const load = () => { try { return JSON.parse(localStorage.getItem('__stub') || '{}'); } catch (e) { return {}; } };
@@ -164,26 +165,39 @@ test('浏览器回归：账号注册/登录、备份与两步恢复', { skip: !f
     await page.locator('#settings-btn').click();
     await page.locator('#workspace-tab-search').click();
     await page.locator('#search-overview [data-search-target="settings"]').click();
-    await page.locator('#ai-key').fill('sk-test');
+    await page.locator('#ai-key').fill('sk-guest');
     await page.locator('#ai-key').dispatchEvent('change');
+    await page.waitForFunction(() => (window.__store['newtab.profile.guest:newtab.settings.v1'] || {}).ai?.apiKey === 'sk-guest');
     await page.locator('#workspace-account').click();
     await page.waitForFunction(() => !document.querySelector('#account-modal').hidden);
 
     /* 未登录只显示两个字段，注册时才出现确认密码。 */
     assert.equal(await page.locator('#backup-account-form input:visible').count(), 2);
     assert.equal(await page.locator('#backup-actions').isVisible(), false);
-    assert.equal(await page.locator('#backup-invite').count(), 0);
+    assert.equal(await page.locator('#backup-invite').isVisible(), false);
     await page.locator('#backup-register').click();
-    assert.equal(await page.locator('#backup-account-form input:visible').count(), 3);
+    assert.equal(await page.locator('#backup-account-form input:visible').count(), 4);
     await page.locator('#backup-username').fill('demo@example.com');
     await page.locator('#backup-password').fill('demo-pass');
     await page.locator('#backup-confirm-password').fill('different-pass');
+    await page.locator('#backup-invite').fill('browser-test-invite');
     await page.locator('#backup-register').click();
     await page.waitForFunction(() => document.querySelector('#backup-status').textContent.includes('两次输入的密码不一致'));
     assert.equal(account, null, '密码不一致时不能发起注册');
     await page.locator('#backup-confirm-password').fill('demo-pass');
     await page.locator('#backup-confirm-password').press('Enter');
-    await page.waitForFunction(() => (document.querySelector('#backup-account-name').textContent || '') === 'demo@example.com');
+    await page.waitForFunction(() => document.body.textContent.includes('账号已切换'));
+    await page.reload();
+    await page.waitForFunction(() => window.Profiles && Profiles.current().user?.id === 2);
+    assert.equal((await page.evaluate(() => Settings.load())).ai.apiKey, '', '新账号不继承访客的 AI 密钥');
+    await page.locator('#settings-btn').click();
+    await page.locator('#workspace-tab-search').click();
+    await page.locator('#search-overview [data-search-target="settings"]').click();
+    await page.locator('#ai-key').fill('sk-test');
+    await page.locator('#ai-key').dispatchEvent('change');
+    await page.waitForFunction(() => (window.__store['newtab.profile.user-2:newtab.settings.v1'] || {}).ai?.apiKey === 'sk-test');
+    await page.locator('#workspace-account').click();
+    await page.waitForFunction(() => document.querySelector('#backup-account-name')?.textContent === 'demo@example.com');
 
     assert.equal(await page.locator('#backup-password').inputValue(), '');
     assert.equal(await page.locator('#backup-confirm-password').inputValue(), '');
@@ -198,12 +212,8 @@ test('浏览器回归：账号注册/登录、备份与两步恢复', { skip: !f
     assert.ok(!lastPutRaw.includes('demo-pass'), '密码不能出现在备份请求体里');
     assert.ok(!lastPutRaw.includes('session-'), '会话令牌不能出现在备份请求体里');
 
-    /* 修改本机设置，再从服务器恢复 */
-    await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('__stub') || '{}');
-      raw['newtab.settings.v1'].ai.apiKey = 'sk-changed';
-      localStorage.setItem('__stub', JSON.stringify(raw));
-    });
+    /* 修改账号空间的本机设置，再从服务器恢复。 */
+    await page.evaluate(async () => { const settings = await Settings.load(); settings.ai.apiKey = 'sk-changed'; await Settings.save(settings); });
 
     await page.locator('#backup-restore').click();
     await page.waitForFunction(() => (document.querySelector('#backup-restore').textContent || '').includes('确认恢复'));
@@ -211,10 +221,7 @@ test('浏览器回归：账号注册/登录、备份与两步恢复', { skip: !f
     await page.waitForTimeout(1200);
     await page.waitForFunction(() => window.__store !== undefined);
 
-    const restored = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('__stub') || '{}');
-      return raw['newtab.settings.v1'] || {};
-    });
+    const restored = await page.evaluate(() => Settings.load());
     assert.equal(restored.ai.apiKey, 'sk-test', '恢复后应回到备份里的 AI Key');
     assert.equal((restored.backup || {}).username, 'demo@example.com', '恢复后应保留本机登录账号');
     assert.match((restored.backup || {}).authToken || '', /^session-\d+$/, '恢复后应保留会话令牌');
@@ -224,6 +231,10 @@ test('浏览器回归：账号注册/登录、备份与两步恢复', { skip: !f
     await page.locator('#workspace-account').click();
     await page.waitForFunction(() => (document.querySelector('#backup-account-name').textContent || '') === 'demo@example.com');
     await page.locator('#backup-logout').click();
+    await page.waitForFunction(() => document.body.textContent.includes('账号已切换'));
+    await page.reload();
+    await page.locator('#settings-btn').click();
+    await page.locator('#workspace-account').click();
     await page.waitForFunction(() => !document.querySelector('#backup-account-form').hidden);
 
     assert.equal(await page.locator('#backup-account-form input:visible').count(), 2);
@@ -231,13 +242,17 @@ test('浏览器回归：账号注册/登录、备份与两步恢复', { skip: !f
     await page.locator('#backup-password').fill('temporary-pass');
     await page.locator('#backup-back-login').click();
     assert.equal(await page.locator('#backup-password').inputValue(), '');
+    await page.locator('#backup-username').fill('demo@example.com');
     await page.locator('#backup-password').fill('wrong-pass');
     await page.locator('#backup-login').click();
     await page.waitForFunction(() => (document.querySelector('#backup-status').textContent || '').includes('账号或密码错误'));
 
     await page.locator('#backup-password').fill('demo-pass');
     await page.locator('#backup-password').press('Enter');
-    await page.waitForFunction(() => (document.querySelector('#backup-account-name').textContent || '') === 'demo@example.com');
+    await page.waitForFunction(() => document.body.textContent.includes('账号已切换'));
+    await page.reload();
+    await page.waitForFunction(() => window.Profiles && Profiles.current().user?.id === 2);
+    assert.equal((await page.evaluate(() => Settings.load())).backup.username, 'demo@example.com');
   } finally {
     if (browser) await browser.close();
     server.close();

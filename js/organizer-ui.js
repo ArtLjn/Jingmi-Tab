@@ -88,6 +88,14 @@
     function el(tag, text, className) {
       var n = document.createElement(tag); if (text) n.textContent = text; if (className) n.className = className; return n;
     }
+    /* 书签行的人工备注来自快捷入口；没有记录时返回 null，不影响浏览。 */
+    function personalTag(row) {
+      if (typeof QuickTags === 'undefined' || !QuickTags.normalizeUrl) return null;
+      try {
+        var url = QuickTags.normalizeUrl(row.url);
+        return QuickTags.list().filter(function (tag) { return tag.url === url; })[0] || null;
+      } catch (e) { return null; }
+    }
     async function send(type) {
       var result = await chrome.runtime.sendMessage({ type: type });
       if (!result || !result.ok) throw new Error(result && result.error || '后台未响应，请重新加载扩展');
@@ -110,7 +118,11 @@
       var current = folders.find(function (f) { return f.id === folder.value; });
       var data = current ? rows.filter(function (r) { return current.ids.has(String(r.id)); }) : rows;
       var text = query.value.trim().toLowerCase();
-      var filtered = data.filter(function (r) { return !text || [r.title, r.url, r.folder, r.desc, r.text].join(' ').toLowerCase().includes(text); });
+      var filtered = data.filter(function (r) {
+        var personal = r.personal;
+        var personalText = personal ? [personal.label].concat(personal.aliases || [], personal.note || '').join(' ') : '';
+        return !text || [r.title, r.url, r.folder, r.desc, r.text, personalText].join(' ').toLowerCase().includes(text);
+      });
       document.querySelector('#organizer-count').textContent = rows.length + ' 条书签';
       document.querySelector('#organizer-pending').textContent = '最新收藏优先';
       document.querySelector('#organizer-list-title').textContent = current ? current.title : '全部书签';
@@ -130,9 +142,33 @@
         var badges = el('div', '', 'organizer-badges');
         [row.contentStatus || '仅标题', row.syncStatus || '未入库'].forEach(function (label) { badges.append(el('span', label, 'organizer-badge')); });
         body.append(badges);
+        var personal = row.personal || null;
+        if (personal) {
+          var personalParts = [];
+          if (personal.label && personal.label !== row.title) personalParts.push('名称：' + personal.label);
+          if (personal.aliases && personal.aliases.length) personalParts.push('别名：' + personal.aliases.join('、'));
+          if (personal.note) personalParts.push('备注：' + personal.note);
+          if (personalParts.length) body.append(el('p', personalParts.join(' · '), 'organizer-personal'));
+        }
         var detail = [row.captureNote, row.contentAt ? '采集于 ' + new Date(row.contentAt).toLocaleDateString('zh-CN') : ''].filter(Boolean).join(' · ');
         if (detail) body.append(el('p', detail, 'organizer-note'));
-        item.append(avatar, body); list.append(item);
+        if (typeof TagEditor !== 'undefined') {
+          var actions = el('div', '', 'organizer-item-actions');
+          var edit = el('button', '编辑备注', 'organizer-note-btn');
+          edit.type = 'button';
+          edit.title = '编辑这个书签的名称、别名和说明';
+          edit.addEventListener('click', function () {
+            TagEditor.open({ tag: personal || { url: row.url, label: row.title || host }, saved: function () {
+              refresh().catch(function () {});
+              if (options && typeof options.changed === 'function') options.changed();
+            } });
+          });
+          actions.append(edit);
+          item.append(avatar, body, actions);
+        } else {
+          item.append(avatar, body);
+        }
+        list.append(item);
       });
       if (filtered.length > limit) {
         var more = el('button', '再显示 50 条', 'btn-ghost organizer-more'); more.type = 'button';
@@ -151,6 +187,10 @@
         var classes = await Organizer.records(rows);
         rows.forEach(function (row) { if (classes[row.id] && classes[row.id].tags) row.hay += ' ' + classes[row.id].tags.join(' ').toLowerCase(); });
         if (typeof BookmarkEnrich !== 'undefined') await BookmarkEnrich.applySummaries(rows);
+        if (typeof QuickTags !== 'undefined' && QuickTags.load) {
+          try { await QuickTags.load(); rows.forEach(function (row) { row.personal = personalTag(row); }); }
+          catch (e) { /* 备注读取失败不影响书签浏览。 */ }
+        }
         folders = indexFolders(tree);
         folder.replaceChildren();
         var all = el('option', '全部书签'); all.value = ''; folder.append(all);

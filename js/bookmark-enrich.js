@@ -150,7 +150,7 @@
       var previous = list.find(function (item) { return String(item.id) === String(node.id) && item.url === node.url; });
       list = list.filter(function (item) { return String(item.id) !== String(node.id); });
       list.unshift({ id: String(node.id), url: node.url || '', title: node.title || '', reason: reason,
-        code: code || '', attempts: (previous && previous.attempts || 0) + (['private', 'ai_config', 'daily_limit'].includes(code) ? 0 : 1), at: Date.now() });
+        code: code || '', mode: node.enrichMode || 'enrich', attempts: (previous && previous.attempts || 0) + (['private', 'ai_config', 'daily_limit', 'network_suspected'].includes(code) ? 0 : 1), at: Date.now() });
       return list;
     });
   }
@@ -206,6 +206,7 @@
     try { found = await chrome.bookmarks.get(String(item.id)); } catch (e) { return; }
     var node = found && found[0];
     if (!node || !node.url || !isWeb(node.url) || item.url && item.url !== node.url) return;
+    node = Object.assign({}, node, { enrichMode: item.mode });
 
     var failed = (await AgentDB.getMeta(FAILED_KEY) || []).find(function (f) { return f.id === String(node.id) && f.url === node.url; });
     if (!item.force && item.mode !== 'private' && failed && !RetryPolicy.classify(failed.code, failed.attempts).auto && !RetryPolicy.resumed(failed.code, failed.at) && !(failed.code === 'ai_config' && AI.available(settings.ai))) return;
@@ -213,7 +214,8 @@
     var cached = await AgentDB.getPages([ContentIndex.normUrl(node.url)]);
     if (!item.force && item.mode === 'enrich' && done[node.id] && done[node.id].url === node.url && done[node.id].at > item.at && ContentIndex.fresh(cached[ContentIndex.normUrl(node.url)], Date.now())) return;
     var page = await captureOne(node.url, item.force);
-    if (page && page.status === 'ok') {
+    if (page && page.status === 'ok' && !page.refreshError) {
+      if (global.SyncEngine) await SyncEngine.markDirty(false);
       await AgentDB.updateMeta(CONFIG_KEY, function (cfg) {
         cfg = Object.assign(defaultConfig(), cfg || {});
         cfg.captured = (cfg.captured || 0) + 1;
@@ -222,7 +224,8 @@
     }
     if (!page || page.status !== 'ok' || page.refreshError) {
       var code = page && (page.refreshError || page.reason) || 'network';
-      await recordFailure(node, '正文采集失败：' + code, code);
+      if (global.NetworkStatus && /^(timeout|network)$/.test(code)) { await NetworkStatus.diagnose(Rag.withAuth(settings.rag, settings.backup)); code = 'network_suspected'; }
+      await recordFailure(node, code === 'network_suspected' ? '本机访问网页异常，待检查网络/VPN；未判定网站失效' : '正文采集失败：' + code, code);
       return;
     }
     if (item.mode === 'capture') {
@@ -318,6 +321,8 @@
     var completed = await AgentDB.getMeta(DONE_KEY) || {};
     var failures = await AgentDB.getMeta(FAILED_KEY) || [];
     var now = Date.now();
+    var networkWaiting = false;
+    if (options.retryFailed && global.NetworkStatus) { var currentSettings = await Settings.load(); await NetworkStatus.diagnose(Rag.withAuth(currentSettings.rag, currentSettings.backup), true); networkWaiting = await NetworkStatus.waiting(); }
     var chosen = rows.filter(function (row) {
       var page = pages[ContentIndex.normUrl(row.url)];
       var failed = failures.find(function (f) { return f.id === String(row.id) && f.url === row.url; });
@@ -325,7 +330,7 @@
       var waiting = pending.some(function (p) { return p.id === String(row.id) && p.url === row.url; });
       var error = failed || page && page.status === 'fail' && { code: page.reason, attempts: 0 };
       var policy = error && RetryPolicy.classify(error.code, error.attempts);
-      if (options.retryFailed) return !(page && (page.private || page.source === 'capture')) && policy && policy.bulk;
+      if (options.retryFailed) return !(page && (page.private || page.source === 'capture')) && policy && (policy.bulk || error.code === 'network_suspected' && !networkWaiting);
       if (error && !(error.code === 'ai_config' && AI.available(options.ai))) {
         if (!policy.auto && !RetryPolicy.resumed(error.code, failed && failed.at, now)) return false;
         if (options.incremental && now - (failed && failed.at || 0) < policy.delay) return false;
@@ -374,6 +379,16 @@
     var successful = 0, capturedPages = 0, withBody = 0, unprocessed = 0, failedCount = 0, manualCount = 0;
     failures = failures.filter(function (f) { return currentRows.some(function (r) { return String(r.id) === f.id && r.url === f.url; }); });
     pending = pending.filter(function (p) { return currentRows.some(function (r) { return String(r.id) === p.id && r.url === p.url; }); });
+    var failureTags = {};
+    var hardFailures = 0;
+    failures.forEach(function (item) {
+      var code = item.code || String(item.reason || '').split('：').pop();
+      var tag = RetryPolicy.category(code);
+      var entry = failureTags[tag.key] || (failureTags[tag.key] = { key: tag.key, label: tag.label, count: 0 });
+      entry.count++;
+      var policy = RetryPolicy.classify(code, item.attempts);
+      if (policy.kind === 'retryable' || policy.kind === 'stopped') hardFailures++;
+    });
     currentRows.forEach(function (row) {
       var page = pages[ContentIndex.normUrl(row.url)];
       var done = completed[row.id] || summaries[row.id];
@@ -416,6 +431,8 @@
         return Object.assign({}, item, { code: code, policy: RetryPolicy.classify(code, item.attempts) });
       }),
       totalFailed: failures.length,
+      hardFailures: hardFailures,
+      failureTags: Object.keys(failureTags).map(function (key) { return failureTags[key]; }).sort(function (a, b) { return b.count - a.count; }),
       retryableFailed: failures.filter(function (f) { return RetryPolicy.classify(f.code, f.attempts).bulk; }).length,
       recent: recent,
       undoable: Array.isArray(applied) && applied.length > 0,
@@ -451,6 +468,7 @@
         url: item.url, tags: tags, at: Date.now()
       }));
     }
+    if (global.SyncEngine) await SyncEngine.markDirty(false);
     await AgentDB.updateMeta(APPLIED_KEY, function (list) {
       list = Array.isArray(list) ? list : [];
       list.push({
@@ -496,6 +514,7 @@
       }
     }
     await AgentDB.setMeta(APPLIED_KEY, list.filter(function (item) { return item.batch !== batch; }));
+    if (global.SyncEngine) await SyncEngine.markDirty(false);
     var state = await status();
     state.restored = restored;
     return state;
@@ -568,7 +587,16 @@
     return rows;
   }
 
+  async function resumeNetwork() {
+    var failures = await AgentDB.getMeta(FAILED_KEY) || [];
+    var rows = Bookmarks.flatten(await chrome.bookmarks.getTree());
+    var selected = rows.filter(function (row) { return failures.some(function (f) { return f.id === String(row.id) && f.url === row.url && /^(timeout|network|network_suspected)$/.test(f.code); }); });
+    await enqueueMany(selected.map(function (row) { return { id: String(row.id), url: row.url, mode: (failures.find(function (f) { return f.id === String(row.id) && f.url === row.url; }) || {}).mode || 'enrich', force: true }; }));
+    if (selected.length) schedule();
+  }
+
   global.BookmarkEnrich = {
+    resumeNetwork: resumeNetwork,
     ALARM: ALARM,
     onCreated: onCreated,
     run: run,

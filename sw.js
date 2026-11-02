@@ -10,7 +10,7 @@
      用一次 debounce 换掉一整套容易出错的增量状态机。
    ============================================================ */
 
-importScripts('js/profiles.js', 'js/db.js', 'js/bookmarks.js', 'js/content-index.js', 'js/resource-gate.js', 'js/retry-policy.js', 'js/collection-stats.js', 'js/organizer.js', 'js/organizer-moves.js', 'js/pageinfo.js', 'js/ai.js', 'js/store.js', 'js/backup.js', 'js/bookmark-auto.js', 'js/bookmark-enrich.js', 'js/documents.js', 'js/rag.js', 'js/capture-adapters.js', 'js/sync-engine.js');
+importScripts('js/profiles.js', 'js/db.js', 'js/bookmarks.js', 'js/content-index.js', 'js/quick-tags.js', 'js/personal-targets.js', 'js/network-status.js', 'js/ingest-policy.js', 'js/resource-gate.js', 'js/retry-policy.js', 'js/collection-stats.js', 'js/organizer.js', 'js/organizer-moves.js', 'js/pageinfo.js', 'js/ai.js', 'js/store.js', 'js/backup.js', 'js/bookmark-auto.js', 'js/bookmark-enrich.js', 'js/documents.js', 'js/rag.js', 'js/capture-adapters.js', 'js/sync-engine.js');
 
 Profiles.restoreLanding().catch(function () {});
 
@@ -163,12 +163,13 @@ if (chrome.storage && chrome.storage.onChanged) chrome.storage.onChanged.addList
 });
 if (chrome.permissions && chrome.permissions.onAdded) chrome.permissions.onAdded.addListener(function () { SyncEngine.request({ force: true }).catch(function () {}); });
 if (chrome.storage && chrome.storage.onChanged) chrome.storage.onChanged.addListener(function (changes, area) {
-  var change = changes['newtab.settings.v1'];
+  var settingsKey; try { settingsKey = Profiles.key('newtab.settings.v1'); } catch (e) { return; }
+  var change = changes[settingsKey];
   if (area !== 'local' || !change) return;
   var oldRag = change.oldValue && change.oldValue.rag || {};
   var newRag = change.newValue && change.newValue.rag || {};
   if (JSON.stringify(oldRag) !== JSON.stringify(newRag)) {
-    var force = ['baseUrl', 'apiKey', 'collection', 'includePrivate'].some(function (key) { return oldRag[key] !== newRag[key]; });
+    var force = ['baseUrl', 'apiKey', 'collection', 'includePrivate', 'cleanupEnabled'].some(function (key) { return oldRag[key] !== newRag[key]; });
     SyncEngine.request({ force: force }).catch(function () {});
   }
 
@@ -233,9 +234,15 @@ var HANDLERS = {
   'enrich:dismiss': function (msg) { return BookmarkEnrich.dismiss(msg.id); },
   'enrich:retry': function (msg) { return BookmarkEnrich.retry(msg.id); },
   'enrich:suggest-private': function (msg) { return BookmarkEnrich.suggestPrivate(msg.id); },
+  'pipeline:audit': function () { return SyncEngine.audit(); },
+  'pipeline:clean': function (msg) { return SyncEngine.clean(msg.ids); },
+  'pipeline:recapture': function (msg) { return SyncEngine.recapture(msg.documentId); },
+  'pipeline:verify': function (msg) { return SyncEngine.verify(msg.documentId); },
+  'pipeline:network-retry': function () { return SyncEngine.networkRetry(); },
   'pipeline:status': function () { return SyncEngine.summary(); },
   'pipeline:start': function (msg) { return SyncEngine.request({ manual: true, force: !!msg.force }); },
-  'pipeline:retry-failed': function () { return SyncEngine.retryFailed(); },
+  'pipeline:retry-failed': function (msg) { return SyncEngine.retryFailed(msg.ids); },
+  'pipeline:delete-failed': function (msg) { return SyncEngine.deleteFailed(msg.ids); },
   'pipeline:retry': function (msg) { return SyncEngine.retry(msg.documentId); },
   'pipeline:changed': function () { return SyncEngine.request(); },
   'pipeline:pause': function () { return SyncEngine.pause(); },
@@ -311,3 +318,6 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
 
   return true;   /* 保持消息通道，等异步 sendResponse */
 });
+
+/* online 只唤醒诊断，不证明 VPN 或服务链路已经恢复。 */
+if (typeof addEventListener === 'function') addEventListener('online', function () { SyncEngine.networkRetry(false).catch(function () {}); });

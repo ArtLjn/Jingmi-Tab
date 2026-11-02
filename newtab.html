@@ -186,6 +186,7 @@
           <nav class="search-breadcrumb" id="search-breadcrumb" aria-label="当前位置" hidden>
             <button type="button" data-search-target="overview">搜索与 AI</button>
             <span aria-hidden="true">/</span><span id="search-page-name" aria-current="page"></span>
+            <span class="search-breadcrumb-detail" id="search-page-detail-wrap" hidden><span aria-hidden="true">/</span><span id="search-page-detail"></span></span>
           </nav>
           <div id="search-overview" class="search-overview">
             <button type="button" class="search-entry" data-search-target="settings"><span><strong>搜索设置</strong><small>搜索引擎与 AI 模型配置</small><span class="search-entry-status" data-search-status="settings"></span></span><span class="search-entry-arrow" aria-hidden="true">›</span></button>
@@ -228,7 +229,7 @@
 
 
           </div>
-          <div class="search-subpage" data-search-page="rag" hidden>
+          <div class="search-subpage" data-search-page="rag" data-page-title="正文采集与 RAG" data-page-detail="处理任务" hidden>
 <section class="automation-card rag-card" id="rag-flow-card" aria-labelledby="rag-flow-title">
                 <div class="automation-heading">
                   <div class="automation-title">
@@ -243,26 +244,61 @@
                 </div>
                 <div class="rag-overview">
                   <div class="rag-stats" id="rag-stats" role="group" aria-label="收录概况">
+                    <div class="rag-stat" data-stat="total"><span>总书签</span><strong id="rag-stat-total">—</strong></div>
                     <div class="rag-stat" data-stat="collected"><span>已收录</span><strong id="rag-stat-collected">—</strong></div>
                     <div class="rag-stat" data-stat="uncollected"><span>未收录</span><strong id="rag-stat-uncollected">—</strong></div>
-                    <div class="rag-stat" data-stat="failed"><span>失败</span><strong id="rag-stat-failed">—</strong></div>
-                    <div class="rag-stat" data-stat="queue"><span>队列</span><strong id="rag-stat-queue">—</strong></div>
+                    <div class="rag-stat" data-stat="failed"><span>失败数量</span><strong id="rag-stat-failed">—</strong></div>
+                    <div class="rag-stat" data-stat="queue"><span>处理队列</span><strong id="rag-stat-queue">—</strong></div>
                   </div>
+                  <p class="hint">总书签 = 已收录 + 未收录（单位：书签）。失败数量、处理队列与下方列表一致（单位：任务）。</p>
+                  <p id="rag-uncollected-breakdown" class="hint rag-count-breakdown" role="status" aria-live="polite">正在读取未收录分类…</p>
+                  <details id="rag-uncollected-details" class="automation-details" data-collapsed>
+                    <summary>查看未收录明细（<span id="rag-uncollected-count">0</span> 个书签）</summary>
+                    <p class="hint">每个未收录书签均列在下面。同一网页的多个书签共用一个任务，已收录书签也可能有更新失败任务，不能直接用未收录数减去失败任务数。</p>
+                    <div id="rag-uncollected-items" class="rag-uncollected-items"></div>
+                  </details>
                   <div class="automation-path" aria-label="同步流程：采集正文、同步入库、可搜索"><span>采集正文</span><b aria-hidden="true">→</b><span>同步入库</span><b aria-hidden="true">→</b><span>可搜索</span></div>
                 </div>
+                <p id="rag-connection-status" class="automation-progress" role="status" aria-live="polite">RAG 连接尚未检测</p>
                 <p id="rag-status" class="rag-alert" role="status" aria-live="polite"></p>
-                <div class="inline-actions rag-actions"><button id="pipeline-start" class="btn-ghost action-primary" type="button">同步一次</button><button id="pipeline-retry" class="btn-ghost" type="button" hidden>重试失败项</button></div>
+                <div class="inline-actions rag-actions"><button id="rag-check" class="btn-ghost" type="button">检测连接</button></div>
+                <div id="pipeline-audit-results" hidden role="region" aria-label="历史收录审查"></div>
                 <p id="pipeline-status" class="automation-progress visually-hidden" role="status" aria-live="polite">自动同步未开启</p>
+                <div class="rag-task-tabs" role="tablist" aria-label="同步任务">
+                  <button id="rag-processing-tab" type="button" role="tab" aria-selected="true" aria-controls="rag-processing-panel" data-rag-tab="processing">处理任务 <em id="rag-processing-count">0</em></button>
+                  <button id="rag-failures-tab" type="button" role="tab" aria-selected="false" aria-controls="rag-failures-panel" tabindex="-1" data-rag-tab="failures">失败任务 <em id="rag-failure-count">0</em></button>
+                </div>
+                <div id="rag-processing-panel" role="tabpanel" aria-labelledby="rag-processing-tab">
+                  <div class="inline-actions rag-actions"><button id="pipeline-start" class="btn-ghost action-primary" type="button">批量处理</button><button id="pipeline-pause" class="btn-ghost rag-pause" type="button">暂停处理</button></div>
+                  <p id="pipeline-queue-status" class="automation-progress" role="status" aria-live="polite">正在读取当前队列…</p>
+                  <p id="pipeline-process-result" class="hint" role="status" aria-live="polite"></p>
                 <details id="rag-connection" class="automation-details" data-collapsed>
                   <summary>同步设置</summary>
                   <div class="rag-settings-body">
                     <div class="switch-row"><span class="label">上传手动采集的登录页面正文</span><label class="switch"><input id="rag-private" type="checkbox" aria-label="上传登录页面正文" /><i></i></label></div>
+                    <div class="switch-row"><span class="label">确认失效后自动清理云端正文</span><label class="switch"><input id="rag-cleanup" type="checkbox" aria-label="开启失效清理与恢复巡检" /><i></i></label></div>
+                    <p class="hint">默认关闭自动清理；开启后按复核结果处理，入口保留，恢复后重新评估收录。</p>
                     <label class="rag-interval"><span>公开正文刷新间隔</span><span class="rag-interval-control"><input id="rag-refresh" class="text-input" type="number" min="1" max="90" /><em>天</em></span></label>
                     <p class="rag-note">RAG 地址、Key 与集合由后台账号统一管理；每个账号的集合唯一且不可编辑。关闭自动开关会停止后台同步，已同步内容仍可检索。收藏变更会自动同步，登录或动态页面可打开后点击扩展图标采集。</p>
-                    <div class="inline-actions"><button id="pipeline-pause" class="btn-ghost rag-pause" type="button">暂停本次同步</button></div>
+                    <div class="inline-actions"><button id="pipeline-network" class="btn-ghost" type="button">网络已恢复，重试</button><button id="pipeline-audit" class="btn-ghost" type="button">检查历史收录</button></div>
                   </div>
                 </details>
                 <div id="pipeline-records" class="pipeline-records"></div>
+                </div>
+                <div id="rag-failures-panel" role="tabpanel" aria-labelledby="rag-failures-tab" hidden>
+                  <p class="automation-description">失败或等待条件恢复的任务自动保留在这里；重新采集或重试后会按最新状态更新。写入结果不确定时请先核验。</p>
+                  <p id="rag-failure-status" class="automation-progress" role="status" aria-live="polite">正在读取失败任务…</p>
+                  <div class="rag-failure-selection">
+                    <label>错误类型 <select id="rag-failure-filter" class="text-input" aria-label="按错误类型筛选"><option value="all">全部错误</option></select></label>
+                    <label><input id="rag-failure-select-all" type="checkbox" />全选当前筛选</label>
+                    <button id="pipeline-retry" class="btn-ghost" type="button" disabled>重试所选</button>
+                    <button id="pipeline-delete-selected" class="btn-ghost rag-delete-selected" type="button" disabled>删除所选</button>
+                  </div>
+                  <p id="pipeline-retry-hint" class="hint">勾选需要重试或删除的任务；切换筛选会清空选择。</p>
+                  <p id="pipeline-retry-status" class="hint" role="status" aria-live="polite"></p>
+                  <p id="pipeline-delete-status" class="hint" role="status" aria-live="polite"></p>
+                  <div id="rag-failure-records" class="pipeline-records"></div>
+                </div>
               </section>
           </div>
           <div class="search-subpage" data-search-page="organize" hidden>
@@ -292,6 +328,7 @@
                 <div class="inline-actions"><button id="enrich-scan" class="btn-ghost" type="button">扫描全部书签</button><button id="enrich-capture" class="btn-ghost" type="button">补采全部缺失正文</button></div>
                 <details id="enrich-details" class="automation-details">
                   <summary id="enrich-summary">待确认建议</summary>
+                  <div id="enrich-filters" class="enrich-filters" role="group" aria-label="按状态筛选" hidden></div>
                   <div id="enrich-body" class="enrich-body"></div>
                 </details>
               </section>
@@ -382,7 +419,7 @@
             <div>
               <p class="view-eyebrow">QUICK TAGS</p>
               <h2>快捷标签</h2>
-              <p>固定你常用的入口，其余交给系统推荐。所有数据只保存在本机。</p>
+              <p>固定你常用的入口，其余交给系统推荐。个人信息默认本地使用，可由你选择导出或备份。</p>
             </div>
             <span class="view-badge" id="tag-count">还没有固定标签</span>
           </div>
@@ -390,10 +427,10 @@
           <div class="tag-manager-grid">
             <div class="tag-col is-side">
               <section class="group settings-card card-pinned">
-                <h3>固定标签<span class="src-link" id="tag-pinned-hint">点击名称可改名 · @ 面板按使用频率展示</span></h3>
+                <h3>固定标签<span class="src-link" id="tag-pinned-hint">点击名称可改名 · 编辑可添加别名和说明</span></h3>
                 <div class="tag-list" id="tag-pinned-list"></div>
                 <div class="tag-more" id="tag-pinned-more"></div>
-                <div class="empty-tip" id="tag-pinned-empty">还没有固定标签。在「系统推荐」里点固定，或在搜索框用 @ 输入网址创建。</div>
+                <div class="empty-tip" id="tag-pinned-empty">还没有固定标签。在右侧搜索书签，或从「系统推荐」里固定一个入口。</div>
               </section>
 
               <section class="group settings-card card-ignored">
@@ -405,21 +442,26 @@
               </section>
 
               <section class="group settings-card card-data">
-                <h3>数据<span class="src-link">只在本机</span></h3>
+                <h3>数据<span class="src-link">自主控制备份范围</span></h3>
+                <div class="switch-row"><span class="label">远端备份包含个人说明</span><label class="switch"><input id="tag-backup-notes" type="checkbox" aria-label="允许远端配置备份包含个人说明" /><i></i></label></div>
                 <div class="row">
                   <button class="btn-ghost" id="tag-export" type="button">导出 JSON</button>
                   <button class="btn-ghost" id="tag-import" type="button">导入 JSON</button>
                   <input type="file" id="tag-import-file" accept="application/json,.json" hidden />
                   <button class="btn-ghost" id="tag-reset" type="button">清空学习数据</button>
                 </div>
-                <p class="hint">导出只包含固定标签；学习数据是忽略记录与使用次数，只影响排序。</p>
+                <p class="hint">导出包含入口名称、别名和个人说明；学习记录只影响推荐与排序。</p>
               </section>
             </div>
 
             <div class="tag-col is-main">
               <section class="group settings-card card-cand">
-                <h3>系统推荐<span class="src-link" id="tag-cand-count">0 个候选</span></h3>
-                <p class="hint">来自浏览器常访站点与最近 120 天新增的书签，只作召回，不会自动固定。</p>
+                <h3>书签与推荐<span class="src-link" id="tag-cand-count">0 个候选</span></h3>
+                <p class="hint" id="tag-cand-hint">搜索全部书签添加备注；系统推荐来自常访站点与最近 120 天新增书签，不会自动固定。</p>
+                <label class="tag-search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg>
+                  <input id="tag-search" type="search" placeholder="搜索书签，添加别名或说明" aria-label="搜索书签并添加备注" />
+                </label>
                 <div class="tag-list" id="tag-cand-list"></div>
                 <div class="tag-more" id="tag-cand-more"></div>
                 <div class="empty-tip" id="tag-cand-empty">暂无候选，正常使用几天后再来看。</div>
@@ -496,6 +538,7 @@
                   <label class="field"><span id="backup-username-label">账号</span><input class="text-input" id="backup-username" type="text" placeholder="邮箱或已有用户名" maxlength="254" spellcheck="false" autocomplete="username" required /></label>
                   <label class="field"><span>密码</span><input class="text-input" id="backup-password" type="password" placeholder="请输入密码" maxlength="128" autocomplete="current-password" required /></label>
                   <label class="field" id="backup-confirm-field" hidden><span>确认密码</span><input class="text-input" id="backup-confirm-password" type="password" placeholder="再次输入密码" maxlength="128" autocomplete="new-password" /></label>
+                  <label class="field" id="backup-invite-field" hidden><span>邀请码</span><input class="text-input" id="backup-invite" type="password" placeholder="向维护者获取邀请码" maxlength="128" autocomplete="off" spellcheck="false" /></label>
                 </div>
                 <div class="backup-account-actions">
                   <button class="btn-ghost action-primary" id="backup-login" type="submit">登录</button>
@@ -530,6 +573,8 @@
   <script src="js/resource-gate.js"></script>
   <script src="js/retry-policy.js"></script>
   <script src="js/collection-stats.js"></script>
+  <script src="js/network-status.js"></script>
+  <script src="js/ingest-policy.js"></script>
   <script src="js/pageinfo.js"></script>
   <script src="js/ai.js"></script>
   <script src="js/organizer.js"></script>
@@ -547,6 +592,8 @@
   <script src="js/search-suggest.js"></script>
   <script src="js/quick-tags.js"></script>
   <script src="js/tag-suggest.js"></script>
+  <script src="js/personal-targets.js"></script>
+  <script src="js/tag-editor.js"></script>
   <script src="js/tag-manager.js"></script>
   <script src="js/store.js"></script>
   <script src="js/backup.js"></script>

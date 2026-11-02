@@ -115,7 +115,7 @@ test('浏览器回归：@ 快捷标签的触发、候选、固定与过滤', { s
     await page.waitForFunction(() => window.__store !== undefined);
     const savedTags = await page.evaluate(() => {
       const raw = JSON.parse(localStorage.getItem('__stub') || '{}');
-      return raw['newtab.tags.v1'] || { tags: [] };
+      return raw['newtab.profile.guest:newtab.tags.v1'] || { tags: [] };
     });
     assert.ok(savedTags.tags.some(t => t.url === 'http://127.0.0.1:' + port + '/'),
       '新建标签必须已经落盘，导航不能取消写入');
@@ -124,7 +124,7 @@ test('浏览器回归：@ 快捷标签的触发、候选、固定与过滤', { s
        先等上一次输入的设置写入落地，否则待发的持久化会把这次的关闭覆盖掉。 */
     await page.waitForTimeout(400);
     await page.evaluate(() => {
-      const key = 'newtab.settings.v1';
+      const key = 'newtab.profile.guest:newtab.settings.v1';
       const raw = JSON.parse(localStorage.getItem('__stub') || '{}');
       const s = raw[key] || {};
       s.tags = { enabled: false };

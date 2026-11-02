@@ -206,6 +206,99 @@ test('关键词检索只调用一次重排，不生成回答', async () => {
   assert.match(result.message, /找到 1 条/);
 });
 
+test('显式 AI 问答模式下关键词和英文问题也生成回答', async () => {
+  for (const query of ['项目文档', 'Compare 项目文档', '项目文档?']) {
+    const c = context();
+    c.AI.available = () => true;
+    c.AI.rerank = async () => { assert.fail('问答模式不应只做筛选'); };
+    let calls = 0;
+    c.AI.chatStream = async () => { calls++; return { ok: true, content: '这是项目资料。[1]' }; };
+    const result = await c.BookmarkSearch.run({ rows: rows(c), query, cfg: {}, answer: true });
+    assert.match(result.answer.text, /项目资料/);
+    assert.equal(result.answer.sources[0].id, '1');
+    assert.equal(calls, 1);
+  }
+});
+
+test('问答没有候选或请求失败时明确说明原因并保留收藏', async () => {
+  const c = context();
+  c.AI.available = () => true;
+  c.AI.rewrite = async () => ({ ok: true, keywords: [] });
+  c.AI.chatStream = async () => ({ ok: false, error: 'timeout' });
+  const failed = await c.BookmarkSearch.run({ rows: rows(c), query: '项目文档', cfg: {}, answer: true });
+  assert.equal(failed.answer.notice, true);
+  assert.match(failed.answer.text, /超时/);
+  assert.equal(failed.hits.length, 1);
+  const empty = await c.BookmarkSearch.run({ rows: [], query: '项目文档', cfg: {}, answer: true });
+  assert.equal(empty.answer.notice, true);
+  assert.match(empty.answer.text, /没有找到相关收藏/);
+});
+
+test('问答空返回或只返回筛选 JSON 时最多补试一次普通回答', async () => {
+  for (const content of ['', '[1][2]', '{"picks":[{"id":"1"}]}', '```json\n{"picks":[]}\n```']) {
+    const c = context();
+    c.AI.available = () => true;
+    const deltas = [];
+    let calls = 0;
+    c.AI.chatStream = async (cfg, system, user, opts) => {
+      opts.onDelta(content, content);
+      return { ok: true, content };
+    };
+    c.AI.chat = async (cfg, system, user, opts) => {
+      calls++;
+      assert.equal(opts.task, 'strong');
+      assert.ok(opts.timeout <= 12000);
+      return { ok: true, content: '这是项目文档。[1]' };
+    };
+    const result = await c.BookmarkAnswer.runStream({ cfg: {}, query: '项目是什么', cands: [{ row: rows(c)[0] }], onDelta: (_, full) => deltas.push(full) });
+    assert.equal(result.ok, true);
+    assert.match(result.answer, /项目文档/);
+    assert.equal(calls, 1);
+    assert.ok(deltas.every(text => !text.includes('picks')));
+  }
+});
+
+test('问答的超时、鉴权、限流、网络错误不自动重试', async () => {
+  for (const error of ['timeout', 'http_401', 'http_403', 'http_429', 'network']) {
+    const c = context();
+    c.AI.available = () => true;
+    c.AI.chatStream = async () => ({ ok: false, error });
+    c.AI.chat = async () => { assert.fail('此类错误不应自动重试'); };
+    const result = await c.BookmarkAnswer.runStream({ cfg: {}, query: '项目是什么', cands: [{ row: rows(c)[0] }] });
+    assert.equal(result.ok, false);
+    assert.equal(result.error, error);
+  }
+});
+
+test('取消旧问题后不补试、不发送旧回答', async () => {
+  const c = context();
+  c.AI.available = () => true;
+  const controller = new AbortController();
+  c.AI.chatStream = async () => { controller.abort(); return { ok: true, content: '' }; };
+  c.AI.chat = async () => { assert.fail('取消后不应补试'); };
+  const result = await c.BookmarkAnswer.runStream({ cfg: {}, query: '项目是什么', cands: [{ row: rows(c)[0] }], signal: controller.signal });
+  assert.equal(result.error, 'cancelled');
+});
+
+test('问答缓存复用完整答案，流式中断保留片段且不补试或缓存', async () => {
+  const c = context();
+  c.AI.available = () => true;
+  const options = { cfg: {}, query: '项目是什么', cands: [{ row: rows(c)[0] }] };
+  let calls = 0;
+  c.AI.chatStream = async () => { calls++; return { ok: true, content: '已生成的部分说明 [1]', incomplete: true, error: 'timeout' }; };
+  c.AI.chat = async () => { assert.fail('已收到部分回答时不补试'); };
+  assert.equal((await c.BookmarkAnswer.runStream(options)).incomplete, true);
+  assert.equal((await c.BookmarkAnswer.runStream(options)).cached, undefined);
+  assert.equal(calls, 2);
+  c.AI.chatStream = async () => { calls++; return { ok: true, content: '完整说明 [1]' }; };
+  await c.BookmarkAnswer.runStream(options);
+  const deltas = [];
+  const cached = await c.BookmarkAnswer.runStream({ ...options, onDelta: (_, full) => deltas.push(full) });
+  assert.equal(cached.cached, true);
+  assert.equal(calls, 3);
+  assert.deepEqual(deltas, ['完整说明 [1]']);
+});
+
 test('问句走 SSE 流式回答，按 [n] 标记还原来源', async () => {
   const c = context();
   const data = c.Bookmarks.flatten([{ children: [
@@ -452,10 +545,57 @@ test('问答接口误返重排 JSON 时降级，不把 JSON 展示成回答', as
   const c = context();
   c.AI.available = () => true;
   c.AI.chatStream = async () => ({ ok: true, content: '{"picks":[{"id":"1"}]}' });
+  let retries = 0;
+  c.AI.chat = async () => { retries++; return { ok: true, content: '{"picks":[{"id":"1"}]}' }; };
   const result = await c.BookmarkAnswer.runStream({ cfg: {}, query: '这是什么',
     cands: [{ row: { id: '1', title: '资料', text: '资料正文' } }] });
   assert.equal(result.ok, false);
   assert.equal(result.error, 'bad_response');
+  assert.equal(retries, 1);
+});
+
+test('问答兼容结构化答案，过滤伪造来源，证据不足时直接说明', async () => {
+  for (const content of [
+    '{"answer":"这是项目资料","sources":[{"id":"1"},{"id":"999"}]}',
+    '```json\n{"answer":"这是项目资料","sources":[{"id":"1"},{"id":"999"}]}\n```',
+    '{"enough":false,"answer":"","sources":[{"id":"999"}]}'
+  ]) {
+    const c = context();
+    c.AI.available = () => true;
+    c.AI.chatStream = async () => ({ ok: true, content });
+    c.AI.chat = async () => { assert.fail('合法结构化答案不补试'); };
+    const result = await c.BookmarkAnswer.runStream({ cfg: {}, query: '项目是什么', cands: [{ row: rows(c)[0] }] });
+    assert.equal(result.ok, true);
+    assert.doesNotMatch(result.answer, /sources|answer/);
+    assert.ok(result.sources.every(source => source.id === '1'));
+    if (content.includes('false')) {
+      assert.equal(result.enough, false);
+      assert.match(result.answer, /没有足够的信息/);
+    } else assert.equal(result.sources.length, 1);
+  }
+});
+
+test('正文以引用编号开头时正常显示，不误判成 JSON 数组', async () => {
+  const c = context();
+  c.AI.available = () => true;
+  c.AI.chatStream = async () => ({ ok: true, content: '[1] 这是项目资料。' });
+  c.AI.chat = async () => { assert.fail('引用编号无需补试'); };
+  const result = await c.BookmarkAnswer.runStream({ cfg: {}, query: '项目是什么', cands: [{ row: rows(c)[0] }] });
+  assert.equal(result.ok, true);
+  assert.equal(result.sources[0].marker, 1);
+});
+
+test('显式问答的地址仍精确匹配，找不到时不向其他 IP 扩散', async () => {
+  const c = context();
+  const data = c.Bookmarks.flatten([{ children: [{ id: '1', title: '业务系统', url: 'http://8.145.50.4/' }] }]);
+  c.AI.available = () => true;
+  c.AI.rewrite = async () => { assert.fail('地址不应改写'); };
+  c.AI.chatStream = async () => ({ ok: true, content: '该地址收藏的标题是业务系统，用途信息不足。[1]' });
+  const matched = await c.BookmarkSearch.run({ rows: data, query: '8.145.50.4', cfg: {}, answer: true });
+  assert.match(matched.answer.text, /业务系统/);
+  const missing = await c.BookmarkSearch.run({ rows: data, query: '8.145.50.40', cfg: {}, answer: true });
+  assert.equal(missing.hits.length, 0);
+  assert.equal(missing.answer.notice, true);
 });
 
 test('标题命中仍交给模型重排，本地候选充足时只跳过改写', async () => {

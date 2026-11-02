@@ -20,6 +20,8 @@ test('工具栏只采集已收藏的当前网页，持久化正文并拒绝跳�
   page.self = page;
   vm.createContext(page);
   const worker = { URL, crypto: require('node:crypto').webcrypto, TextEncoder, indexedDB: new IDBFactory(), setTimeout, clearTimeout };
+  const storage = new Map();
+  worker.localStorage = { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
   worker.self = worker;
   worker.chrome = {
     bookmarks: { getTree: async () => [{ children: [{ id: '1', url, title: '工作文档' }] }] },

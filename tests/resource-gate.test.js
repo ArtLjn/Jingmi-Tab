@@ -3,6 +3,21 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { fixture } = require('./helpers/extension');
 
+test('仅服务端确认的不限额账号跳过采集和入库次数限制，AI与其他账号仍受限', async () => {
+  const { c } = fixture();
+  const d = new Date(); const day = [d.getFullYear(), d.getMonth() + 1, d.getDate()].join('-');
+  await c.AgentDB.setMeta('guard:daily', { day, counts: { capture: 500, rag: 500, ai: 200 } });
+  let binding = { unlimited: true };
+  c.Profiles = { ready: async () => {}, cloud: () => binding, initial: async () => {}, dbName: name => name };
+  await c.ResourceGate.reserve('capture');
+  await c.ResourceGate.reserve('rag');
+  await assert.rejects(c.ResourceGate.reserve('ai'), { code: 'daily_limit' });
+  for (binding of [{ unlimited: false }, { unlimited: 'true' }, null]) {
+    await assert.rejects(c.ResourceGate.reserve('capture'), { code: 'daily_limit' });
+    await assert.rejects(c.ResourceGate.reserve('rag'), { code: 'daily_limit' });
+  }
+});
+
 test('每日配额原子预扣，重载状态不重置；跨日恢复', async () => {
   const { c } = fixture();
   const d = new Date(); const day = [d.getFullYear(), d.getMonth() + 1, d.getDate()].join('-');

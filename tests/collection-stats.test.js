@@ -96,3 +96,43 @@ test('暂停自动同步不抹去已收录事实，切换集合不沿用旧集�
   settings.rag.collection = 'chrome_tab_another';
   assert.equal((await f.c.CollectionStats.read()).collected, 0);
 });
+
+test('每个未收录书签都有可见去向，重复网址不吞条目，分类之和等于未收录总数', async () => {
+  const f = setup(); await seed(f);
+  const result = await f.c.CollectionStats.read();
+  assert.equal(result.uncollectedItems.length, result.uncollected);
+  assert.deepEqual(Array.from(result.uncollectedItems, item => item.id), ['5', '6']);
+  assert.equal(result.uncollectedItems.find(item => item.id === '6').reason, '此类地址不支持正文收录');
+  assert.equal(Object.values(result.uncollectedBreakdown).reduce((a, b) => a + b, 0), result.uncollected);
+  assert.equal(result.uncollectedBreakdown.manual, 1);
+  assert.equal(result.uncollectedBreakdown.unarranged, 1);
+});
+
+test('失败任务按网页计数，未收录明细保留同网页的每个书签；已收录更新失败不混入未收录', async () => {
+  const f = setup(); const { doc, key } = await seed(f);
+  await f.c.AgentDB.setMeta(key, {});
+  await f.c.AgentDB.updateRecord('jobs', doc.id, () => ({ id: doc.id, status: 'failed', error: '网络异常', errorCode: 'network' }));
+  let result = await f.c.CollectionStats.read();
+  assert.equal(result.uncollected, 4);
+  assert.equal(result.uncollectedBreakdown.failed, 2);
+  assert.equal(result.uncollectedItems.filter(item => item.state === 'failed').length, 2);
+  await f.c.AgentDB.updateRecord('jobs', doc.id, () => ({ id: doc.id, status: 'pending', nextAt: Date.now() + 60000 }));
+  result = await f.c.CollectionStats.read();
+  assert.equal(result.uncollectedBreakdown.queue, 2);
+  await f.c.AgentDB.setMeta(key, { [doc.id]: { docId: 'remote-a', quality: 'body' } });
+  await f.c.AgentDB.updateRecord('jobs', doc.id, () => ({ id: doc.id, status: 'failed', error: '更新失败' }));
+  result = await f.c.CollectionStats.read();
+  assert.equal(result.collected, 2);
+  assert.equal(result.uncollectedBreakdown.failed, 0);
+  assert.equal(result.uncollectedItems.length, 2);
+});
+
+test('任务归类只把实际排队或运行项计入队列，失败、完成和未安排互不混淆', () => {
+  const { c } = setup();
+  const kind = c.CollectionStats.taskKind;
+  assert.equal(kind({ status: 'done', sync: 'synced' }), '');
+  assert.equal(kind({ status: 'unqueued' }), '');
+  assert.equal(kind({ status: 'pending', sync: 'failed' }), 'queue');
+  assert.equal(kind({ status: 'waiting', error: '网络失败' }), 'failed');
+  assert.equal(kind({ status: 'running', outcomeUnknown: true }), 'failed');
+});

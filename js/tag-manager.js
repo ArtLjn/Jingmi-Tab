@@ -20,6 +20,7 @@
   var lastDeleted = null;     // { tag, timer }
   var confirmResetUntil = 0;  // 两步确认的时间窗
   var expanded = { pinned: false, cand: false, ignored: false };
+  var query = '';             // 在书签里搜索要添加备注的网站
 
   function $(sel) { return document.querySelector(sel); }
 
@@ -60,7 +61,7 @@
     if (!lastDeleted) return;
     var tag = lastDeleted.tag;
     clearUndo();
-    var res = global.QuickTags.add({ url: tag.url, label: tag.label, aliases: tag.aliases, pin: tag.pin });
+    var res = global.QuickTags.add(tag);
     setStatus(res.ok ? '已恢复「' + tag.label + '」' : '恢复失败');
     refresh();
   }
@@ -117,16 +118,73 @@
       ops.append(opButton('↑', '上移', i === 0, function () { act('up', tag.id); }));
       ops.append(opButton('↓', '下移', i === shownPinned.length - 1 && pinned.length === shownPinned.length, function () { act('down', tag.id); }));
       ops.append(opButton('删除', '删除这个标签', false, function () { act('del', tag.id); }, 'is-danger'));
+      ops.append(opButton('编辑', '编辑名称、别名和说明', false, function () { TagEditor.open({ tag: tag, saved: refresh }); }));
+      if (tag.aliases && tag.aliases.length) main.append(el('span', 'tag-alias', '别名：' + tag.aliases.join('、')));
       row.append(ops);
 
       els.pinned.append(row);
     });
   }
 
+  /* 搜索结果直接复用书签行：已有备注进入编辑，没有备注则带上网址和标题新建。 */
+  function openBookmark(row) {
+    var url = global.QuickTags.normalizeUrl(row.url);
+    var existing = global.QuickTags.list().filter(function (tag) { return tag.url === url; })[0];
+    var saved = function () {
+      query = ''; if (els.search) els.search.value = '';
+      setStatus(existing ? '已更新「' + existing.label + '」' : '已添加「' + (row.title || row.host) + '」');
+      refresh();
+    };
+    TagEditor.open({ tag: existing || { url: row.url, label: row.title || row.host }, saved: saved });
+  }
+
+  function searchBookmarks() {
+    var q = query.trim().toLowerCase();
+    if (!q) return null;
+    var seen = {};
+    return (ctxOf().rows || []).filter(function (row) {
+      if (!row.url || seen[row.url]) return false;
+      var hay = [row.title, row.url, row.host, row.folder].join(' ').toLowerCase();
+      if (hay.indexOf(q) < 0) return false;
+      seen[row.url] = true;
+      return true;
+    }).slice(0, 8);
+  }
+
+  function renderSearchResults(rows) {
+    els.cand.replaceChildren();
+    els.candMore.replaceChildren();
+    els.candEmpty.hidden = rows.length > 0;
+    els.candEmpty.textContent = rows.length ? '' : '没有找到匹配的书签';
+    if (els.candHint) els.candHint.textContent = '在全部书签中搜索，选中后添加别名或说明。';
+    if (els.candCount) els.candCount.textContent = rows.length + ' 个结果';
+    var tags = global.QuickTags.list();
+    rows.forEach(function (row) {
+      var existing = tags.filter(function (tag) { return tag.url === global.QuickTags.normalizeUrl(row.url); })[0];
+      var item = el('div', 'tag-row');
+      var dot = el('span', 'tag-dot');
+      dot.style.background = dotColor(row.host);
+      item.append(dot);
+      var main = el('div', 'tag-main');
+      main.append(el('span', 'tag-name is-static', row.title || row.host));
+      main.append(el('span', 'tag-host', row.host + (row.folder ? ' · ' + row.folder : '')));
+      item.append(main);
+      var ops = el('div', 'tag-ops');
+      ops.append(opButton(existing ? '编辑' : '加备注', existing ? '编辑这个入口的别名和说明' : '给这个书签添加别名和说明', false, function () { openBookmark(row); }, existing ? '' : 'is-primary'));
+      item.append(ops);
+      els.cand.append(item);
+    });
+  }
+
   function renderCandidates(cands) {
+    var results = searchBookmarks();
+    if (results) { renderSearchResults(results); return; }
+    els.candEmpty.textContent = '暂无候选，正常使用几天后再来看。';
+    if (els.candHint) els.candHint.textContent = '搜索全部书签添加备注；系统推荐来自常访站点与最近 120 天新增书签，不会自动固定。';
     els.cand.replaceChildren();
     els.candEmpty.hidden = cands.length > 0;
     renderMore(els.candMore, 'cand', cands.length);
+    if (els.candCount) els.candCount.textContent = cands.length + ' 个候选';
 
     visibleRows(els.cand, cands, 'cand').forEach(function (cand) {
       var row = el('div', 'tag-row');
@@ -192,7 +250,7 @@
     if (kind === 'del') {
       var tag = tags.list().filter(function (t) { return t.id === id; })[0];
       if (!tag) return;
-      var snapshot = { url: tag.url, label: tag.label, aliases: tag.aliases, pin: tag.pin };
+      var snapshot = JSON.parse(JSON.stringify(tag));
       if (!tags.remove(id)) return;
       clearUndo();
       lastDeleted = { tag: snapshot, timer: setTimeout(function () { lastDeleted = null; setStatus(''); }, UNDO_MS) };
@@ -228,7 +286,7 @@
     var input = el('input', 'tag-name-input');
     input.type = 'text';
     input.value = tag.label;
-    input.maxLength = 40;
+    input.removeAttribute('maxlength');
     input.setAttribute('aria-label', '标签名称');
     nameEl.replaceWith(input);
     input.focus();
@@ -240,8 +298,11 @@
       done = true;
       var value = input.value.trim();
       if (save && value && value !== tag.label) {
-        global.QuickTags.rename(id, value);
-        setStatus('已改名为「' + value + '」');
+        global.QuickTags.save(Object.assign({}, tag, { label: value }), id, tag.revision || 0).then(function (res) {
+          if (res.ok) { setStatus('已改名为「' + value + '」'); refresh(); }
+          else { done = false; setStatus(res.error); input.focus(); }
+        });
+        return;
       }
       refresh();
     }
@@ -267,7 +328,6 @@
     renderIgnored(ignored);
 
     if (els.count) els.count.textContent = pinned.length ? pinned.length + ' 个固定' : '还没有固定标签';
-    if (els.candCount) els.candCount.textContent = cands.length + ' 个候选';
     if (els.ignoredCount) els.ignoredCount.textContent = ignored.length ? ignored.length + ' 个' : '';
   }
 
@@ -322,6 +382,13 @@
 
   /* ------------------------- 挂载 ------------------------- */
   function bind() {
+    if (els.search) els.search.addEventListener('input', function () { query = els.search.value; refresh(); });
+    var backupNotes = document.getElementById('tag-backup-notes');
+    if (backupNotes && opts.settings) {
+      backupNotes.checked = !!opts.settings().tags.backupNotes;
+      backupNotes.addEventListener('change', async function () { var previous = opts.settings().tags.backupNotes; opts.settings().tags.backupNotes = backupNotes.checked; try { await Settings.save(opts.settings()); setStatus('备份范围已更新'); } catch (e) { opts.settings().tags.backupNotes = previous; backupNotes.checked = !!previous; setStatus('保存失败，请重试'); } });
+    }
+    document.addEventListener('quick-tags:updated', refresh);
     els.importBtn.addEventListener('click', function () { els.importFile.click(); });
     els.importFile.addEventListener('change', function () {
       importFile(els.importFile.files && els.importFile.files[0]);
@@ -344,6 +411,8 @@
       cand: $('#tag-cand-list'),
       candMore: $('#tag-cand-more'),
       candEmpty: $('#tag-cand-empty'),
+      candHint: $('#tag-cand-hint'),
+      search: $('#tag-search'),
       ignored: $('#tag-ignored-list'),
       ignoredMore: $('#tag-ignored-more'),
       ignoredEmpty: $('#tag-ignored-empty'),

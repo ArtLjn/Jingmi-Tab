@@ -142,6 +142,8 @@
     if (Number(payload.schema) !== SCHEMA) throw new BackupError('unsupported_schema', '备份版本不兼容');
     if (!payload.settings || typeof payload.settings !== 'object') throw new BackupError('invalid_payload', '缺少设置');
     if (!payload.tags || !Array.isArray(payload.tags.tags)) throw new BackupError('invalid_payload', '缺少标签');
+    if (Number(payload.tags.version) > 3) throw new BackupError('unsupported_schema', '快捷入口数据来自新版，请升级后恢复');
+    if (global.QuickTags && QuickTags.validateState) QuickTags.validateState(payload.tags);
     if (payload.meta && typeof payload.meta !== 'object') throw new BackupError('invalid_payload', '元数据格式错误');
     return payload;
   }
@@ -230,10 +232,11 @@
     return data;
   }
 
-  function authRegister(cfg, username, password) {
+  function authRegister(cfg, username, password, inviteCode) {
     return request(cfg, 'POST', '/api/auth/register', {
       username: String(username || '').trim(),
-      password: String(password || '')
+      password: String(password || ''),
+      invite_code: String(inviteCode || '').trim()
     }, { auth: false }).then(authData);
   }
 
@@ -266,6 +269,11 @@
 
   async function push(cfg, prepared) {
     var pack = prepared || await collect();
+    pack = Object.assign({}, pack, { payload: clone(pack.payload), sha256: undefined });
+    var allowNotes = cfg.includePersonalNotes;
+    if (allowNotes === undefined) { var current = await Settings.load(); allowNotes = !!(current.tags && current.tags.backupNotes); }
+    if (!allowNotes && pack.payload.tags) pack.payload.tags.tags.forEach(function (tag) { delete tag.note; });
+    var uploadText = canonicalJson(pack.payload); pack.sha256 = await sha256Hex(uploadText); pack.sizeBytes = byteLength(uploadText);
     var body = {
       device_id: String(cfg.deviceId || 'default'),
       schema: SCHEMA,
@@ -424,6 +432,7 @@
 
   function onStorageChanged(changes, area) {
     if (area !== 'local') return;
+    if (global.Profiles) changes = Profiles.changes(changes);
     if (changes[STATUS_KEY]) return;   /* 状态写入绝不触发下一次上传 */
 
     var tagsChanged = !!changes[TAGS_KEY];

@@ -69,7 +69,7 @@ test('远端召回只接受当前实例和存在的文档版本', async () => {
   assert.equal((await c.Rag.retrieve(cfg, '文档', [row])).length, 1);
   assert.equal((await c.Rag.retrieve(cfg, '文档', [])).length, 0);
   await c.Documents.capture(doc.id, { text: '新版本正文' });
-  assert.equal((await c.Rag.retrieve(cfg, '文档', [row])).length, 0);
+  assert.equal((await c.Rag.retrieve(cfg, '文档', [row])).length, 1, '新版本尚未上传时保留已确认的历史正文');
   assert.equal(c.Rag.available({ ...cfg, collection: 'agent_user_memory_bge_m3' }), false);
 });
 
@@ -107,4 +107,44 @@ test('账号模式本机状态重建后沿用服务端文档 ID，兼容旧实�
   assert.equal(saved[doc.id].docId, 'persisted-document');
   assert.equal(api.docs.size, 1);
   assert.equal((await c.Rag.retrieve(accountCfg, '项目', [row])).length, 1);
+});
+
+test('配置读取接受账号后台的 ok 响应，检索仍要求上游 OK 协议', async () => {
+  const { c } = fixture({ fetch: async () => new Response(JSON.stringify({ ok: true, data: { enabled: true, collection: 'chrome_tab_account' } })) });
+  assert.equal((await c.Rag.config('测试令牌')).collection, 'chrome_tab_account');
+  await assert.rejects(c.Rag.request(cfg, '/retrieve', {}), /未完成操作/);
+});
+
+test('检测连接只读检索，空集合也算连通，异常响应不能算通过', async () => {
+  const api = server(); const { c } = fixture({ fetch: api.fetch });
+  assert.ok((await c.Rag.check({ ...cfg, enabled: false }, {})).checkedAt);
+  assert.deepEqual(api.calls.map(call => call.path), ['/retrieve']);
+  c.fetch = async () => new Response(JSON.stringify({ code: 'OK', data: {} }));
+  await assert.rejects(c.Rag.check(cfg, {}), /返回格式异常/);
+  c.fetch = async () => new Response('', { status: 401 });
+  await assert.rejects(c.Rag.check(cfg, {}), /登录会话已失效/);
+});
+
+test('账号校验缓存过期后搜索配置先刷新绑定，拒绝使用旧账号集合', async () => {
+  const { c } = fixture(); let binding = null; let checks = 0;
+  c.Profiles = { cloud: () => binding, requireCloud: async () => { checks++; binding = { token: '测试令牌', collection: 'chrome_tab_account' }; return binding; } };
+  assert.equal(c.Rag.available(c.Rag.withAuth(cfg, {})), false);
+  const resolved = await c.Rag.resolve(cfg, {});
+  assert.equal(c.Rag.available(resolved), true);
+  assert.equal(resolved.collection, 'chrome_tab_account');
+  assert.equal(checks, 1);
+  await assert.rejects(c.Rag.request({ ...resolved, collection: 'chrome_tab_other' }, '/retrieve', {}), /账号已变化/);
+});
+
+test('仅配置 RAG 时明确标注云端召回，检索失败后保留本地候选和失败原因', async () => {
+  const { c } = fixture();
+  const row = { id: '3', title: '网页', url: 'https://example.com/a', hay: '网页' };
+  c.Rag.retrieve = async () => [{ row, source: 'rag', score: 1 }];
+  const result = await c.BookmarkSearch.run({ rows: [row], query: '图片压缩', cfg: {}, rag: cfg });
+  assert.match(result.message, /RAG 已召回 1 条/);
+  c.Rag.retrieve = async () => { throw new Error('RAG 请求超时'); };
+  c.Bookmarks.recall = () => [{ row, score: 1 }];
+  const fallback = await c.BookmarkSearch.run({ rows: [row], query: '图片压缩', cfg: {}, rag: cfg });
+  assert.match(fallback.message, /RAG 请求超时/);
+  assert.equal(fallback.hits.length, 1);
 });

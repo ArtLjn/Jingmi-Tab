@@ -1,6 +1,7 @@
 /* 公开页面采集：不带 Cookie，提取描述和有限正文；缓存由内容索引统一管理。 */
 (function (global) {
   'use strict';
+  var inFlight = new Map();
 
   var CONCURRENCY = 4;
   var TIMEOUT = 5000;
@@ -180,11 +181,14 @@
 
   /* 仅临时网络故障及服务器故障重试一次；不重试登录墙和权限拒绝。 */
   async function fetchOne(url) {
+    if (global.NetworkStatus && await NetworkStatus.waiting()) return { url: url, status: 'fail', reason: 'network_suspected', source: 'public', fetchedAt: Date.now(), operation: 'capture', requestSource: 'local' };
     var row = await fetchAttempt(url, TIMEOUT);
     if (row.status !== 'ok' && /^(timeout|network|http_(408|500|502|503|504))$/.test(row.reason)) {
       row = await fetchAttempt(url, RETRY_TIMEOUT);
       row.attempts = 2;
     }
+    row.operation = 'capture'; row.requestSource = 'local';
+    if (global.NetworkStatus) await NetworkStatus.observe(url, row.reason);
     return row;
   }
 
@@ -249,11 +253,16 @@
 
     var done = 0;
     await mapLimit(missing, CONCURRENCY, async function (u) {
-      var row = await fetchOne(u);
+      var key = u + ':' + !!options.force;
+      var task = inFlight.get(key);
+      if (!task) { task = fetchOne(u); inFlight.set(key, task); }
+      var row;
+      try { row = await task; } finally { if (inFlight.get(key) === task) inFlight.delete(key); }
+      row = Object.assign({}, row);
       row.version = ContentIndex.VERSION;
       /* 更新失败时保留已有内容，同时记录失败原因供后续重试。 */
       if (row.status !== 'ok' && cached[u] && cached[u].status === 'ok') {
-        row = Object.assign({}, cached[u], { checkedAt: now, version: ContentIndex.VERSION, refreshError: row.reason });
+        row = Object.assign({}, cached[u], { checkedAt: now, version: ContentIndex.VERSION, refreshError: row.reason, refreshCheckedAt: row.fetchedAt });
       }
       map[u] = row;
       done++;

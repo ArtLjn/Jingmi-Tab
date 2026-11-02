@@ -24,7 +24,7 @@
     /* 普通输入时的全网联想（走当前搜索引擎的 suggest 接口） */
     suggest: { enabled: true },
     /* @ 快捷标签：enabled 关掉后 @ 退回普通搜索字符；aiSuggest 控制面板 AI 短名 */
-    tags: { enabled: true, aiSuggest: true },
+    tags: { enabled: true, aiSuggest: true, backupNotes: false },
     /* 自建服务端备份：配置只存本机，token 永不写入备份文件 */
     backup: {
       serverUrl: 'https://api.jingmi.lllcnm.cn',
@@ -54,6 +54,7 @@
       includePrivate: false,
       autoSync: true,
       autoCapture: true,
+      cleanupEnabled: false,
       refreshDays: 7
     },
     wallpaper: {

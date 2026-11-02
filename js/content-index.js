@@ -18,7 +18,7 @@
     if (!page) return false;
     if (page.source === 'capture' && page.status === 'ok') return true;
     if (page.version !== VERSION) return false;
-    var transient = /^(timeout|network|http_(408|429|500|502|503|504))$/.test(page.refreshError || page.reason || '');
+    var transient = /^(timeout|network|network_suspected|http_(408|429|500|502|503|504))$/.test(page.refreshError || page.reason || '');
     var ttl = page.status === 'ok' && !page.refreshError ? (page.partial ? 3600e3 : OK_TTL) : transient ? 5 * 60e3 : FAIL_TTL;
     return (now || Date.now()) - (page.checkedAt || page.fetchedAt) <
       ttl;
@@ -42,7 +42,9 @@
   async function hydrate(rows) {
     var pages = await AgentDB.getPages(rows.map(function (r) { return normUrl(r.url); }));
     apply(rows, pages);
-    return typeof Documents !== 'undefined' ? Documents.hydrate(rows) : rows;
+    if (typeof Documents !== 'undefined') await Documents.hydrate(rows);
+    if (global.QuickTags) await QuickTags.load();
+    return global.PersonalTargets ? PersonalTargets.hydrate(rows) : rows;
   }
 
   global.ContentIndex = { VERSION: VERSION, normUrl: normUrl, isWeb: isWeb,

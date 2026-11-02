@@ -12,7 +12,20 @@
     var scan = document.getElementById('enrich-scan');
     var capture = document.getElementById('enrich-capture');
     var details = document.getElementById('enrich-details');
+    var filters = document.getElementById('enrich-filters');
     var busy = false;
+    var filter = 'pending';
+    var filterTouched = false;
+    var lastState = null;
+    var FILTERS = [
+      { key: 'pending', label: '待确认' },
+      { key: 'failures', label: '补全异常' },
+      { key: 'recent', label: '最近成功' }
+    ];
+    var detailWrap = document.getElementById('search-page-detail-wrap');
+    var detailName = document.getElementById('search-page-detail');
+    var pageName = document.getElementById('search-page-name');
+    var enrichPage = document.querySelector('[data-search-page="enrich"]');
 
     function el(tag, text, className) {
       var node = document.createElement(tag);
@@ -54,30 +67,143 @@
       return row;
     }
 
-    function render(state) {
-      if (!state) return;
-      toggle.checked = !!state.enabled;
-      var pending = state.pending || [];
+    function countsOf(state) {
       var failures = state.failures || [];
-      status.textContent = state.collection ? CollectionStats.format(state.collection) : '正在读取收藏收录状态…';
-      var accounting = document.getElementById('enrich-accounting');
-      if (!accounting) { accounting = el('p', '', 'enrich-summary'); accounting.id = 'enrich-accounting'; status.after(accounting); }
-      accounting.textContent = state.collection ? CollectionStats.breakdown(state.collection) : '';
-      status.title = '总数＝已收录＋未收录；未收录＝队列＋失败＋需人工处理＋暂停＋待安排，各类互斥。已收录的后续更新单独列出，不计入未收录队列与失败。';
-      summary.textContent = 'AI 建议待确认 ' + (state.totalPending || 0) + ' · 采集补全异常 ' + (state.totalFailed || 0);
-      body.replaceChildren();
-      if (!pending.length && !failures.length) {
-        body.append(el('p', '暂无需要你处理的内容，完成的项目会自动从这里移除。', 'auto-empty'));
-      }
+      return {
+        pending: Math.max(Number(state.totalPending) || 0, (state.pending || []).length),
+        failures: Math.max(Number(state.totalFailed) || 0, failures.length),
+        recent: (state.recent || []).length
+      };
+    }
 
+    function pickFilter(counts) {
+      if (counts.pending) return 'pending';
+      if (counts.failures) return 'failures';
+      if (counts.recent) return 'recent';
+      return 'pending';
+    }
+
+    function activeFilterLabel() {
+      for (var i = 0; i < FILTERS.length; i++) if (FILTERS[i].key === filter) return FILTERS[i].label;
+      return FILTERS[0].label;
+    }
+
+    /* 补全页的第三个面包屑段表示当前列表；离开本页时交给 workspace 管理。 */
+    function syncBreadcrumb() {
+      if (!detailWrap || !detailName) return;
+      if (!enrichPage || enrichPage.hidden) return;
+      detailWrap.hidden = false;
+      detailName.textContent = activeFilterLabel();
+      detailName.setAttribute('aria-current', 'page');
+      if (pageName) pageName.removeAttribute('aria-current');
+    }
+
+    function renderFilters(state) {
+      if (!filters) return;
+      var counts = countsOf(state);
+      var total = counts.pending + counts.failures + counts.recent;
+      filters.hidden = !total;
+      filters.replaceChildren();
+      if (!total) return;
+      FILTERS.forEach(function (meta) {
+        var button = el('button', '', 'enrich-filter' + (filter === meta.key ? ' is-active' : ''));
+        button.type = 'button';
+        button.dataset.filter = meta.key;
+        button.setAttribute('aria-pressed', String(filter === meta.key));
+        button.setAttribute('aria-controls', 'enrich-body');
+        button.append(el('span', meta.label), el('em', String(counts[meta.key])));
+        filters.append(button);
+      });
+    }
+
+    /* 补全异常同时包含“未收录异常”和“已收录后的后续异常”，在列表顶部拆开口径。 */
+    function failureScope(state) {
+      var c = state.collection;
+      if (!c || !c.states || !c.updates) return '';
+      var uncollected = (Number(c.states.failed) || 0) + (Number(c.states.manual) || 0) + (Number(c.states.paused) || 0);
+      var updates = Number(c.updates.failed) || 0;
+      var total = Number(state.totalFailed) || 0;
+      if (!uncollected || !updates || uncollected + updates !== total) return '';
+      return total + ' 条中：未收录异常 ' + uncollected + ' · 已收录后续异常 ' + updates;
+    }
+
+    function failureInfo(item) {
+      var manual = ['http_401', 'http_403', 'dynamic_shell', 'login_wall', 'no_content'].includes(item.code);
+      var reason = item.code === 'private' ? '已保存页面正文；生成建议前需确认发送片段给 AI'
+        : manual ? '公开抓取无法读取正文；打开页面后点击扩展图标采集'
+          : item.reason;
+      if (item.code === 'daily_limit') reason = '今日采集额度已用完，明日恢复；手动重试不会重置额度';
+      var policy = item.policy || RetryPolicy.classify(item.code, item.attempts);
+      var tone = policy.kind === 'retryable' ? 'retryable'
+        : policy.kind === 'paused' ? 'paused'
+          : policy.kind === 'manual' ? 'manual' : 'stopped';
+      var label = policy.kind === 'retryable' ? (policy.auto ? '可自动重试' : '自动重试已达上限')
+        : policy.kind === 'paused' ? '已暂停'
+          : policy.kind === 'manual' ? '需人工处理' : '已停止';
+      /* 重试类补充策略说明；人工/暂停类的原因已经写清楚，不再拼接重复文案。 */
+      var detail = policy.kind === 'retryable' || policy.kind === 'stopped' ? ' · ' + policy.message : '';
+      return { manual: manual, policy: policy, reason: reason + detail, tone: tone, label: label,
+        category: RetryPolicy.category(item.code) };
+    }
+
+    function failureTagSummary(state) {
+      var tags = Array.isArray(state.failureTags) ? state.failureTags : [];
+      if (!tags.length) return '';
+      return '类型：' + tags.map(function (tag) { return tag.label + ' ' + tag.count; }).join(' · ');
+    }
+
+    function renderFailure(item) {
+      var info = failureInfo(item);
+      var row = el('div', '', 'enrich-item');
+      var main = el('div', '', 'enrich-main');
+      var head = el('div', '', 'enrich-item-head');
+      var tags = el('span', '', 'enrich-item-tags');
+      tags.append(el('span', info.category.label, 'enrich-cat-chip'),
+        el('span', info.label, 'enrich-status-chip is-' + info.tone));
+      head.append(el('p', item.title || item.url || item.id, 'enrich-current'), tags);
+      main.append(head, el('p', info.reason, 'enrich-summary'));
+      var action = null;
+      if (item.code === 'private') {
+        action = el('button', '发送正文给 AI', 'auto-action');
+        action.type = 'button';
+        action.dataset.enrichPrivate = item.id;
+      } else if (info.manual && item.url) {
+        action = el('a', '打开页面', 'auto-action');
+        action.href = item.url;
+        action.target = '_blank';
+        action.rel = 'noopener noreferrer';
+      } else if (info.policy.allowManual) {
+        action = el('button', info.policy.auto ? '重新抓取' : '检查后重试', 'auto-action');
+        action.type = 'button';
+        action.dataset.enrichRetry = item.id;
+      }
+      row.append(main);
+      if (action) row.append(action);
+      return row;
+    }
+
+    function renderRecent(item) {
+      var row = el('div', '', 'enrich-item');
+      var main = el('div', '', 'enrich-main');
+      var link = el('a', item.title || item.url || '收藏摘要', 'enrich-current');
+      link.href = item.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      main.append(link, el('p', item.summary || '', 'enrich-summary'));
+      if (item.facts && item.facts.length) main.append(el('p', item.facts.join(' · '), 'enrich-summary'));
+      row.append(main);
+      return row;
+    }
+
+    function renderToolbar(state, selected) {
       var toolbar = el('div', '', 'enrich-toolbar');
-      if (state.retryableFailed > 0) {
+      if ((selected === 'failures') && state.retryableFailed > 0) {
         var retryAll = el('button', '重试可重试项', 'btn-ghost');
         retryAll.type = 'button';
         retryAll.id = 'enrich-retry-unsuccessful';
         toolbar.append(retryAll);
       }
-      if (pending.length > 1) {
+      if (selected === 'pending' && (state.pending || []).length > 1) {
         var all = el('button', '全部应用', 'btn-ghost enrich-all');
         all.type = 'button';
         all.id = 'enrich-apply-all';
@@ -89,55 +215,61 @@
         undo.id = 'enrich-undo';
         toolbar.append(undo);
       }
-      if ((state.totalFailed || 0) > failures.length) body.append(el('p', '当前展示最近 ' + failures.length + ' 条，批量重试仅处理可重试项，跳过需人工处理和已停止项。', 'enrich-summary'));
-      if (toolbar.childNodes.length) body.append(toolbar);
-      pending.forEach(function (item) { body.append(renderItem(item)); });
-      if (state.recent && state.recent.length) {
-        body.append(el('p', '最近生成的摘要', 'enrich-current'));
-        state.recent.forEach(function (item) {
-          var row = el('div', '', 'enrich-item');
-          var main = el('div', '', 'enrich-main');
-          var link = el('a', item.title || item.url || '收藏摘要', 'enrich-current');
-          link.href = item.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
-          main.append(link, el('p', item.summary || '', 'enrich-summary'));
-          if (item.facts && item.facts.length) main.append(el('p', item.facts.join(' · '), 'enrich-summary'));
-          row.append(main); body.append(row);
-        });
+      return toolbar.childNodes.length ? toolbar : null;
+    }
+
+    function render(state) {
+      if (!state) return;
+      lastState = state;
+      toggle.checked = !!state.enabled;
+      var counts = countsOf(state);
+      if (!filterTouched) filter = pickFilter(counts);
+      var pending = state.pending || [];
+      var failures = state.failures || [];
+      var recent = state.recent || [];
+      status.textContent = state.collection ? CollectionStats.format(state.collection) : '正在读取补全状态…';
+      var accounting = document.getElementById('enrich-accounting');
+      if (!accounting) { accounting = el('p', '', 'enrich-summary'); accounting.id = 'enrich-accounting'; status.after(accounting); }
+      accounting.textContent = state.collection ? CollectionStats.breakdown(state.collection) : '';
+      status.title = '总书签＝已收录＋未收录；未收录明细按书签逐条统计。下方补全任务按任务单独计数。';
+      summary.textContent = 'AI 建议待确认 ' + counts.pending + ' · 采集补全异常 ' + counts.failures;
+      renderFilters(state);
+      syncBreadcrumb();
+      body.replaceChildren();
+
+      var toolbar = renderToolbar(state, filter);
+      if (!counts.pending && !counts.failures && !counts.recent) {
+        if (toolbar) body.append(toolbar);
+        body.append(el('p', '暂无需要你处理的内容，完成的项目会自动从这里移除。', 'auto-empty'));
+        return;
       }
-      if (state.failures && state.failures.length) {
-        body.append(el('p', '采集补全异常（与 RAG 入库状态分别记录）', 'enrich-current'));
-        state.failures.forEach(function (item) {
-          var row = el('div', '', 'enrich-item');
-          var main = el('div', '', 'enrich-main');
-          main.append(el('p', item.title || item.url || item.id, 'enrich-current'));
-          var manual = ['http_401', 'http_403', 'dynamic_shell', 'login_wall', 'no_content'].includes(item.code);
-          var reason = item.code === 'private' ? '已保存页面正文；生成建议前需确认发送片段给 AI'
-            : manual ? '公开抓取无法读取正文；打开页面后点击扩展图标采集'
-              : item.reason;
-          if (item.code === 'daily_limit') reason = '今日采集额度已用完，明日恢复；手动重试不会重置额度';
-          var policy = item.policy || RetryPolicy.classify(item.code, item.attempts);
-          reason += ' · ' + policy.message;
-          main.append(el('p', reason, 'enrich-summary'));
-          if (item.code === 'private') {
-            var consent = el('button', '发送正文给 AI', 'auto-action');
-            consent.type = 'button';
-            consent.dataset.enrichPrivate = item.id;
-            row.append(main, consent);
-          } else if (manual && item.url) {
-            var open = el('a', '打开页面', 'auto-action');
-            open.href = item.url;
-            open.target = '_blank';
-            open.rel = 'noopener noreferrer';
-            row.append(main, open);
-          } else if (policy.allowManual) {
-            var retry = el('button', policy.auto ? '重新抓取' : '检查后重试', 'auto-action');
-            retry.type = 'button';
-            retry.dataset.enrichRetry = item.id;
-            row.append(main, retry);
-          } else { row.append(main); }
-          body.append(row);
-        });
+
+      if (filter === 'pending') {
+        if (counts.pending > pending.length) body.append(el('p', '当前展示最近 ' + pending.length + ' 条待确认建议。', 'enrich-summary'));
+        if (toolbar) body.append(toolbar);
+        if (pending.length) pending.forEach(function (item) { body.append(renderItem(item)); });
+        else body.append(el('p', '暂无待确认建议。', 'auto-empty'));
+        return;
       }
+
+      if (filter === 'failures') {
+        var scope = failureScope(state);
+        var scopeBox = el('div', '', 'enrich-scope');
+        scopeBox.append(el('p', '补全 = 生成标题、摘要和标签。已入库书签的后续更新失败也会出现在这里，但仍可正常检索。', 'enrich-scope-line'));
+        if (scope) scopeBox.append(el('p', scope, 'enrich-scope-line is-count'));
+        var tagSummary = failureTagSummary(state);
+        if (tagSummary) scopeBox.append(el('p', tagSummary, 'enrich-scope-line is-count'));
+        body.append(scopeBox);
+        if (counts.failures > failures.length) body.append(el('p', '当前展示最近 ' + failures.length + ' 条，批量重试仅处理可重试项，跳过需人工处理和已停止项。', 'enrich-summary'));
+        if (toolbar) body.append(toolbar);
+        if (failures.length) failures.forEach(function (item) { body.append(renderFailure(item)); });
+        else body.append(el('p', counts.failures ? '异常项正在读取，请稍后刷新。' : '暂无采集补全异常。', 'auto-empty'));
+        return;
+      }
+
+      if (toolbar) body.append(toolbar);
+      if (recent.length) recent.forEach(function (item) { body.append(renderRecent(item)); });
+      else body.append(el('p', '还没有成功生成的摘要。', 'auto-empty'));
     }
 
     async function refresh() {
@@ -160,6 +292,18 @@
 
     toggle.addEventListener('change', function () {
       act(function () { return send('enrich:toggle', { enabled: toggle.checked }); });
+    });
+
+    if (filters) filters.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-filter]');
+      if (!button || !lastState) return;
+      var next = button.dataset.filter;
+      if (next === filter) return;
+      filter = next;
+      filterTouched = true;
+      render(lastState);
+      var selected = filters.querySelector('[data-filter="' + filter + '"]');
+      if (selected) selected.focus();
     });
 
     async function scanInto(type, limit, message) {
@@ -194,8 +338,9 @@
     });
 
     details.addEventListener('toggle', function () { if (details.open) refresh(); });
+    document.addEventListener('workspace:search-page', function () { syncBreadcrumb(); });
     document.addEventListener('workspace:view', function (event) {
-      if (event.detail === 'search') refresh();
+      if (event.detail === 'search') { syncBreadcrumb(); refresh(); }
     });
     setInterval(function () {
       var search = document.getElementById('workspace-search');

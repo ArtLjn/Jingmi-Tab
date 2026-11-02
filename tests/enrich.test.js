@@ -98,6 +98,7 @@ test('AI 失败保留原因并允许重试，重试前不改名', async () => {
   let state = await f.c.BookmarkEnrich.status();
   assert.equal(state.totalPending, 0);
   assert.equal(state.totalFailed, 1);
+  assert.equal(state.hardFailures, 1);
   assert.match(state.failures[0].reason, /AI 请求失败/);
   assert.equal(f.node('3').title, '财务接口 A');
 
@@ -107,6 +108,7 @@ test('AI 失败保留原因并允许重试，重试前不改名', async () => {
   await f.c.BookmarkEnrich.run();
   state = await f.c.BookmarkEnrich.status();
   assert.equal(state.totalFailed, 0);
+  assert.equal(state.hardFailures, 0);
   assert.equal(state.totalPending, 1);
   assert.equal(f.node('3').title, '财务接口 A');
 });
@@ -162,7 +164,9 @@ test('手动重试绕过临时失败缓存并重新采集', async () => {
   await f.c.BookmarkEnrich.onCreated('3', f.node('3'));
   await f.c.BookmarkEnrich.run();
   assert.equal(pageCalls, 2);
-  assert.equal((await f.c.BookmarkEnrich.status()).totalFailed, 1);
+  const failedState = await f.c.BookmarkEnrich.status();
+  assert.equal(failedState.totalFailed, 1);
+  assert.equal(failedState.hardFailures, 1);
   await f.c.BookmarkEnrich.retry('3');
   await f.c.BookmarkEnrich.run();
   assert.equal(pageCalls, 3);

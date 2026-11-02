@@ -57,15 +57,33 @@
     return out;
   }
 
+  function fallback(hits, message, answerRequested) {
+    var result = { hits: hits, candidates: hits, message: message };
+    if (answerRequested) result.answer = { text: message, sources: [], notice: true };
+    return result;
+  }
+
   async function run(options) {
     var rows = options.rows;
+    if (global.PersonalTargets) PersonalTargets.apply(rows);
     var q = options.query;
     var ql = String(q || '').toLowerCase();
     var cfg = options.cfg;
+    // 界面明确进入问答模式时，关键词、英文和省略问号的表达也要生成回答。
+    var answerRequested = options.answer === true || isQuestion(q);
     var current = options.current || function () { return true; };
     var progress = options.progress || function () {};
     var onAnswer = options.onAnswer || function () {};
     var local = Bookmarks.query(rows, q, 30);
+    var personal = global.PersonalTargets ? PersonalTargets.resolve(q, rows) : { rows: [], query: q };
+    personal.rows.forEach(function (row) { if (!local.some(function (hit) { return hit.row.id === row.id; })) local.unshift({ row: row, score: 120 }); });
+    if (global.PersonalTargets) PersonalTargets.independent(q, rows).forEach(function (row) { local.push({ row: row, score: 120 }); });
+    if (personal.ambiguous) return fallback(personal.rows.map(function (row) { return { row: row, score: 120 }; }), '此称呼对应多个入口，请先选择或补充具体名称', answerRequested);
+    if (personal.rows.length) local = personal.rows.map(function (row) { return { row: row, score: 120 }; });
+    if (personal.rows.length || local.some(function (hit) { return String(hit.row.id).startsWith('quick:'); })) {
+      if (!local.some(function (hit) { return String(hit.row.text || hit.row.retrievedText || '').trim(); })) return fallback(local, '已找到相关入口，但尚无可用正文，无法据此回答具体流程', answerRequested);
+      q = personal.query;
+    }
     if (isQuestion(q)) {
       var ids = numericIdentifiers(q);
       if (ids.length) {
@@ -79,10 +97,10 @@
     }
     if (!current()) return null;
 
-    if (isAddressQuery(q)) {
+    if (isAddressQuery(q) && (options.answer !== true || !local.length)) {
       var addressMessage = local.length ? '按地址精确匹配 · 共 ' + local.length + ' 条' : '本地没有匹配的地址收藏';
       progress(addressMessage, local);
-      return { hits: local, candidates: local, message: addressMessage };
+      return fallback(local, addressMessage, options.answer === true);
     }
 
     progress(local.length ? '本地已找到 ' + local.length + ' 条，AI 正在回答…' : '正在查找相关收藏…', local);
@@ -90,7 +108,7 @@
     var remote = { hits: [] };
     if (!cands.length || (isQuestion(q) && cands.length >= 3)) {
       var remoteTask = options.rag && typeof Rag !== 'undefined' && Rag.available(options.rag)
-        ? Rag.retrieve(options.rag, q, rows).then(function (hits) { return { hits: hits }; }, function () { return { hits: [], failed: true }; })
+        ? Rag.retrieve(options.rag, q, rows).then(function (hits) { return { hits: hits }; }, function (e) { return { hits: [], failed: true, error: e.message }; })
         : Promise.resolve({ hits: [] });
       var rewriteTask = AI.available(cfg)
         ? AI.rewrite({ cfg: cfg, query: q, signal: options.signal }).catch(function () { return { ok: false }; })
@@ -112,12 +130,12 @@
         .slice(0, 30).map(function (entry) { return byBookmark.get(entry[0]); });
       if (cands.length) progress('AI 正在回答…', cands);
     }
-    if (!cands.length) return { hits: [], candidates: [], message: remote.failed
-      ? '云端检索暂不可用，本地也未找到相关收藏' : '没有找到相关收藏，可先采集正文后重试' };
-    if (!AI.available(cfg)) return { hits: cands, candidates: cands, message: '未配置 AI，已显示本地收藏' };
+    if (!cands.length) return fallback([], remote.failed
+      ? '云端检索暂不可用，本地也未找到相关收藏' : '没有找到相关收藏，可先采集正文后重试', answerRequested);
+    if (!AI.available(cfg)) return fallback(cands, remote.failed ? 'RAG 检索失败 · ' + remote.error + ' · 已显示本地结果' : remote.hits.length ? 'RAG 已召回 ' + remote.hits.length + ' 条收藏 · 未配置 AI 回答' : '已显示本地收藏 · 未配置 AI 回答', answerRequested);
 
     var byId = new Map(cands.map(function (h) { return [String(h.row.id), h]; }));
-    if (isQuestion(q) && typeof BookmarkAnswer !== 'undefined' && BookmarkAnswer.available(cfg) &&
+    if (answerRequested && typeof BookmarkAnswer !== 'undefined' && BookmarkAnswer.available(cfg) &&
         typeof BookmarkAnswer.runStream === 'function') {
       progress('AI 正在组织回答…', cands);
       var streamed;
@@ -159,13 +177,14 @@
         return {
           hits: answerHits.length ? answerHits : cands,
           candidates: cands,
-          message: answerSources.length ? 'AI 回答 · 引用 ' + answerSources.length + ' 条收藏' : 'AI 回答 · 基于本地正文',
+          message: answerSources.length ? 'AI 回答 · 引用 ' + answerSources.length + ' 条收藏' : 'AI 回答 · 基于收藏资料',
           answer: { text: streamed.answer, sources: answerSources, incomplete: !!streamed.incomplete }
         };
       }
-      return { hits: cands, candidates: cands, message: streamed.error === 'no_evidence'
-        ? '收藏缺少可用内容，已显示本地结果' : 'AI 回答暂不可用（' + AI.errText(streamed.error) + '），已显示本地结果' };
+      return fallback(cands, streamed.error === 'no_evidence'
+        ? '收藏缺少可用内容，暂时无法回答，已显示本地结果' : 'AI 回答暂不可用（' + AI.errText(streamed.error) + '），已显示本地结果', true);
     }
+    if (answerRequested) return fallback(cands, '问答模块暂不可用，请重新加载扩展后再试，已保留相关收藏', true);
     var result;
     try { result = await AI.rerank({ cfg: cfg, query: q, hits: cands, topN: 20, memoryId: options.memoryId, signal: options.signal }); }
     catch (e) { result = { ok: false, error: 'network' }; }
