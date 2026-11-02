@@ -7,7 +7,7 @@ last_updated: 2026-11-01
 # AI 功能推进路线与设计规划
 
 > 版本 v0.1 · 待评审
-> 适用：静谧新标签页（Chrome MV3，`manifest.json` v1.14.0）
+> 适用：静谧新标签页（Chrome MV3，`manifest.json` v1.16.0）
 > 关联能力：`?` AI 检索、问答式检索、域名记忆归档、书签空间、RAG 同步
 
 ---
@@ -560,3 +560,14 @@ last_updated: 2026-11-01
 - [`docs/quick-tags-design.md`](../quick-tags-design.md)：`@` 快捷标签设计，可复用其「精确率优先」与交互原则。
 - [`docs/design/ai-acceptance.md`](ai-acceptance.md)：按本文件第 11 节清单做的逐项验收结果与差异记录。
 - [`README.md`](../../README.md)：现有功能、RAG 同步与验证说明。
+
+## 附录 C：@ 面板 AI 短名推荐（v1.16）
+
+- 目标：解决自动候选「标题太长、记不住该敲什么」的问题；AI 只做候选内挑选与短名，不创建新站点。
+- 输入：最多 12 个本地候选的 `title`（≤40 字）与 `host`；不发完整 URL、路径、查询参数、文件夹、正文或用户输入。
+- 输出：`{"picks":[{"id":"c1","name":"打卡"}]}`；id 必须命中候选，未知 id、空名、重复 host 一律丢弃。
+- 缓存：`newtab.tag-suggest.v1`，TTL 24h，失败 15 分钟退避；指纹由候选 host/title 与模型配置组成。
+- 触发：打开 `@` 时先展示缓存，过期再后台刷新；仅当仍处于 `@` 模式且输入框聚焦时重绘。
+- 降级：AI 未配置、超时、格式错误时完全静默，保留本地候选与旧缓存。
+- 开关：`settings.tags.aiSuggest`；关闭后不再展示和请求。
+- 实现：`js/tag-suggest.js`；面板接线在 `js/newtab.js` 的 `refreshTagPanel()`。

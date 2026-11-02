@@ -215,3 +215,94 @@ test('关闭自动同步后后台不采集，手动同步一次后仍保持自�
   assert.equal(result.indexed, 1); assert.equal(result.manual, false);
   assert.equal(f.config.rag.autoSync, false);
 });
+
+test('相同正文只更新采集时间不会增加版本、重新入队或减少已收录', async () => {
+  const f = setup(); await f.c.SyncEngine.request();
+  const before = (await f.c.AgentDB.allRecords('documents'))[0];
+  const job = await f.c.AgentDB.getRecord('jobs', before.id);
+  await f.c.AgentDB.putPage({ ...before, url: before.identity.canonicalUrl, status: 'ok', fetchedAt: before.fetchedAt + 1000 });
+  await f.c.SyncEngine.reconcile(false);
+  const after = await f.c.Documents.get(before.id);
+  assert.equal(after.revision, before.revision);
+  assert.equal((await f.c.AgentDB.getRecord('jobs', before.id)).generation, job.generation);
+  await f.c.SyncEngine.run();
+  assert.equal(f.calls().ingests, 1);
+  assert.equal((await f.c.CollectionStats.read()).collected, 2);
+});
+
+test('待更新及更新失败保留最近一次成功收录，不把已有云端记录算成未收录', async () => {
+  const options = {}; const f = setup(options); await f.c.SyncEngine.request();
+  const before = (await f.c.AgentDB.allRecords('documents'))[0];
+  await f.c.Documents.capture(before.id, { text: '真正变化后的正文' });
+  await f.c.SyncEngine.reconcile(false);
+  assert.equal((await f.c.CollectionStats.read()).collected, 2);
+  options.failIngest = true;
+  await f.c.SyncEngine.run();
+  assert.equal((await f.c.CollectionStats.read()).collected, 2);
+  assert.equal((await f.c.AgentDB.getRecord('jobs', before.id)).status, 'pending');
+});
+
+test('同页收藏入口调整顺序以及连续重新加载，不反复同步完成任务', async () => {
+  let f = setup(); await f.c.SyncEngine.request();
+  f.node('1').children.reverse();
+  const before = (await f.c.AgentDB.allRecords('documents'))[0];
+  await f.c.SyncEngine.request();
+  assert.equal(f.calls().ingests, 1);
+  for (let i = 0; i < 4; i++) {
+    f = setup({ db: f.c.indexedDB, tree: f.tree });
+    await f.c.SyncEngine.request();
+    assert.equal(f.calls().publicCalls, 0);
+    assert.equal(f.calls().ingests, 0);
+    const stats = await f.c.CollectionStats.read();
+    assert.equal(stats.collected, 2);
+    assert.equal(stats.queue, 0);
+    assert.equal((await f.c.Documents.get(before.id)).revision, before.revision);
+  }
+});
+
+test('同内容再次采集不复活已达失败上限的任务', async () => {
+  const options = { failIngest: true }; const f = setup(options);
+  await f.c.SyncEngine.request();
+  const doc = (await f.c.AgentDB.allRecords('documents'))[0];
+  await f.c.AgentDB.updateRecord('jobs', doc.id, j => ({ ...j, status: 'failed', attempts: 5 }));
+  await f.c.AgentDB.putPage({ ...doc, url: doc.identity.canonicalUrl, status: 'ok', fetchedAt: doc.fetchedAt + 1000 });
+  await f.c.SyncEngine.request();
+  const job = await f.c.AgentDB.getRecord('jobs', doc.id);
+  assert.equal(job.attempts, 5);
+  assert.equal(job.status, 'failed');
+  assert.equal(f.calls().ingests, 1);
+});
+
+test('更新采集失败只保留待重试状态，不将错误提示再入库', async () => {
+  const f = setup(); await f.c.SyncEngine.request();
+  const doc = (await f.c.AgentDB.allRecords('documents'))[0];
+  const original = f.c.fetch;
+  f.c.fetch = (url, opts) => url.startsWith(f.config.rag.baseUrl) ? original(url, opts) : Promise.reject(new Error('临时断网'));
+  await f.c.SyncEngine.retry(doc.id);
+  assert.equal(f.calls().ingests, 1);
+  assert.equal((await f.c.CollectionStats.read()).collected, 2);
+  assert.equal((await f.c.AgentDB.getRecord('jobs', doc.id)).status, 'pending');
+});
+
+test('无网页标题时沿用收藏标题，重建索引不来回修改版本', async () => {
+  const f = setup(); const original = f.c.fetch;
+  f.c.fetch = (url, opts) => url.startsWith(f.config.rag.baseUrl) ? original(url, opts) : Promise.resolve(new Response('<html><body><p>没有 title 的项目正文。</p></body></html>', { headers: { 'content-type': 'text/html' } }));
+  await f.c.SyncEngine.request();
+  const before = (await f.c.AgentDB.allRecords('documents'))[0];
+  await f.c.SyncEngine.request();
+  const after = await f.c.Documents.get(before.id);
+  assert.equal(after.revision, before.revision);
+  assert.equal(f.calls().ingests, 1);
+});
+
+test('关闭正文采集的元数据记录成功后，不因没有 fetchedAt 每次重载都重做', async () => {
+  const f = setup(); f.config.rag.autoCapture = false;
+  await f.c.SyncEngine.request();
+  const job = (await f.c.AgentDB.allRecords('jobs'))[0];
+  await f.c.SyncEngine.request();
+  const current = await f.c.AgentDB.getRecord('jobs', job.id);
+  assert.equal(current.generation, job.generation);
+  assert.equal(current.status, 'done');
+  assert.equal(f.calls().publicCalls, 0);
+  assert.equal(f.calls().ingests, 1);
+});

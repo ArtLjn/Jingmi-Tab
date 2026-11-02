@@ -79,6 +79,7 @@ test('浏览器回归：背景动效、指针视差与减少动态效果降级',
     await page.mouse.down();
     await page.mouse.up();
     await page.waitForFunction(() => document.body.classList.contains('panel-open'));
+    await page.locator('#workspace-tab-appearance').click();
 
     /* 用户开关同时关闭循环动效与视差，并在重开后保留。 */
     await page.locator('label.switch:has(#sw-motion)').click();
@@ -100,6 +101,7 @@ test('浏览器回归：背景动效、指针视差与减少动态效果降级',
 
     /* 系统减少动态效果优先于用户开关；恢复系统偏好后可重新启用。 */
     await page.locator('#settings-btn').click();
+    await page.locator('#workspace-tab-appearance').click();
     await page.locator('label.switch:has(#sw-motion)').click();
     await page.waitForFunction(() => document.body.classList.contains('ambient-motion'));
     await page.emulateMedia({ reducedMotion: 'reduce' });

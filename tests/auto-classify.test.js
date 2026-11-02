@@ -49,5 +49,5 @@ test('旧自动整理设置被忽略，未命中域名规则时后台不移动�
   const state = await f.c.HANDLERS['auto:status']();
   assert.equal(state.enabled, true);
   assert.equal(state.rules.length, 0);
-  assert.equal(state.pending.length, 0);
+  assert.equal(state.pending.length, 1);
 });

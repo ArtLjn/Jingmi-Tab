@@ -111,7 +111,7 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     await context.exposeBinding('bookmarkAPI', async (_, { method, args }) => model.bookmarks[method](...args));
     await context.addInitScript(({ origin }) => {
       window.__enrichState = {
-        enabled: true, aiReady: true, totalPending: 0, pending: [], queue: 0,
+        collection: { total: 400, collected: 185, uncollected: 215, queue: 0, failed: 1 }, enabled: true, aiReady: true, totalPending: 0, pending: [], queue: 0,
         captured: 15, totalFailed: 3, totalWeb: 400, withBody: 215,
         failures: [
           { id: 'a', title: '需要登录的页面', url: origin + '/article', reason: '正文采集失败：http_403', code: 'http_403' },
@@ -159,20 +159,27 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     await page.waitForSelector('.organizer-item');
     assert.equal(await page.locator('#organizer-dialog .automation-card').count(), 0);
     await page.locator('#organizer-sync-settings').click();
+    /* 概览进入功能子页，业务操作继续使用原控件。 */
     await page.waitForSelector('#workspace-search:not([hidden])');
     assert.equal(await page.locator('#workspace-search .automation-card').count(), 4);
-    assert.equal(await page.locator('#auto-organize-title').innerText(), '按域名记忆自动归档');
+    assert.equal(await page.locator('#workspace-automation').count(), 0);
+    assert.equal(await page.locator('#workspace-crumbs').count(), 0);
+    assert.equal(await page.locator('#auto-organize-title').innerText(), 'AI 辅助收藏归档');
+    await page.locator('#search-breadcrumb button').click();
+    await page.locator('#search-overview [data-search-target="enrich"]').click();
     assert.equal(await page.locator('#enrich-title').innerText(), '标题、摘要与标签');
     await page.locator('#enrich-details').evaluate(el => { el.open = true; el.dispatchEvent(new Event('toggle')); });
-    await page.waitForFunction(() => document.querySelector('#enrich-summary').textContent.includes('正文覆盖 215/400'));
+    await page.waitForFunction(() => document.querySelector('#enrich-summary').textContent.includes('采集补全异常'));
     assert.match(await page.locator('#enrich-body').innerText(), /公开抓取无法读取正文；打开页面后点击扩展图标采集/);
     assert.equal(await page.locator('#enrich-body [data-enrich-retry]').count(), 1);
     assert.equal(await page.locator('#enrich-body [data-enrich-private]').count(), 1);
     assert.equal(await page.locator('#enrich-body a.auto-action').count(), 1);
     assert.equal(await page.locator('#index-build, #feishu-token, #feishu-authorize, #rag-auto, #rag-capture, #organizer-auto, #organizer-run, #organizer-target').count(), 0);
     assert.equal(await page.locator('#rag-enabled').isChecked(), false);
+    await page.locator('#search-breadcrumb button').click();
+    await page.locator('#search-overview [data-search-target="rag"]').click();
     await page.locator('#pipeline-start').click();
-    await page.waitForFunction(() => document.querySelector('#pipeline-status').textContent.includes('已入库 1/1'));
+    await page.waitForFunction(() => document.querySelector('#pipeline-status').textContent.includes('已收录 1'), null, { timeout: 5000 }).catch(async error => { throw new Error(error.message + '；状态=' + await page.locator('#pipeline-status').textContent() + '；提示=' + await page.locator('#rag-status').textContent()); });
     assert.equal(await page.locator('#rag-enabled').isChecked(), false);
     assert.equal(model.node('1').parentId, '10');
     assert.match(Array.from(cloudDocs.values())[0].content, /应收凭证/);
@@ -238,6 +245,7 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     await page.waitForFunction(() => document.querySelector('#organizer-status').textContent.includes('已恢复 1 条'));
     assert.equal(model.node('1').parentId, '10');
     await page.locator('#workspace-tab-search').click();
+    await page.locator('#search-overview [data-search-target="rag"]').click();
     await page.locator('label.switch:has(#rag-enabled)').click();
     await page.waitForFunction(() => document.querySelector('#pipeline-status').textContent.includes('自动同步已开启'));
     await page.locator('label.switch:has(#rag-enabled)').click();

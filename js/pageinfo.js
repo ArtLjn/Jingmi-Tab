@@ -4,6 +4,7 @@
 
   var CONCURRENCY = 4;
   var TIMEOUT = 5000;
+  var RETRY_TIMEOUT = 8000;
   var DESC_MAX = 180;
   var TITLE_MAX = 80;
   var HTML_MAX = 1000000;
@@ -26,6 +27,11 @@
       .replace(/[\u200b-\u200d\ufeff]/g, '')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  /* 只识别短提示，避免误伤讨论登录或浏览器兼容性的文章。 */
+  function placeholder(text) {
+    return /^(?:loading[. …]*|加载中[.。 …]*|正在加载[.。 …]*|please (?:enable|turn on) javascript[\s\S]*|you need to enable javascript[\s\S]*|请启用\s*javascript[\s\S]*|(?:your |this )?browser (?:is (?:not supported|unsupported)|not supported)[\s\S]*|unsupported browser[\s\S]*|(?:当前|您的)?浏览器不(?:受支持|支持)[\s\S]*|just a moment[. …]*|checking your browser[\s\S]*|access denied[\s\S]*)$/i.test(text);
   }
 
   /** 解析为独立文档，绝不把外部 HTML 插入扩展界面。 */
@@ -74,18 +80,33 @@
         || html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
       out.text = body ? clean(body[1].replace(/<(nav|header|footer|aside|form|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')).slice(0, TEXT_MAX) : '';
     }
-    out.desc = out.desc.slice(0, DESC_MAX);
+    /* SPA 或图片站常把有效描述放在 JSON-LD 中；仅取明确字段，不执行脚本。 */
+    var scripts = html.match(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi) || [];
+    var visited = 0;
+    function structured(value, depth) {
+      if (!value || typeof value !== 'object' || depth > 6 || ++visited > 200) return;
+      if (Array.isArray(value)) { value.forEach(function (item) { structured(item, depth + 1); }); return; }
+      if (!out.title && typeof (value.headline || value.name) === 'string') out.title = clean(value.headline || value.name).slice(0, TITLE_MAX);
+      if ((!out.desc || placeholder(out.desc)) && typeof value.description === 'string') out.desc = clean(value.description);
+      if (value['@graph']) structured(value['@graph'], depth + 1);
+      if (value.mainEntity) structured(value.mainEntity, depth + 1);
+    }
+    scripts.forEach(function (script) {
+      try { structured(JSON.parse(script.replace(/^<script\b[^>]*>/i, '').replace(/<\/script>$/i, '')), 0); } catch (e) { /* 忽略损坏的结构化数据 */ }
+    });
+    out.desc = clean(out.desc).slice(0, DESC_MAX);
     out.coverage = out.text ? 'html' : 'metadata';
     return out;
   }
 
-  async function fetchOne(url) {
+  async function fetchAttempt(url, timeout) {
     if (!ContentIndex.isWeb(url)) return { url: url, status: 'fail', reason: 'unsupported', fetchedAt: Date.now(), version: ContentIndex.VERSION };
     var ctrl = new AbortController();
-    var timer = setTimeout(function () { ctrl.abort(); }, TIMEOUT);
+    var timer = setTimeout(function () { ctrl.abort(); }, timeout);
     var now = Date.now();
 
     try {
+      if (global.ResourceGate) await ResourceGate.reserve('capture');
       var res = await fetch(url, {
         credentials: 'omit',
         redirect: 'follow',
@@ -105,6 +126,7 @@
       var reader = res.body.getReader();
       var decoder = null;
       var body = '';
+      var readError = null;
       var bytes = 0;
       try {
         while (bytes < HTML_MAX) {
@@ -122,8 +144,11 @@
           body += decoder.decode(part.value.subarray(0, remaining), { stream: true });
         }
         if (decoder) body += decoder.decode();
+      } catch (e) {
+        readError = e;
+        if (decoder) body += decoder.decode();
       } finally {
-        await reader.cancel().catch(function () {});
+        reader.cancel().catch(function () {});
       }
       var info = extract(body);
       info.truncated = !!info.truncated || bytes >= HTML_MAX;
@@ -131,24 +156,36 @@
         return { url: url, status: 'fail', reason: 'login_wall', fetchedAt: now };
       }
       var shell = (info.text || '').replace(/\s+/g, ' ').trim();
-      if (shell.length < 180 && /^(?:loading[. …]*|加载中[.。 …]*|正在加载[.。 …]*|please (?:enable|turn on) javascript[\s\S]*|you need to enable javascript[\s\S]*|请启用\s*javascript[\s\S]*)$/i.test(shell)) {
-        return { url: url, status: 'fail', reason: 'dynamic_shell', title: info.title, fetchedAt: now };
-      }
+      var isShell = shell.length < 600 && placeholder(shell);
+      if (isShell) info.text = '';
+      if (placeholder(info.desc)) info.desc = '';
       if (!info.desc && !info.text) {
-        return { url: url, status: 'fail', reason: 'no_content', title: info.title, fetchedAt: now };
+        return { url: url, status: 'fail', reason: readError ? (ctrl.signal.aborted ? 'timeout' : 'network') : isShell ? 'dynamic_shell' : 'no_content', title: info.title, fetchedAt: now };
       }
+      info.coverage = info.text ? 'html' : 'metadata';
+      if (readError) { info.truncated = true; info.partial = true; }
       return Object.assign(info, { url: url, status: 'ok', source: 'public',
         version: ContentIndex.VERSION, fetchedAt: now });
     } catch (e) {
       return {
         url: url,
         status: 'fail',
-        reason: (e && e.name === 'AbortError') ? 'timeout' : 'network',
+        reason: e && /ERR_BLOCKED_BY_CLIENT/.test(e.message || '') ? 'client_blocked' : e && e.code === 'daily_limit' ? 'daily_limit' : (e && e.name === 'AbortError') ? 'timeout' : 'network',
         fetchedAt: now
       };
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /* 仅临时网络故障及服务器故障重试一次；不重试登录墙和权限拒绝。 */
+  async function fetchOne(url) {
+    var row = await fetchAttempt(url, TIMEOUT);
+    if (row.status !== 'ok' && /^(timeout|network|http_(408|500|502|503|504))$/.test(row.reason)) {
+      row = await fetchAttempt(url, RETRY_TIMEOUT);
+      row.attempts = 2;
+    }
+    return row;
   }
 
   /** 固定并发跑任务，避免同时打开几十个连接 */

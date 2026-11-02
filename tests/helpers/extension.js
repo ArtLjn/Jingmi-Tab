@@ -51,7 +51,7 @@ function fixture(options = {}) {
   const c = { URL, crypto: webcrypto, TextEncoder, TextDecoder, FormData, Response, AbortController, setTimeout, clearTimeout,
     indexedDB: options.db || new IDBFactory(), chrome: { bookmarks }, fetch: options.fetch };
   c.self = c; vm.createContext(c);
-  for (const name of ['db', 'bookmarks', 'content-index', 'documents', 'pageinfo', 'capture-adapters', 'ai', 'organizer', 'organizer-moves', 'rag', 'sync-engine', 'bookmark-answer', 'bookmark-enrich', 'bookmark-search']) vm.runInContext(fs.readFileSync(path.join(root, 'js', name + '.js'), 'utf8'), c);
+  for (const name of ['db', 'bookmarks', 'content-index', 'resource-gate', 'retry-policy', 'collection-stats', 'documents', 'pageinfo', 'capture-adapters', 'ai', 'organizer', 'organizer-moves', 'rag', 'sync-engine', 'bookmark-answer', 'bookmark-enrich', 'bookmark-search']) vm.runInContext(fs.readFileSync(path.join(root, 'js', name + '.js'), 'utf8'), c);
   return { c, node, tree, bookmarks };
 }
 module.exports = { fixture };

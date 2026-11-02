@@ -151,21 +151,21 @@ test('前台 AI 请求期间补全队列让出模型连接', async () => {
   assert.equal((await f.c.BookmarkEnrich.status()).totalPending, 1);
 });
 
-test('重试绕过 24 小时失败缓存并重新采集', async () => {
+test('手动重试绕过临时失败缓存并重新采集', async () => {
   const f = setup();
   let pageCalls = 0;
   f.c.fetch = async url => {
     if (String(url).includes('api.test')) return new Response(JSON.stringify(CHAT), { headers: { 'content-type': 'application/json' } });
     pageCalls++;
-    return pageCalls === 1 ? new Response('', { status: 503 }) : new Response(HTML, { headers: { 'content-type': 'text/html' } });
+    return pageCalls <= 2 ? new Response('', { status: 503 }) : new Response(HTML, { headers: { 'content-type': 'text/html' } });
   };
   await f.c.BookmarkEnrich.onCreated('3', f.node('3'));
   await f.c.BookmarkEnrich.run();
-  assert.equal(pageCalls, 1);
+  assert.equal(pageCalls, 2);
   assert.equal((await f.c.BookmarkEnrich.status()).totalFailed, 1);
   await f.c.BookmarkEnrich.retry('3');
   await f.c.BookmarkEnrich.run();
-  assert.equal(pageCalls, 2);
+  assert.equal(pageCalls, 3);
   assert.equal((await f.c.BookmarkEnrich.status()).totalPending, 1);
 });
 

@@ -475,3 +475,84 @@ test('标题命中仍交给模型重排，本地候选充足时只跳过改写',
   assert.equal(result.hits[0].row.id, '1');
   assert.equal(c.AI.toCandidate(data[0], Date.now(), '项目').host, 'example.com');
 });
+
+test('网络瞬断和超时最多重试一次，权限拒绝不重试', async () => {
+  for (const name of ['AbortError', 'TypeError']) {
+    let calls = 0;
+    const c = context(undefined, { fetch: async (url, options) => {
+      assert.equal(options.credentials, 'omit');
+      if (++calls === 1) { const error = new Error('临时故障'); error.name = name; throw error; }
+      return new Response(html, { headers: { 'content-type': 'text/html' } });
+    } });
+    assert.equal((await c.PageInfo.fetchOne('https://example.com')).status, 'ok');
+    assert.equal(calls, 2);
+    c.fetch = async () => { calls++; return new Response('', { status: 403 }); };
+    assert.equal((await c.PageInfo.fetchOne('https://example.com')).reason, 'http_403');
+    assert.equal(calls, 3);
+  }
+});
+
+test('正文流中断保留已收到的描述和正文，并缩短缓存时间', async () => {
+  const c = context(undefined, { fetch: async () => ({
+    ok: true, headers: new Headers({ 'content-type': 'text/html' }),
+    body: { getReader() { let first = true; return {
+      async read() { if (first) { first = false; return { value: new TextEncoder().encode(html), done: false }; } throw new Error('连接中断'); },
+      cancel: async () => {}
+    }; } }
+  }) });
+  const page = await c.PageInfo.fetchOne('https://example.com');
+  assert.equal(page.status, 'ok');
+  assert.equal(page.partial, true);
+  assert.match(page.text, /应收凭证/);
+  assert.equal(c.ContentIndex.fresh(page, page.fetchedAt + 3600e3 + 1), false);
+});
+
+test('稀疏页面使用结构化描述，兼容后台和 DOM 解析，不执行脚本', async () => {
+  const sparse = '<html><head><title>图库</title><script type="application/ld+json">{"@graph":[{"description":"提供自然风光摄影作品与高清图片下载。"}]}</script></head><body><main>Loading...</main></body></html>';
+  for (const DOM of [DOMParser, undefined]) {
+    const c = context(undefined, { DOMParser: DOM, fetch: async () => new Response(sparse, { headers: { 'content-type': 'text/html' } }) });
+    const page = await c.PageInfo.fetchOne('https://example.com');
+    assert.equal(page.status, 'ok');
+    assert.equal(page.text, '');
+    assert.equal(page.coverage, 'metadata');
+    assert.match(page.desc, /自然风光/);
+  }
+});
+
+test('浏览器不支持提示和无描述空壳不进入摘要，元数据仍可兜底', async () => {
+  const c = context();
+  for (const body of ['当前浏览器不受支持，请更新浏览器。', 'Your browser is not supported. Please update.', '']) {
+    c.fetch = async () => new Response('<html><head><title>控制台</title></head><body><main>' + body + '</main></body></html>', { headers: { 'content-type': 'text/html' } });
+    assert.equal((await c.PageInfo.fetchOne('https://example.com')).status, 'fail');
+  }
+  c.fetch = async () => new Response('<html><head><meta property="og:description" content="管理设备与网络连接的控制台"></head><body>Loading...</body></html>', { headers: { 'content-type': 'text/html' } });
+  const page = await c.PageInfo.fetchOne('https://example.com');
+  assert.equal(page.status, 'ok');
+  assert.equal(page.text, '');
+});
+
+test('临时故障五分钟后可重新采集，手动采集长期保留', () => {
+  const c = context();
+  const page = { status: 'fail', reason: 'timeout', version: c.ContentIndex.VERSION, fetchedAt: Date.now() };
+  assert.equal(c.ContentIndex.fresh(page, page.fetchedAt + 60000), true);
+  assert.equal(c.ContentIndex.fresh(page, page.fetchedAt + 300001), false);
+  assert.equal(c.ContentIndex.fresh({ ...page, status: 'ok', source: 'capture' }, page.fetchedAt + 864e8), true);
+});
+
+test('真实超时信号终止挂起请求，两次尝试后返回而不无限等待', async () => {
+  let calls = 0;
+  const budgets = [];
+  const c = context(undefined, {
+    setTimeout: (callback, delay) => { budgets.push(delay); return setTimeout(callback, 1); },
+    fetch: async (url, options) => {
+      calls++;
+      return new Promise((resolve, reject) => {
+        options.signal.addEventListener('abort', () => { const error = new Error('超时'); error.name = 'AbortError'; reject(error); }, { once: true });
+      });
+    }
+  });
+  const page = await c.PageInfo.fetchOne('https://example.com');
+  assert.equal(page.reason, 'timeout');
+  assert.equal(calls, 2);
+  assert.deepEqual(budgets, [5000, 8000]);
+});

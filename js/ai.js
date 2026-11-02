@@ -25,7 +25,7 @@
   }
 
   function available(cfg) {
-    return !!(cfg && cfg.enabled && cfg.apiKey && cfg.baseUrl && cfg.model);
+    return !!((!global.Profiles || Profiles.canCloud()) && cfg && cfg.enabled && cfg.apiKey && cfg.baseUrl && cfg.model);
   }
 
   function modelFor(cfg, task) {
@@ -167,7 +167,11 @@
   /* ------------------------- 底层调用 ------------------------- */
 
   async function chat(cfg, system, user, opts) {
+    if (global.Profiles) { try { await Profiles.requireCloud(); } catch (e) { return { ok: false, error: 'cloud_unavailable' }; } }
     opts = opts || {};
+    if (opts.background && global.ResourceGate) {
+      try { await ResourceGate.reserve('ai'); } catch (e) { return { ok: false, error: e.code || 'gate_unavailable' }; }
+    }
     var timeout = opts.timeout || cfg.timeout || DEFAULT_TIMEOUT;
     var ctrl = new AbortController();
     var abort = function () { ctrl.abort(); };
@@ -232,6 +236,7 @@
    * 超时但已有部分内容时保留部分回答，避免用户白等。
    */
   async function chatStream(cfg, system, user, opts) {
+    if (global.Profiles) { try { await Profiles.requireCloud(); } catch (e) { return { ok: false, error: 'cloud_unavailable' }; } }
     opts = opts || {};
     var timeout = opts.timeout || cfg.timeout || DEFAULT_TIMEOUT;
     var ctrl = new AbortController();
@@ -469,8 +474,11 @@
   function clearCache() { cache.clear(); rewriteCache.clear(); }
 
   function errText(code) {
+    if (code === 'daily_limit') return '今日后台 AI 请求额度已用完，明日恢复';
+    if (code === 'gate_unavailable') return '无法确认后台额度，已停止请求';
     var map = {
       not_configured: '未配置 AI',
+      cloud_unavailable: '请先登录并绑定个人 RAG 集合',
       empty_query: '请输入检索内容',
       no_candidates: '本地没有候选',
       no_keywords: '没识别出关键词',

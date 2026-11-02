@@ -17,16 +17,14 @@
   var APPLIED_KEY = 'enrich:applied';
   var FAILED_KEY = 'enrich:failed';
   var MAX_APPLIED = 100;
-  var MAX_QUEUE = 200;
-  var MAX_PENDING = 60;
-  var MAX_SUMMARIES = 2000;
-  var MAX_FAILED = 30;
+  var FAILURE_PREVIEW = 30;
   var BATCH = 3;
   var BUDGET = 15000;
 
   var running = false;
   var timer = 0;
-  var coverageCache = null;
+  var DONE_KEY = 'enrich:done';
+  var LEASE_MS = 60000;
 
   var SYSTEM = [
     '你是浏览器书签整理助手。根据当前标题、站点和正文，生成更具体的收藏标题和一句话摘要。',
@@ -71,20 +69,50 @@
     return Array.isArray(list) ? list : [];
   }
 
-  async function saveQueue(list) { await AgentDB.setMeta(QUEUE_KEY, list); }
   async function savePending(list) { await AgentDB.setMeta(PENDING_KEY, list); }
 
-  async function enqueue(id, mode) {
-    id = String(id);
-    return AgentDB.updateMeta(QUEUE_KEY, function (list) {
+  /* 全量任务一次登记，原子合并；处理中有新任务加入也不会被旧快照覆盖。 */
+  async function enqueueMany(items) {
+    var added = 0;
+    await AgentDB.updateMeta(QUEUE_KEY, function (list) {
       list = Array.isArray(list) ? list : [];
-      var existing = list.find(function (item) { return String(item.id) === id; });
-      if (existing) {
-        if (mode === 'private') existing.mode = 'private';
-        return list;
+      items.forEach(function (item) {
+        item = Object.assign({ mode: 'enrich', at: Date.now() }, item, { id: String(item.id) });
+        var existing = list.find(function (x) { return x.id === item.id; });
+        if (!existing) { list.push(item); added++; return; }
+        var changed = item.url && existing.url !== item.url;
+        if (changed) Object.assign(existing, item, { lease: null, leaseUntil: 0 });
+        else if (item.mode === 'private' || existing.mode === 'capture' && item.mode === 'enrich' || item.force && !existing.force) {
+          Object.assign(existing, item, { lease: null, leaseUntil: 0 });
+        }
+      });
+      return list;
+    });
+    return added;
+  }
+
+  async function enqueue(id, mode, url, force) {
+    return enqueueMany([{ id: String(id), mode: mode || 'enrich', url: url, force: !!force }]);
+  }
+
+  /* 完成才出队；后台被回收后，租约过期的任务可重新领取。 */
+  async function claim() {
+    var item = null;
+    await AgentDB.updateMeta(QUEUE_KEY, function (list) {
+      list = Array.isArray(list) ? list : [];
+      var next = list.find(function (x) { return !x.leaseUntil || x.leaseUntil <= Date.now(); });
+      if (next) {
+        next.lease = crypto.randomUUID(); next.leaseUntil = Date.now() + LEASE_MS;
+        item = Object.assign({}, next);
       }
-      list.push({ id: id, mode: mode || 'enrich', at: Date.now() });
-      return list.slice(-MAX_QUEUE);
+      return list;
+    });
+    return item;
+  }
+
+  async function acknowledge(item) {
+    await AgentDB.updateMeta(QUEUE_KEY, function (list) {
+      return (list || []).filter(function (x) { return x.id !== item.id || x.lease !== item.lease; });
     });
   }
 
@@ -103,10 +131,6 @@
     await AgentDB.updateMeta(SUMMARY_KEY, function (map) {
       map = map && typeof map === 'object' ? map : {};
       map[id] = { url: url, summary: summary, facts: facts, at: Date.now() };
-      var keys = Object.keys(map);
-      if (keys.length > MAX_SUMMARIES) {
-        keys.slice(0, keys.length - MAX_SUMMARIES).forEach(function (key) { delete map[key]; });
-      }
       return map;
     });
   }
@@ -116,17 +140,18 @@
       list = Array.isArray(list) ? list : [];
       list = list.filter(function (x) { return String(x.id) !== String(item.id); });
       list.unshift(item);
-      return list.slice(0, MAX_PENDING);
+      return list;
     });
   }
 
   async function recordFailure(node, reason, code) {
     await AgentDB.updateMeta(FAILED_KEY, function (list) {
       list = Array.isArray(list) ? list : [];
+      var previous = list.find(function (item) { return String(item.id) === String(node.id) && item.url === node.url; });
       list = list.filter(function (item) { return String(item.id) !== String(node.id); });
       list.unshift({ id: String(node.id), url: node.url || '', title: node.title || '', reason: reason,
-        code: code || '', at: Date.now() });
-      return list.slice(0, MAX_FAILED);
+        code: code || '', attempts: (previous && previous.attempts || 0) + (['private', 'ai_config', 'daily_limit'].includes(code) ? 0 : 1), at: Date.now() });
+      return list;
     });
   }
 
@@ -156,9 +181,9 @@
       text: text
     };
     var result = await AI.chat(cfg, SYSTEM, JSON.stringify(payload), {
-      maxTokens: 260, temperature: 0.2, timeout: 10000, task: 'fast'
+      background: true, maxTokens: 260, temperature: 0.2, timeout: 10000, task: 'fast'
     });
-    if (!result.ok) return { ok: false, reason: 'AI 请求失败：' + AI.errText(result.error) };
+    if (!result.ok) return { ok: false, code: result.error === 'daily_limit' ? 'daily_limit' : 'ai_' + result.error, reason: 'AI 请求失败：' + AI.errText(result.error) };
     var parsed = AI.parseLoose(result.content);
     if (!parsed || typeof parsed !== 'object') return { ok: false, reason: 'AI 返回格式无法解析' };
 
@@ -180,19 +205,23 @@
     var found;
     try { found = await chrome.bookmarks.get(String(item.id)); } catch (e) { return; }
     var node = found && found[0];
-    if (!node || !node.url || !isWeb(node.url)) return;
+    if (!node || !node.url || !isWeb(node.url) || item.url && item.url !== node.url) return;
 
+    var failed = (await AgentDB.getMeta(FAILED_KEY) || []).find(function (f) { return f.id === String(node.id) && f.url === node.url; });
+    if (!item.force && item.mode !== 'private' && failed && !RetryPolicy.classify(failed.code, failed.attempts).auto && !RetryPolicy.resumed(failed.code, failed.at) && !(failed.code === 'ai_config' && AI.available(settings.ai))) return;
+    var done = await AgentDB.getMeta(DONE_KEY) || {};
+    var cached = await AgentDB.getPages([ContentIndex.normUrl(node.url)]);
+    if (!item.force && item.mode === 'enrich' && done[node.id] && done[node.id].url === node.url && done[node.id].at > item.at && ContentIndex.fresh(cached[ContentIndex.normUrl(node.url)], Date.now())) return;
     var page = await captureOne(node.url, item.force);
     if (page && page.status === 'ok') {
-      coverageCache = null;
       await AgentDB.updateMeta(CONFIG_KEY, function (cfg) {
         cfg = Object.assign(defaultConfig(), cfg || {});
         cfg.captured = (cfg.captured || 0) + 1;
         return cfg;
       });
     }
-    if (!page || page.status !== 'ok') {
-      var code = page && page.reason || 'network';
+    if (!page || page.status !== 'ok' || page.refreshError) {
+      var code = page && (page.refreshError || page.reason) || 'network';
       await recordFailure(node, '正文采集失败：' + code, code);
       return;
     }
@@ -207,12 +236,14 @@
       return;
     }
     if (!AI.available(settings.ai)) {
-      await recordFailure(node, '正文已采集；请配置 AI 后重试补全');
+      await recordFailure(node, '正文已采集；请配置 AI 后重试补全', 'ai_config');
       return;
     }
 
     var suggestion = await suggest(node, page, settings.ai);
-    if (!suggestion.ok) { await recordFailure(node, suggestion.reason); return; }
+    if (!suggestion.ok) { await recordFailure(node, suggestion.reason, suggestion.code || 'ai'); return; }
+    var latest = await chrome.bookmarks.get(String(node.id)).catch(function () { return []; });
+    if (!latest[0] || latest[0].url !== node.url) return;
     await clearFailure(node.id);
     await rememberSummary(String(node.id), node.url, suggestion.summary, suggestion.facts);
     if (suggestion.title || suggestion.tags.length) {
@@ -222,6 +253,7 @@
         summary: suggestion.summary, tags: suggestion.tags, facts: suggestion.facts, at: Date.now()
       });
     }
+    await AgentDB.updateMeta(DONE_KEY, function (map) { map = map || {}; map[node.id] = { url: node.url, at: Date.now() }; return map; });
     await AgentDB.updateMeta(CONFIG_KEY, function (cfg) {
       cfg = Object.assign(defaultConfig(), cfg || {});
       cfg.suggested = (cfg.suggested || 0) + 1;
@@ -238,15 +270,16 @@
       var cfg = await readConfig();
       if (!cfg.enabled) return status();
       var settings = await Settings.load();
-      var queue = await getQueue();
       var processed = 0;
-      while (queue.length && processed < BATCH && Date.now() - start < BUDGET) {
+      while (processed < BATCH && Date.now() - start < BUDGET) {
         var foreground = await AgentDB.getMeta('ai:foreground');
         if (foreground && foreground.until > Date.now()) { schedule(3000); break; }
-        var item = queue.shift();
-        await saveQueue(queue);
+        if (!(await readConfig()).enabled) break;
+        var item = await claim();
+        if (!item) break;
         try { await processItem(item, settings); }
-        catch (e) { await recordFailure({ id: item.id }, '处理失败：' + (e && e.message || '未知错误')); }
+        catch (e) { await recordFailure({ id: item.id, url: item.url }, '处理失败：' + (e && e.message || '未知错误'), 'processing'); }
+        await acknowledge(item);
         processed += 1;
       }
       await AgentDB.updateMeta(CONFIG_KEY, function (current) {
@@ -257,7 +290,7 @@
       if (processed && chrome.runtime && chrome.runtime.sendMessage) {
         chrome.runtime.sendMessage({ type: 'enrich:updated' }).catch(function () {});
       }
-      if (queue.length) schedule(2500);
+      if ((await getQueue()).length) schedule(2500);
       return status();
     } finally {
       running = false;
@@ -268,45 +301,59 @@
     if (!node || !node.url || !isWeb(node.url)) return null;
     var cfg = await readConfig();
     if (!cfg.enabled) return null;
-    await enqueue(id, 'enrich');
+    await enqueue(id, 'enrich', node.url);
     schedule();
     alarm().catch(function () {});
     return { queued: true };
   }
 
-  /**
-   * 扫描最近收藏。
-   * enrich：跳过已有建议或摘要的书签；capture：只补没有新鲜正文缓存的页面。
-   */
+  /* 默认覆盖所有现有网页书签；定期扫描仅选择缺失、过期或可重试的任务。 */
   async function scan(options) {
     options = options || {};
     var mode = options.mode === 'capture' ? 'capture' : 'enrich';
-    var limit = Math.max(1, Math.min(100, Number(options.limit) || 20));
     var rows = Bookmarks.flatten(await chrome.bookmarks.getTree()).filter(function (row) { return isWeb(row.url); });
-    var chosen = [];
-
-    if (mode === 'enrich') {
-      var pending = await getPending();
-      var pendingIds = {};
-      pending.forEach(function (item) { pendingIds[String(item.id)] = 1; });
-      var summaries = await AgentDB.getMeta(SUMMARY_KEY) || {};
-      chosen = rows.filter(function (row) {
-        return !pendingIds[String(row.id)] && !(summaries[row.id] && summaries[row.id].url === row.url);
-      });
-    } else {
-      var pages = await AgentDB.getPages(rows.map(function (row) { return ContentIndex.normUrl(row.url); }));
-      chosen = rows.filter(function (row) {
-        var page = pages[ContentIndex.normUrl(row.url)];
-        return !page || !ContentIndex.fresh(page, Date.now());
-      });
-    }
-
+    var pages = await AgentDB.getPages(rows.map(function (row) { return ContentIndex.normUrl(row.url); }));
+    var pending = await getPending();
+    var summaries = await AgentDB.getMeta(SUMMARY_KEY) || {};
+    var completed = await AgentDB.getMeta(DONE_KEY) || {};
+    var failures = await AgentDB.getMeta(FAILED_KEY) || [];
+    var now = Date.now();
+    var chosen = rows.filter(function (row) {
+      var page = pages[ContentIndex.normUrl(row.url)];
+      var failed = failures.find(function (f) { return f.id === String(row.id) && f.url === row.url; });
+      var done = completed[row.id] || summaries[row.id];
+      var waiting = pending.some(function (p) { return p.id === String(row.id) && p.url === row.url; });
+      var error = failed || page && page.status === 'fail' && { code: page.reason, attempts: 0 };
+      var policy = error && RetryPolicy.classify(error.code, error.attempts);
+      if (options.retryFailed) return !(page && (page.private || page.source === 'capture')) && policy && policy.bulk;
+      if (error && !(error.code === 'ai_config' && AI.available(options.ai))) {
+        if (!policy.auto && !RetryPolicy.resumed(error.code, failed && failed.at, now)) return false;
+        if (options.incremental && now - (failed && failed.at || 0) < policy.delay) return false;
+      }
+      if (mode === 'capture') return !ContentIndex.fresh(page, now);
+      if (waiting) return !ContentIndex.fresh(page, now);
+      return !(done && done.url === row.url && !failed && ContentIndex.fresh(page, now));
+    });
     chosen.sort(function (a, b) { return (b.added || 0) - (a.added || 0); });
-    chosen = chosen.slice(0, limit);
-    for (var row of chosen) await enqueue(row.id, mode);
-    schedule();
-    alarm().catch(function () {});
-    return { mode: mode, queued: chosen.length, total: rows.length };
+    if (options.limit) chosen = chosen.slice(0, Math.max(1, Number(options.limit) || 1));
+    if (options.retryFailed) await AgentDB.updateMeta(FAILED_KEY, function (list) {
+      return (list || []).map(function (f) { return chosen.some(function (r) { return String(r.id) === f.id && r.url === f.url; }) ? Object.assign({}, f, { attempts: 0 }) : f; });
+    });
+    var queued = await enqueueMany(chosen.map(function (row) {
+      return { id: String(row.id), url: row.url, mode: pending.some(function (p) { return p.id === String(row.id) && p.url === row.url; }) ? 'capture' : mode, force: !!options.retryFailed || failures.some(function (f) { return f.id === String(row.id) && f.url === row.url && RetryPolicy.resumed(f.code, f.at, now); }) };
+    }));
+    schedule(); alarm().catch(function () {});
+    return { mode: mode, queued: queued, total: rows.length };
+  }
+
+  async function maintain() {
+    var cfg = await readConfig();
+    if (cfg.enabled && (!cfg.sweptAt || Date.now() - cfg.sweptAt >= 300000)) {
+      var settings = await Settings.load();
+      await scan({ incremental: true, ai: settings.ai });
+      await AgentDB.updateMeta(CONFIG_KEY, function (current) { current = current || {}; current.sweptAt = Date.now(); return current; });
+    }
+    return run();
   }
 
   async function status() {
@@ -321,15 +368,37 @@
     }).filter(function (item) { return item.summary || item.facts && item.facts.length; })
       .sort(function (a, b) { return b.at - a.at; }).slice(0, 5);
     var settings = await Settings.load();
-    if (!coverageCache || Date.now() - coverageCache.at > 30000) {
-      var rows = Bookmarks.flatten(await chrome.bookmarks.getTree()).filter(function (row) { return isWeb(row.url); });
-      var pages = await AgentDB.getPages(rows.map(function (row) { return ContentIndex.normUrl(row.url); }));
-      coverageCache = { at: Date.now(), total: rows.length, withBody: rows.filter(function (row) {
-        var page = pages[ContentIndex.normUrl(row.url)];
-        return page && page.status === 'ok' && !!page.text;
-      }).length };
-    }
+    var currentRows = Bookmarks.flatten(await chrome.bookmarks.getTree()).filter(function (row) { return isWeb(row.url); });
+    var pages = await AgentDB.getPages(currentRows.map(function (row) { return ContentIndex.normUrl(row.url); }));
+    var completed = await AgentDB.getMeta(DONE_KEY) || {};
+    var successful = 0, capturedPages = 0, withBody = 0, unprocessed = 0, failedCount = 0, manualCount = 0;
+    failures = failures.filter(function (f) { return currentRows.some(function (r) { return String(r.id) === f.id && r.url === f.url; }); });
+    pending = pending.filter(function (p) { return currentRows.some(function (r) { return String(r.id) === p.id && r.url === p.url; }); });
+    currentRows.forEach(function (row) {
+      var page = pages[ContentIndex.normUrl(row.url)];
+      var done = completed[row.id] || summaries[row.id];
+      if (page && page.status === 'ok') { capturedPages++; if (page.text) withBody++; }
+      if (done && done.url === row.url || pending.some(function (p) { return p.id === String(row.id); })) successful++;
+      else if (queue.some(function (q) { return q.id === String(row.id); })) return;
+      else {
+        var failed = failures.find(function (f) { return f.id === String(row.id); });
+        var code = failed && failed.code || page && page.status === 'fail' && page.reason;
+        if (['private', 'http_401', 'http_403', 'dynamic_shell', 'login_wall', 'no_content'].includes(code)) manualCount++;
+        else if (failed || code) failedCount++;
+        else unprocessed++;
+      }
+    });
+    var processing = queue.filter(function (q) { return q.leaseUntil > Date.now(); }).length;
     return {
+      collection: await CollectionStats.read({ queue: queue, failures: failures, settings: settings }),
+      totalItems: currentRows.length,
+      successful: successful,
+      unprocessed: unprocessed,
+      capturedPages: capturedPages,
+      failedCount: failedCount,
+      manualCount: manualCount,
+      processing: processing,
+      queued: queue.length - processing,
       enabled: cfg.enabled !== false,
       aiReady: AI.available(settings.ai),
       totalPending: pending.length,
@@ -342,17 +411,18 @@
         };
       }),
       queue: queue.length,
-      failures: failures.slice(0, MAX_FAILED).map(function (item) {
+      failures: failures.slice(0, FAILURE_PREVIEW).map(function (item) {
         var code = item.code || String(item.reason || '').split('：').pop();
-        return Object.assign({}, item, { code: code });
+        return Object.assign({}, item, { code: code, policy: RetryPolicy.classify(code, item.attempts) });
       }),
       totalFailed: failures.length,
+      retryableFailed: failures.filter(function (f) { return RetryPolicy.classify(f.code, f.attempts).bulk; }).length,
       recent: recent,
       undoable: Array.isArray(applied) && applied.length > 0,
       captured: cfg.captured || 0,
-      totalWeb: coverageCache.total,
-      withBody: coverageCache.withBody,
-      missingBody: coverageCache.total - coverageCache.withBody,
+      totalWeb: currentRows.length,
+      withBody: withBody,
+      missingBody: currentRows.length - withBody,
       suggested: cfg.suggested || 0,
       lastRunAt: cfg.lastRunAt || 0
     };
@@ -364,6 +434,7 @@
       cfg.enabled = !!enabled;
       return cfg;
     });
+    if (enabled) { schedule(); alarm().catch(function () {}); }
     return status();
   }
 
@@ -388,7 +459,8 @@
         tagsApplied: !!tags.length, beforeClass: before || null,
         at: Date.now()
       });
-      return list.slice(-MAX_APPLIED);
+      while (list.length > MAX_APPLIED && list[0].batch !== batch) list.shift();
+      return list;
     });
   }
 
@@ -442,13 +514,9 @@
     if ((failed.code || String(failed.reason || '').split('：').pop()) === 'private') {
       throw new Error('请使用“用 AI 生成”确认发送页面片段');
     }
-    await enqueue(id, 'enrich');
-    await AgentDB.updateMeta(QUEUE_KEY, function (list) {
-      return (Array.isArray(list) ? list : []).map(function (item) {
-        return String(item.id) === String(id) ? Object.assign({}, item, { force: true }) : item;
-      });
-    });
-    await clearFailure(id);
+    if (!RetryPolicy.classify(failed.code, 0).allowManual) throw new Error(RetryPolicy.classify(failed.code, 0).message);
+    await AgentDB.updateMeta(FAILED_KEY, function (list) { return (list || []).map(function (f) { return f.id === String(id) ? Object.assign({}, f, { attempts: 0 }) : f; }); });
+    await enqueue(id, 'enrich', failed.url, true);
     schedule();
     alarm().catch(function () {});
     return status();
@@ -464,8 +532,8 @@
     if (!failures.some(function (item) { return String(item.id) === String(id) && item.code === 'private'; })) {
       throw new Error('这条页面采集记录已不存在');
     }
-    await enqueue(id, 'private');
-    await clearFailure(id);
+    var nodes = await chrome.bookmarks.get(String(id));
+    await enqueue(id, 'private', nodes[0].url);
     schedule();
     alarm().catch(function () {});
     return status();
@@ -504,6 +572,7 @@
     ALARM: ALARM,
     onCreated: onCreated,
     run: run,
+    maintain: maintain,
     scan: scan,
     status: status,
     toggle: toggle,

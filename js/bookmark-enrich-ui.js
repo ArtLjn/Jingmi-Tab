@@ -57,27 +57,27 @@
     function render(state) {
       if (!state) return;
       toggle.checked = !!state.enabled;
-      if (!state.enabled) {
-        status.textContent = '已暂停 · 不会自动采集或补全';
-      } else if (!state.aiReady) {
-        status.textContent = '已启用 · 只采集正文（配置 AI 后可生成标题和摘要）' +
-          (state.totalPending ? ' · 待确认 ' + state.totalPending + ' 条' : '');
-      } else {
-        status.textContent = '已启用 · 待确认 ' + state.totalPending + ' 条 · 队列 ' + state.queue + ' 条';
-      }
-      summary.textContent = '待确认建议 ' + state.totalPending + (state.captured ? ' · 已采集 ' + state.captured : '') +
-        (state.totalFailed ? ' · 待处理 ' + state.totalFailed : '') +
-        (state.totalWeb ? ' · 正文覆盖 ' + state.withBody + '/' + state.totalWeb : '');
+      var pending = state.pending || [];
+      var failures = state.failures || [];
+      status.textContent = state.collection ? CollectionStats.format(state.collection) : '正在读取收藏收录状态…';
+      var accounting = document.getElementById('enrich-accounting');
+      if (!accounting) { accounting = el('p', '', 'enrich-summary'); accounting.id = 'enrich-accounting'; status.after(accounting); }
+      accounting.textContent = state.collection ? CollectionStats.breakdown(state.collection) : '';
+      status.title = '总数＝已收录＋未收录；未收录＝队列＋失败＋需人工处理＋暂停＋待安排，各类互斥。已收录的后续更新单独列出，不计入未收录队列与失败。';
+      summary.textContent = 'AI 建议待确认 ' + (state.totalPending || 0) + ' · 采集补全异常 ' + (state.totalFailed || 0);
       body.replaceChildren();
-
-      if (!state.pending.length) {
-        body.append(el('p', state.aiReady && !state.recent.length && !state.totalFailed
-          ? '还没有待确认的标题建议。收藏新页面后会自动采集；也可以点「扫描最近收藏」。'
-          : state.aiReady ? '当前没有需要应用的标题或标签。' : '正文会继续自动采集；配置 AI 接口后会生成标题和摘要建议。', 'auto-empty'));
+      if (!pending.length && !failures.length) {
+        body.append(el('p', '暂无需要你处理的内容，完成的项目会自动从这里移除。', 'auto-empty'));
       }
 
       var toolbar = el('div', '', 'enrich-toolbar');
-      if (state.pending.length > 1) {
+      if (state.retryableFailed > 0) {
+        var retryAll = el('button', '重试可重试项', 'btn-ghost');
+        retryAll.type = 'button';
+        retryAll.id = 'enrich-retry-unsuccessful';
+        toolbar.append(retryAll);
+      }
+      if (pending.length > 1) {
         var all = el('button', '全部应用', 'btn-ghost enrich-all');
         all.type = 'button';
         all.id = 'enrich-apply-all';
@@ -89,23 +89,23 @@
         undo.id = 'enrich-undo';
         toolbar.append(undo);
       }
+      if ((state.totalFailed || 0) > failures.length) body.append(el('p', '当前展示最近 ' + failures.length + ' 条，批量重试仅处理可重试项，跳过需人工处理和已停止项。', 'enrich-summary'));
       if (toolbar.childNodes.length) body.append(toolbar);
-      state.pending.forEach(function (item) { body.append(renderItem(item)); });
+      pending.forEach(function (item) { body.append(renderItem(item)); });
       if (state.recent && state.recent.length) {
         body.append(el('p', '最近生成的摘要', 'enrich-current'));
         state.recent.forEach(function (item) {
           var row = el('div', '', 'enrich-item');
-          var link = el('a', item.url || item.id, 'enrich-host');
-          link.href = item.url;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          row.append(link, el('p', item.summary, 'enrich-summary'));
-          if (item.facts && item.facts.length) row.append(el('p', item.facts.join(' · '), 'enrich-summary'));
-          body.append(row);
+          var main = el('div', '', 'enrich-main');
+          var link = el('a', item.title || item.url || '收藏摘要', 'enrich-current');
+          link.href = item.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+          main.append(link, el('p', item.summary || '', 'enrich-summary'));
+          if (item.facts && item.facts.length) main.append(el('p', item.facts.join(' · '), 'enrich-summary'));
+          row.append(main); body.append(row);
         });
       }
       if (state.failures && state.failures.length) {
-        body.append(el('p', '待处理', 'enrich-current'));
+        body.append(el('p', '采集补全异常（与 RAG 入库状态分别记录）', 'enrich-current'));
         state.failures.forEach(function (item) {
           var row = el('div', '', 'enrich-item');
           var main = el('div', '', 'enrich-main');
@@ -114,6 +114,9 @@
           var reason = item.code === 'private' ? '已保存页面正文；生成建议前需确认发送片段给 AI'
             : manual ? '公开抓取无法读取正文；打开页面后点击扩展图标采集'
               : item.reason;
+          if (item.code === 'daily_limit') reason = '今日采集额度已用完，明日恢复；手动重试不会重置额度';
+          var policy = item.policy || RetryPolicy.classify(item.code, item.attempts);
+          reason += ' · ' + policy.message;
           main.append(el('p', reason, 'enrich-summary'));
           if (item.code === 'private') {
             var consent = el('button', '发送正文给 AI', 'auto-action');
@@ -126,12 +129,12 @@
             open.target = '_blank';
             open.rel = 'noopener noreferrer';
             row.append(main, open);
-          } else {
-            var retry = el('button', '重新抓取', 'auto-action');
+          } else if (policy.allowManual) {
+            var retry = el('button', policy.auto ? '重新抓取' : '检查后重试', 'auto-action');
             retry.type = 'button';
             retry.dataset.enrichRetry = item.id;
             row.append(main, retry);
-          }
+          } else { row.append(main); }
           body.append(row);
         });
       }
@@ -168,10 +171,11 @@
       finally { busy = false; await refresh(); }
     }
 
-    scan.addEventListener('click', function () { scanInto('enrich:scan', 20, '正在扫描最近收藏…'); });
-    capture.addEventListener('click', function () { scanInto('enrich:capture', 30, '正在整理待补采的正文…'); });
+    scan.addEventListener('click', function () { scanInto('enrich:scan', null, '正在登记全部现有书签…'); });
+    capture.addEventListener('click', function () { scanInto('enrich:capture', null, '正在登记全部缺失或过期正文…'); });
 
     body.addEventListener('click', function (event) {
+      if (event.target.closest('#enrich-retry-unsuccessful')) { scanInto('enrich:retry-failed', null, '正在登记全部失败项…'); return; }
       var apply = event.target.closest('[data-enrich-apply]');
       if (apply) { act(function () { return send('enrich:apply', { id: apply.dataset.enrichApply }); }); return; }
       var dismiss = event.target.closest('[data-enrich-dismiss]');
@@ -194,8 +198,8 @@
       if (event.detail === 'search') refresh();
     });
     setInterval(function () {
-      var view = document.getElementById('workspace-search');
-      if (!view || view.hidden || !document.body.classList.contains('panel-open')) return;
+      var search = document.getElementById('workspace-search');
+      if (!search || search.hidden || !document.body.classList.contains('panel-open')) return;
       refresh();
     }, 5000);
 

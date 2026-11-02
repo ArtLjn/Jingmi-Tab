@@ -38,46 +38,70 @@
     }
     return result;
   }
+  function stableRefs(refs) {
+    return (refs || []).slice().sort(function (a, b) { return String(a.id).localeCompare(String(b.id)); });
+  }
+  function stableClasses(value) {
+    try { return JSON.stringify(JSON.parse(value || '[]').sort(function (a, b) { return String(a[0]).localeCompare(String(b[0])); })); }
+    catch (e) { return ''; }
+  }
+  /* 版本只反映可检索内容与稳定来源，时间、错误提示和处理进度不构成新版本。 */
+  function contentVersion(info) {
+    return JSON.stringify([info.title || '', info.text || '', info.desc || '', info.source || '',
+      !!info.private, info.coverage || '', info.headings || [], info.sourceRevision || '']);
+  }
   async function reconcile(rows) {
     var grouped = await groups(rows);
     var classes = typeof Organizer !== 'undefined' ? await Organizer.records(rows) : {};
     var pages = await AgentDB.getPages(rows.map(function (r) { return ContentIndex.normUrl(r.url); }));
     for (var pair of grouped) {
       var info = pair[1].info;
-      var refs = pair[1].rows.map(function (row) { return { id: String(row.id), url: row.url, title: row.title, folder: row.folder || '', addedAt: row.added || 0 }; });
+      var refs = stableRefs(pair[1].rows.map(function (row) { return { id: String(row.id), url: row.url, title: row.title, folder: row.folder || '', addedAt: row.added || 0 }; }));
       var classificationSignature = JSON.stringify(refs.map(function (r) { var c = classes[r.id] || {}; return [r.id, c.category, c.tags, c.type]; }));
-      var old = await get(info.id);
+      var changed = false;
       var page = pair[1].rows.map(function (row) { return pages[ContentIndex.normUrl(row.url)]; }).filter(function (p) { return p && p.status === 'ok'; }).sort(function (a, b) { return (b.fetchedAt || 0) - (a.fetchedAt || 0); })[0];
+      var pageHash = page ? await hash(page.text || page.desc || '') : '';
       await update(info.id, function (current) {
         var doc = current || { id: info.id, identity: info, title: refs[0].title, captureState: 'pending', syncState: 'pending', createdAt: Date.now() };
-        var changed = JSON.stringify(doc.bookmarks) !== JSON.stringify(refs) || doc.classificationSignature !== classificationSignature;
+        changed = !current || !!doc.deleted || JSON.stringify(stableRefs(doc.bookmarks)) !== JSON.stringify(refs) || stableClasses(doc.classificationSignature) !== stableClasses(classificationSignature);
         doc.classificationSignature = classificationSignature;
         doc.bookmarks = refs; doc.deleted = false;
         if (page && (!doc.fetchedAt || page.fetchedAt > doc.fetchedAt)) {
-          Object.assign(doc, { text: page.text || '', desc: page.desc || '', title: page.title || refs[0].title,
-            fetchedAt: page.fetchedAt, source: page.source || 'public', coverage: page.coverage || (page.text ? 'partial' : 'metadata'),
-            captureState: page.text ? 'partial' : 'metadata', captureNote: page.captureNote || (page.coverage ? '公开 HTML 提取；动态内容、附件可能缺失' : '旧版采集记录，覆盖范围尚未验证') });
-          changed = true;
+          var incoming = { text: page.text || '', desc: page.desc || '', title: page.title || refs[0].title,
+            fetchedAt: page.fetchedAt, checkedAt: page.checkedAt || page.fetchedAt, source: page.source || 'public',
+            private: !!page.private || page.source === 'capture' || page.source === 'feishu_api',
+            coverage: page.coverage || (page.text ? 'partial' : 'metadata'), headings: page.headings || [],
+            sourceRevision: page.sourceRevision || '', contentHash: pageHash,
+            captureState: page.text ? 'partial' : 'metadata', captureNote: page.captureNote || '公开 HTML 提取；动态内容、附件可能缺失' };
+          if (contentVersion(doc) !== contentVersion(Object.assign({}, doc, incoming))) changed = true;
+          Object.assign(doc, incoming);
         }
+
         if (changed) { doc.revision = (doc.revision || 0) + 1; doc.syncState = 'pending'; }
         return doc;
       });
-      pair[1].changed = !old || old.deleted || old.classificationSignature !== classificationSignature || JSON.stringify(old.bookmarks) !== JSON.stringify(refs) || !!(page && page.fetchedAt > (old.fetchedAt || 0));
+      pair[1].changed = changed;
     }
     var existing = await AgentDB.allRecords('documents');
     for (var doc of existing) if (!grouped.has(doc.id) && !doc.deleted) await update(doc.id, function (current) { return Object.assign(current, { deleted: true, bookmarks: [], revision: (current.revision || 0) + 1, syncState: 'pending' }); });
     return grouped;
   }
   async function capture(id, info) {
-    var contentHash = await hash(info.text || info.desc || '');
+    var previous = await get(id);
+    if (!previous) throw new Error('文档已不存在');
+    info = Object.assign({}, info);
+    if (Object.prototype.hasOwnProperty.call(info, 'title') && !info.title) info.title = previous.title || previous.bookmarks && previous.bookmarks[0] && previous.bookmarks[0].title || '';
+    var merged = Object.assign({}, previous, info);
+    var contentHash = await hash(merged.text || merged.desc || '');
     return update(id, function (doc) {
       if (!doc) throw new Error('文档已不存在');
-      var changed = doc.contentHash !== contentHash || doc.coverage !== info.coverage || doc.source !== info.source;
+      var changed = contentVersion(doc) !== contentVersion(Object.assign({}, doc, info));
       Object.assign(doc, info, { id: id, contentHash: contentHash, checkedAt: Date.now(), fetchedAt: info.fetchedAt || Date.now() });
       if (changed) { doc.revision = (doc.revision || 0) + 1; doc.syncState = 'pending'; }
       return doc;
     });
   }
+
   async function alias(from, to) {
     /* 仅官方接口解析出的 wiki -> docx 映射调用这里；不按标题或相似内容合并。 */
     var destination = await forUrl(to);

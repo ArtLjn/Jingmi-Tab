@@ -1,8 +1,37 @@
 /* QuillRAG 适配器：独立书签集合、增量同步和有边界的云端检索。 */
 (function (global) {
   'use strict';
+  var PROXY_BASE = 'https://api.jingmi.lllcnm.cn/api/rag';
+
+  /**
+   * 账号模式下，RAG 请求走后台代理：地址固定、Key 由服务端注入、
+   * 集合由服务端按账号生成；浏览器只持有会话令牌。
+   */
+  function withAuth(ragCfg, backupCfg) {
+    var cfg = Object.assign({}, ragCfg || {});
+    if (global.Profiles) {
+      var binding = Profiles.cloud();
+      return Object.assign(cfg, { enabled: !!binding && !!cfg.enabled, baseUrl: PROXY_BASE, apiKey: '', authToken: binding ? binding.token : '', collection: binding ? binding.collection : '' });
+    }
+    var token = backupCfg && (backupCfg.authToken || backupCfg.token);
+    if (token) {
+      cfg.baseUrl = PROXY_BASE;
+      cfg.apiKey = '';
+      cfg.authToken = token;
+      return cfg;
+    }
+    /* 兼容升级前的直连配置与单元测试；新装默认配置为空，会保持禁用 */
+    if (cfg.baseUrl && cfg.apiKey) return cfg;
+    cfg.enabled = false;
+    return cfg;
+  }
+
+  function tokenOf(cfg) {
+    return String(cfg && (cfg.authToken || cfg.apiKey) || '');
+  }
+
   function available(cfg) {
-    try { return !!(cfg && cfg.enabled && cfg.apiKey && /^chrome_tab_[a-zA-Z0-9_-]+$/.test(cfg.collection) && base(cfg)); }
+    try { return !!(cfg && cfg.enabled && tokenOf(cfg) && /^chrome_tab_[a-zA-Z0-9_-]+$/.test(cfg.collection) && base(cfg)); }
     catch (e) { return false; }
   }
   function base(cfg) {
@@ -12,29 +41,46 @@
     return url.href.replace(/\/+$/, '');
   }
   async function request(cfg, path, body, method, timeout) {
+    if (global.Profiles && path !== '/config') {
+      var binding = await Profiles.requireCloud();
+      if (cfg.collection !== binding.collection) throw new Error('RAG 账号已变化');
+      cfg = Object.assign({}, cfg, { authToken: binding.token, apiKey: '', baseUrl: PROXY_BASE });
+    }
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, timeout || 8000);
     try {
-      var headers = { Authorization: 'Bearer ' + cfg.apiKey };
+      var headers = { Authorization: 'Bearer ' + tokenOf(cfg) };
       var data;
       if (body instanceof FormData) data = body;
       else if (body !== undefined) { headers['Content-Type'] = 'application/json'; data = JSON.stringify(body); }
       var response = await fetch(base(cfg) + path, { method: method || (body === undefined ? 'GET' : 'POST'), headers: headers, body: data, signal: controller.signal, redirect: 'error', credentials: 'omit' });
-      if (!response.ok) throw new Error('RAG 请求失败（' + response.status + '）');
+      if (!response.ok) {
+        var error = new Error(response.status === 401 ? 'RAG 登录会话已失效，请重新登录后重试' : response.status === 409 ? 'RAG 上次写入结果待核验，已暂停重复写入' : response.status === 429 ? 'RAG 今日写入额度已用完，已暂停' : 'RAG 请求失败（' + response.status + '）');
+        error.code = response.status === 401 ? 'unauthorized' : 'http_' + response.status;
+        throw error;
+      }
       var result = await response.json();
       if (result.code !== 'OK' || result.error_code) throw new Error('RAG 未完成操作，请检查服务状态');
       return result.data;
     } catch (e) {
-      if (e.name === 'AbortError') throw new Error('RAG 请求超时');
+      if (e.name === 'AbortError') { var timeoutError = new Error('RAG 请求超时'); timeoutError.code = 'timeout'; throw timeoutError; }
       /* 不向界面透传可能包含认证信息的服务响应。 */
-      if (/^RAG |^RAG地址|HTTPS/.test(e.message)) throw e;
-      throw new Error('RAG 无法连接，请检查地址和站点授权');
+      if (e.code === 'daily_limit' || /^RAG |^RAG地址|HTTPS/.test(e.message)) throw e;
+      var networkError = new Error('RAG 无法连接，请检查地址和站点授权'); networkError.code = 'network'; throw networkError;
     } finally { clearTimeout(timer); }
   }
   async function clientId() {
     return AgentDB.updateMeta('rag:client', function (value) { return value || crypto.randomUUID(); });
   }
   async function defaultCollection() { return 'chrome_tab_bookmarks_' + (await clientId()).replace(/-/g, '').slice(0, 12); }
+
+  /** 从后台读取当前账号只读的 RAG 集合；失败时返回 null */
+  async function config(authToken) {
+    var cfg = { baseUrl: PROXY_BASE, authToken: authToken, collection: 'chrome_tab_probe', enabled: true };
+    var data = await request(cfg, '/config', undefined, 'GET', 8000);
+    if (!data || !data.collection) throw new Error('后台尚未配置 RAG');
+    return data;
+  }
   async function stateKey(cfg) { return 'rag:sync:' + base(cfg) + ':' + cfg.collection; }
   async function withLease(cfg, operation) {
     var key = await stateKey(cfg); var owner = crypto.randomUUID();
@@ -45,7 +91,7 @@
     finally { await AgentDB.updateMeta(key + ':lease', function (value) { return value && value.owner === owner ? null : value; }); }
   }
   async function ensure(cfg) {
-    if (!available(cfg)) throw new Error('请启用 RAG、填写密钥，并使用 chrome_tab_ 开头的独立集合');
+    if (!available(cfg)) throw new Error('RAG 尚未就绪：请先登录账号，并确认后台已配置 RAG');
     await request(cfg, '/collections', { name: cfg.collection }, 'POST', 20000);
   }
   async function removeDocument(cfg, documentId) {
@@ -68,7 +114,7 @@
     }
     return withLease(cfg, async function (key) {
       var saved = await AgentDB.getMeta(key) || {};
-      var id = await clientId(); var docId = id + '-' + doc.id;
+      var id = await clientId(); var docId = cfg.authToken ? (saved[doc.id] && saved[doc.id].docId || 'page-' + doc.id) : id + '-' + doc.id;
       var refs = doc.bookmarks || [];
       var category = refs.map(function (ref) { return classifications[ref.id] && classifications[ref.id].category; }).find(Boolean) || '待整理';
       var tags = Array.from(new Set(refs.flatMap(function (ref) { return classifications[ref.id] && classifications[ref.id].tags || []; })));
@@ -98,7 +144,9 @@
         Object.entries({ collection: cfg.collection, doc_id: docId, text: text, file_type: 'txt', source: doc.identity.canonicalUrl,
           category: category, chunk_size: '1000', chunk_overlap: '160', metadata_json: JSON.stringify(metadata)
         }).forEach(function (pair) { form.append(pair[0], pair[1]); });
-        await request(cfg, '/ingest', form, 'POST', 20000);
+        if (global.ResourceGate) await ResourceGate.reserve('rag');
+        var response = await request(cfg, '/ingest', form, 'POST', 20000);
+        if (cfg.authToken && response && response.doc_id) docId = response.doc_id;
         if (staleDocId) {
           try { await request(cfg, '/collections/' + encodeURIComponent(cfg.collection) + '/documents/' + encodeURIComponent(staleDocId), undefined, 'DELETE', 15000); }
           catch (e) { if (!/（404）/.test(e.message)) throw e; }
@@ -113,17 +161,18 @@
     var id = await clientId(); var grouped = await Documents.groups(rows);
     var data = await request(cfg, '/retrieve', { collection: cfg.collection, query: query, mode: 'hybrid', top_k: 60, candidate_k: 100, rerank: true }, 'POST', cfg.retrieveTimeout || 5000);
     if (!data || !Array.isArray(data.results)) throw new Error('RAG 返回格式异常');
+    var saved = cfg.authToken ? await AgentDB.getMeta(await stateKey(cfg)) || {} : {};
     var hits = new Map();
     for (var result of data.results) {
       var extra = result.metadata && result.metadata.extra || {};
-      if (extra.client_id !== id || (extra.private && !cfg.includePrivate)) continue;
+      if ((!cfg.authToken && extra.client_id !== id) || (extra.private && !cfg.includePrivate)) continue;
       var group = grouped.get(extra.page_id);
       /* 旧版记录在首次完整同步前仍可检索，但必须严格匹配真实收藏。 */
       if (!group && extra.bookmark_id) {
         var legacy = rows.find(function (row) { return String(row.id) === String(extra.bookmark_id) && row.url === extra.url; });
         if (!legacy || result.doc_id !== id + '-' + legacy.id) continue;
         group = { info: await Documents.forUrl(legacy.url), rows: [legacy] };
-      } else if (!group || result.doc_id !== id + '-' + group.info.id || extra.canonical_url !== group.info.canonicalUrl) continue;
+      } else if (!group || result.doc_id !== (cfg.authToken ? (saved[group.info.id] && saved[group.info.id].docId || 'page-' + group.info.id) : id + '-' + group.info.id) || extra.canonical_url !== group.info.canonicalUrl) continue;
       var doc = await Documents.get(group.info.id);
       if (doc && doc.contentHash && extra.content_hash && doc.contentHash !== extra.content_hash) continue;
       var hit = hits.get(group.info.id);
@@ -138,5 +187,18 @@
     }
     return Array.from(hits.values()).slice(0, 30);
   }
-  global.Rag = { available: available, request: request, clientId: clientId, defaultCollection: defaultCollection, retrieve: retrieve, ensure: ensure, upsertDocument: upsertDocument, removeDocument: removeDocument, stateKey: stateKey };
+  global.Rag = {
+    PROXY_BASE: PROXY_BASE,
+    available: available,
+    withAuth: withAuth,
+    config: config,
+    request: request,
+    clientId: clientId,
+    defaultCollection: defaultCollection,
+    retrieve: retrieve,
+    ensure: ensure,
+    upsertDocument: upsertDocument,
+    removeDocument: removeDocument,
+    stateKey: stateKey
+  };
 })(typeof self !== 'undefined' ? self : window);

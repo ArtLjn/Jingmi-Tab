@@ -349,6 +349,14 @@ html, body {
 
 .ac-item.is-sel { background: rgba(255, 255, 255, 0.1); }
 
+.ac-item.is-create {
+  margin-top: 4px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ac-item.is-create.is-sel { background: rgba(255, 255, 255, 0.1); }
+
 .ac-dot {
   width: 7px;
   height: 7px;
@@ -1388,7 +1396,7 @@ kbd {
 .organizer-content { padding: 0 24px; min-height: 220px; }
 .organizer-item { padding: 18px 0; border-bottom: 1px solid var(--line); }
 .organizer-link { color: var(--ink); text-decoration: none; font-size: 14px; overflow-wrap: anywhere; }
-.organizer-link:hover { text-decoration: underline; }
+.organizer-link:hover { text-decoration: none; }
 .organizer-meta, .organizer-reason, .organizer-tags { margin: 6px 0; color: var(--ink-faint); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
 .organizer-reason { color: var(--ink-soft); }
 .organizer-tags { color: #bad3fd; }
@@ -1556,6 +1564,275 @@ kbd {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 .workspace-tab.is-active small { color: rgba(222, 215, 255, 0.48); }
+/* 左下角账号入口：登录后显示用户名首字，未登录显示问号 */
+.workspace-account {
+  margin-top: auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.72);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.workspace-account:hover { border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.07); }
+.workspace-account-avatar {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  font-weight: 600;
+}
+.workspace-account.is-logged .workspace-account-avatar { background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.92); }
+.workspace-account-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.workspace-account-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
+.workspace-account-copy small { color: rgba(255, 255, 255, 0.3); font-size: 9.5px; }
+.workspace-account + .workspace-nav-foot { margin-top: 4px; }
+
+/* 账号弹层：覆盖工作台内容，左下角头像打开 */
+.account-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: rgba(4, 6, 9, 0.68);
+  backdrop-filter: blur(14px) saturate(1.08);
+  animation: accountFade 0.22s ease-out;
+}
+.account-modal[hidden] { display: none; }
+.account-modal-card {
+  position: relative;
+  width: min(464px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--workspace-border-strong);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 46%),
+    rgba(25, 27, 32, 0.97);
+  box-shadow:
+    0 32px 90px rgba(0, 0, 0, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  overflow: hidden;
+  animation: accountPop 0.28s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+@keyframes accountFade { from { opacity: 0; } }
+@keyframes accountPop {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+}
+.account-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 0;
+}
+.account-modal-title-wrap { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.account-modal-glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  color: rgba(255, 255, 255, 0.82);
+  background: var(--workspace-accent-soft);
+  border: 1px solid var(--workspace-border-strong);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+.account-modal-glyph svg { width: 20px; height: 20px; }
+.account-modal-head .view-eyebrow { margin: 0; color: rgba(255, 255, 255, 0.45); letter-spacing: 0.24em; }
+.account-modal-head h3 { margin: 4px 0 0; color: rgba(255, 255, 255, 0.94); font-size: 18px; font-weight: 550; letter-spacing: 0.01em; }
+.account-modal-close {
+  position: static;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+.account-modal-close:hover { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.9); transform: rotate(90deg); }
+.account-modal-body { min-height: 0; overflow-y: auto; padding: 18px 24px 26px; }
+.account-modal .backup-intro {
+  margin: 0;
+  max-width: none;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 11.5px;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+}
+.account-modal .backup-account { margin-top: 18px; padding-top: 0; border-top: none; }
+.account-modal .backup-account-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  margin: 0;
+}
+.account-modal .backup-account-grid .field { gap: 8px; font-size: 11px; }
+.account-modal .backup-account-grid .field > span {
+  display: block;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+.account-modal .backup-account-grid .text-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 12.5px;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+.account-modal .backup-account-grid .text-input::placeholder { color: rgba(255, 255, 255, 0.28); }
+.account-modal .backup-account-grid .text-input:hover { border-color: rgba(255, 255, 255, 0.17); background: rgba(255, 255, 255, 0.055); }
+.account-modal .backup-account-grid .text-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+}
+/* 主操作占满整行，登录/注册切换降为一行轻量文字按钮。 */
+.account-modal .backup-account-actions { display: grid; gap: 4px; margin-top: 20px; }
+.account-modal .backup-account-actions .btn-ghost {
+  width: 100%;
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 11.5px;
+  font-weight: 500;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.account-modal .backup-account-actions .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.88);
+  transform: none;
+}
+.account-modal .backup-account-actions .action-primary,
+.account-modal .backup-account-actions .btn-ghost.action-primary {
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #14171c;
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+.account-modal .backup-account-actions .action-primary:hover {
+  background: #fff;
+  color: #14171c;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+.account-modal .backup-account-actions .btn-ghost:active,
+.account-modal .backup-account-actions .action-primary:active { transform: translateY(0); }
+.account-modal .backup-account-actions .btn-ghost:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+.account-modal .backup-account-actions .btn-ghost:focus-visible,
+.account-modal-close:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.5); outline-offset: 2px; }
+/* 登录态：账号胶囊卡片 */
+.account-modal .backup-account-logged {
+  padding: 14px 15px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  font-size: 12px;
+}
+.account-modal .backup-account-logged strong { color: rgba(255, 255, 255, 0.92); font-weight: 600; }
+.account-modal .backup-account-logged .btn-ghost {
+  height: 31px;
+  padding: 0 13px;
+  border-radius: 9px;
+  border-color: var(--workspace-border);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.account-modal .backup-account-logged .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--workspace-border-strong);
+  color: rgba(255, 255, 255, 0.85);
+}
+/* 登录后的备份操作按钮 */
+.account-modal .backup-actions { margin-top: 16px; }
+.account-modal .backup-actions .backup-action-group { width: 100%; display: grid; gap: 8px; }
+.account-modal .backup-actions .btn-ghost {
+  width: 100%;
+  height: 42px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.account-modal .backup-actions .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.92);
+  transform: translateY(-1px);
+}
+.account-modal .backup-actions .action-primary {
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  color: #14171c;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+.account-modal .backup-actions .action-primary:hover {
+  background: #fff;
+  color: #14171c;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+.account-modal .backup-actions .btn-ghost:disabled { opacity: 0.55; transform: none; box-shadow: none; cursor: default; }
+/* 状态行：安静的单行提示 */
+.account-modal .backup-status {
+  margin: 14px 0 0;
+  padding: 0;
+  background: none;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.account-modal .backup-status::before {
+  width: 5px;
+  height: 5px;
+  margin-right: 7px;
+}
+.account-modal .backup-note {
+  margin: 12px 0 0;
+  color: rgba(255, 255, 255, 0.36);
+  font-size: 10px;
+  line-height: 1.65;
+}
+
 .workspace-nav-foot {
   margin-top: auto;
   padding: 14px 10px 2px;
@@ -1581,6 +1858,46 @@ kbd {
 .settings-view::-webkit-scrollbar { width: 6px; }
 .settings-view::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 4px; }
 
+/* 统一设置页：同一滚动容器内用锚点跳转，书签空间仍是独立视图。 */
+.settings-page-head { margin-bottom: 8px; }
+.settings-anchors {
+  position: sticky;
+  top: -26px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 -4px 18px;
+  padding: 10px 4px;
+  background: linear-gradient(180deg, rgba(22, 25, 30, 0.96) 72%, rgba(22, 25, 30, 0));
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.settings-anchors a {
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11px;
+  text-decoration: none;
+}
+.settings-anchors a:hover { border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.85); }
+.settings-block { scroll-margin-top: 88px; }
+/* 本页分区导航（搜索与 AI）：sticky 二级导航，兼做面包屑；
+   卡片滚动定位时预留导航条高度，标题不会被盖住。 */
+.settings-anchors a.is-active {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.92);
+}
+.automation-card, .advanced-card { scroll-margin-top: 88px; }
+.settings-block + .settings-block { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--workspace-border); }
+.settings-block .view-heading { margin-bottom: 16px; }
+.settings-block .view-heading h2 { font-size: 18px; }
+.settings-block .view-eyebrow { margin-bottom: 5px; }
+.settings-block .view-heading p:not(.view-eyebrow) { margin: 6px 0 0; font-size: 11.5px; }
+
 .view-heading { margin-bottom: 22px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .view-eyebrow { margin: 0 0 7px; color: rgba(255, 255, 255, 0.58); font-size: 9px; letter-spacing: 0.18em; }
 .view-heading h2,
@@ -1590,6 +1907,8 @@ kbd {
 
 .appearance-grid { display: grid; grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr); gap: 14px; align-items: start; }
 .settings-stack { min-width: 0; display: grid; gap: 14px; }
+/* 在线壁纸卡跟随左列高度：右侧底部与左列齐平，缺口由缩略图墙吸收。 */
+.wallpaper-card { align-self: stretch; display: flex; flex-direction: column; }
 .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
 /* 配置页内的次级分组：用一条分隔线把「搜索/AI」与「内容自动化」分开，
    标题层级低于页面标题，避免和左侧导航抢注意力。 */
@@ -1646,12 +1965,16 @@ kbd {
 input[type="range"]::-webkit-slider-runnable-track { background: rgba(255, 255, 255, 0.13); }
 input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .wp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-/* 缩略图墙在卡片内滚动：24 张铺开会把整个设置面板拉成一条长列表。 */
+/* 缩略图墙在卡片内滚动：多余高度交给网格，避免壁纸卡底部短于左列。 */
 .wp-grid {
-  max-height: 264px;
+  flex: 1 1 0;
+  min-height: 264px;
+  max-height: none;
   overflow-y: auto;
   overscroll-behavior: contain;
   align-content: start;
+  /* 行高跟随缩略图比例；不随容器高度压缩，避免相邻两行叠在一起。 */
+  grid-auto-rows: max-content;
   padding-right: 2px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
@@ -1660,6 +1983,8 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .wp-grid::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 3px; }
 .wp-item { border-radius: 8px; }
 .wp-status { min-height: 16px; margin: 8px 0; }
+/* 网格按整行填满后，状态与分页贴住卡片底部，余量留在网格与状态之间。 */
+.wallpaper-card .wp-status { margin-top: auto; padding-top: 8px; }
 .wp-more { width: 100%; }
 
 .advanced-settings { margin-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.065); }
@@ -1708,22 +2033,171 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .field-wide { grid-column: 1 / -1; }
 .inline-actions { min-height: 35px; margin-top: 13px; display: flex; align-items: center; gap: 12px; }
 .segmented button.is-active { background: #e2e5e9; color: #24262b; }
-/* 左列「时间 + 快捷键」自然堆叠，右列是较高的显示元素卡；
-   两列等高端对齐，避免时间卡下方空出整块留白。 */
-.preference-grid { align-items: stretch; }
-.preference-col {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  justify-content: space-between;
+
+/* ---------------- 偏好设置 ---------------- */
+/* 上层：时间预览 + 快捷键速查；中层：按主题分栏的显示元素矩阵；
+   下层：备份与重置。层级靠留白和分组标题建立，不再堆叠同质开关行。 */
+#workspace-preferences .settings-card {
+  padding: 18px 20px;
+  border-radius: 16px;
 }
-.shortcut-list { display: flex; flex-wrap: wrap; gap: 12px 24px; color: var(--ink-soft); font-size: 11px; }
-.shortcut-list span { display: inline-flex; align-items: center; gap: 7px; }
-.reset-card { margin-top: 14px !important; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-.reset-card h3 { margin: 0 !important; }
-.reset-card p { margin: 6px 0 0; color: var(--ink-faint); font-size: 10.5px; line-height: 1.6; }
+#workspace-preferences .card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+#workspace-preferences .card-head h3 { margin: 0; }
+#workspace-preferences .card-note {
+  flex: none;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.preferences-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.04fr) minmax(0, 0.96fr);
+  align-items: stretch;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.time-card { display: flex; flex-direction: column; }
+.time-preview {
+  display: flex;
+  align-items: baseline;
+  min-height: 38px;
+  margin: 0 0 12px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 31px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.time-preview .sec { margin-left: 0.045em; font-size: 0.44em; letter-spacing: 0; opacity: 0.52; }
+.time-preview .meridiem { margin-left: 0.5em; font-size: 0.27em; letter-spacing: 0.12em; opacity: 0.58; }
+.time-card .switch-list { margin-top: auto; }
+.time-card .switch-row { padding: 9px 0; }
+.time-card .switch-row + .switch-row { border-top: 1px solid rgba(255, 255, 255, 0.055); }
+.time-card .switch-row:last-child { padding-bottom: 0; }
+
+.shortcut-list { display: flex; flex-direction: column; }
+.shortcut-list > span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 31px;
+  padding: 4px 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+.shortcut-list > span + span { border-top: 1px solid rgba(255, 255, 255, 0.055); }
+.shortcut-list kbd {
+  flex: none;
+  min-width: 24px;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.display-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.display-group { min-width: 0; padding: 0 18px; }
+.display-group:first-child { padding-left: 0; }
+.display-group:last-child { padding-right: 0; }
+.display-group + .display-group { border-left: 1px solid rgba(255, 255, 255, 0.065); }
+.display-group-title {
+  margin: 0 0 4px;
+  color: rgba(255, 255, 255, 0.34);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+}
+.display-group .switch-row { min-height: 34px; padding: 4px 0; }
+.display-group .switch-row .label { color: rgba(255, 255, 255, 0.76); font-size: 11.5px; }
+.display-hint {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10.5px;
+}
+
+/* 备份区：设置项在上，主次操作分组在下；状态行只在有内容时出现。 */
+#workspace-preferences .backup-card { margin-top: 16px; }
+.backup-intro { margin: 0 0 2px; max-width: 64ch; color: var(--ink-faint); font-size: 11px; line-height: 1.7; }
+.backup-card .field-grid { margin: 16px 0 0; gap: 12px; }
+.backup-card .field { font-size: 10px; }
+.backup-card .field span { color: rgba(255, 255, 255, 0.46); }
+.backup-auto-row {
+  margin-top: 10px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+}
+.switch-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.switch-copy .label { font-size: 11.5px; }
+.switch-copy small { color: var(--ink-faint); font-size: 10px; }
+.backup-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 14px; }
+.backup-actions[hidden] { display: none; }
+.backup-action-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.backup-action-group.is-files { margin-left: auto; }
+.backup-action-group .action-primary { border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.09); color: rgba(255, 255, 255, 0.92); }
+.backup-account { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.055); }
+.backup-account[hidden], .backup-account-form[hidden], .backup-account-logged[hidden] { display: none; }
+.backup-account-logged {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(120, 200, 160, 0.14);
+  border-radius: 10px;
+  background: rgba(120, 200, 160, 0.055);
+  color: rgba(205, 235, 218, 0.86);
+  font-size: 11.5px;
+}
+.backup-account-logged strong { color: #fff; font-weight: 500; }
+.backup-account-grid { margin: 0; }
+.backup-account-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.backup-account-actions .action-primary { border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.09); color: rgba(255, 255, 255, 0.92); }
+.backup-account-grid > [hidden], .backup-account-actions > [hidden] { display: none; }
+.backup-status { margin: 12px 0 0; font-size: 10.5px; }
+.backup-status:empty { display: none; }
+.backup-status::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 7px; border-radius: 50%; background: currentColor; vertical-align: 1px; opacity: 0.8; }
+.backup-note { margin: 10px 0 0; color: rgba(255, 255, 255, 0.36); font-size: 10px; line-height: 1.65; }
+
+#workspace-preferences .reset-card {
+  margin-top: 16px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+#workspace-preferences .reset-card h3 { margin: 0; color: rgba(255, 255, 255, 0.7); font-size: 11.5px; letter-spacing: 0.06em; }
+#workspace-preferences .reset-card p { margin: 6px 0 0; color: var(--ink-faint); font-size: 10.5px; line-height: 1.6; }
 .btn-reset { width: auto; flex: none; margin: 0; padding: 0 14px; }
+
+/* 偏好页开关更轻：缩小轨道、保留白色开态，多个开关同时出现时不抢视线。 */
+#workspace-preferences .switch { width: 34px; height: 20px; cursor: pointer; }
+#workspace-preferences .switch i { background: rgba(255, 255, 255, 0.13); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04); }
+#workspace-preferences .switch i::after { top: 2px; left: 2px; width: 16px; height: 16px; background: rgba(255, 255, 255, 0.72); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); }
+#workspace-preferences .switch input:checked + i { background: rgba(255, 255, 255, 0.9); }
+#workspace-preferences .switch input:checked + i::after { transform: translateX(14px); background: #171a1f; }
+#workspace-preferences .switch:hover input:not(:checked) + i { background: rgba(255, 255, 255, 0.18); }
+#workspace-preferences .switch input:focus-visible + i { outline: 2px solid rgba(255, 255, 255, 0.55); outline-offset: 2px; }
 
 /* 书签空间：单层内容结构，清晰的工具层级与可扫描的书签行。 */
 #organizer-dialog.settings-view {
@@ -1852,6 +2326,8 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
   .workspace-layout { display: flex; flex-direction: column; }
   .workspace-nav { flex: none; min-height: 60px; padding: 7px 10px; flex-direction: row; gap: 5px; border-right: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
   .workspace-tab { min-width: 0; min-height: 44px; flex: 1; }
+  .account-modal { padding: 16px; }
+  .account-modal-card { border-radius: 20px; }
   .workspace-tab > svg { width: 18px; height: 18px; }
   .settings-view { padding: 20px 16px 24px; }
   .view-heading { margin-bottom: 18px; }
@@ -1860,7 +2336,12 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
   .settings-grid, .field-grid, .compact-switches { grid-template-columns: 1fr; }
   .field-wide { grid-column: auto; }
   .swatches { grid-template-columns: repeat(8, minmax(0, 1fr)); }
-  .reset-card { align-items: flex-start; flex-direction: column; }
+  .preferences-top { grid-template-columns: 1fr; }
+  .display-groups { grid-template-columns: 1fr; }
+  .display-group { padding: 0; }
+  .display-group + .display-group { margin-top: 14px; padding-top: 14px; border-left: 0; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+  .backup-action-group.is-files { margin-left: 0; }
+  #workspace-preferences .reset-card { align-items: flex-start; flex-direction: column; }
   #organizer-dialog.settings-view { padding: 20px 14px; }
 }
 
@@ -1916,9 +2397,18 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .automation-description { margin: 8px 0 10px; color: var(--ink-faint); font-size: 10px; line-height: 1.55; }
 .automation-path { display: flex; align-items: center; justify-content: flex-start; gap: 10px; min-height: 31px; margin: 10px 0; padding: 0; color: rgba(255,255,255,.48); font-size: 10px; }
 .automation-path b { color: rgba(255,255,255,.2); font-weight: 400; }
-.automation-grid .inline-actions { min-height: 30px; gap: 7px; margin: 8px 0 0; flex-wrap: wrap; }
-.automation-grid .btn-ghost { height: 29px; padding: 0 10px; font-size: 10px; }
-.automation-grid .action-primary { background: rgba(255,255,255,.09); border-color: var(--workspace-border-strong); color: #f5f5f7; }
+.automation-grid .inline-actions { min-height: 32px; gap: 8px; margin: 10px 0 0; flex-wrap: wrap; }
+/* 卡片级按钮统一 30px / 8px 圆角：主操作亮一档，次操作弱一档，按压有下沉反馈。 */
+.automation-grid .btn-ghost,
+.enrich-toolbar .btn-ghost { height: 30px; padding: 0 12px; border-radius: 8px; font-size: 10.5px; }
+.automation-grid .btn-ghost:active,
+.enrich-toolbar .btn-ghost:active { transform: translateY(1px); }
+.automation-grid .btn-ghost:disabled,
+.enrich-toolbar .btn-ghost:disabled { opacity: 0.35; cursor: default; transform: none; }
+.automation-grid .btn-ghost:focus-visible,
+.enrich-toolbar .btn-ghost:focus-visible, .auto-action:focus-visible { outline: 2px solid var(--workspace-accent); outline-offset: 1px; }
+.automation-grid .action-primary { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.28); color: #f5f5f7; }
+.automation-grid .action-primary:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.4); }
 .automation-progress { min-height: 0; margin: 9px 0 0; color: rgba(255,255,255,.5); font-size: 9.5px; line-height: 1.55; overflow-wrap: anywhere; }
 .automation-note { display: none; }
 .automation-card .hint { margin: 6px 0 0; font-size: 10px; }
@@ -1931,9 +2421,29 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .automation-details .switch-row .label { font-size: 11px; }
 /* 智能归档：域名记忆与待确认建议 */
 .auto-organize-body { display: grid; gap: 12px; margin-top: 10px; }
+.auto-archive-history { display: grid; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--workspace-border); }
+.auto-archive-record { padding: 12px; border: 1px solid var(--workspace-border); border-radius: 9px; background: rgba(255,255,255,.022); }
+.auto-archive-title { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.auto-archive-title strong { min-width: 0; overflow-wrap: anywhere; font-size: 12px; font-weight: 500; color: rgba(255,255,255,.85); }
+.auto-archive-path { margin: 7px 0; font-size: 11px; line-height: 1.7; color: rgba(255,255,255,.6); overflow-wrap: anywhere; }
+.auto-archive-time { display: block; margin-top: 6px; color: var(--ink-faint); font-size: 10px; }
 .auto-block { display: grid; gap: 6px; }
 .auto-block-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgba(255, 255, 255, 0.4); font-size: 9.5px; letter-spacing: 0.06em; }
-.auto-rule-list, .auto-pending-list { display: grid; gap: 5px; }
+/* 列表体固定高度：条目多时在卡片内滚动，不把整页拉长。 */
+.auto-rule-list, .auto-pending-list {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  max-height: 264px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.auto-pending-list { max-height: 220px; }
+.auto-rule-list::-webkit-scrollbar, .auto-pending-list::-webkit-scrollbar { width: 5px; }
+.auto-rule-list::-webkit-scrollbar-thumb, .auto-pending-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 3px; }
 .auto-empty { margin: 0; padding: 8px 0; color: var(--ink-faint); font-size: 10px; line-height: 1.6; }
 .auto-rule { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 9px; border: 1px solid rgba(255, 255, 255, 0.055); border-radius: 8px; background: rgba(255, 255, 255, 0.022); color: rgba(255, 255, 255, 0.62); font-size: 10px; }
 .auto-rule-domain { flex: 0 1 auto; max-width: 38%; overflow: hidden; color: rgba(255, 255, 255, 0.84); text-overflow: ellipsis; white-space: nowrap; }
@@ -1941,21 +2451,37 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .auto-rule-folder { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .auto-rule-folder.is-stale { color: rgba(255, 255, 255, 0.36); text-decoration: line-through; }
 .auto-rule-source { flex: none; padding: 2px 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.055); color: rgba(255, 255, 255, 0.42); font-size: 8.5px; }
-.auto-rule-remove { flex: none; padding: 2px 4px; border: 0; background: transparent; color: rgba(255, 255, 255, 0.3); font: inherit; font-size: 9.5px; cursor: pointer; }
-.auto-rule-remove:hover { color: rgba(255, 255, 255, 0.85); }
+.auto-rule-remove { flex: none; height: 22px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: rgba(255, 255, 255, 0.32); font: inherit; font-size: 9.5px; cursor: pointer; transition: color 0.18s, background 0.18s; }
+.auto-rule-remove:hover { color: rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.08); }
 .auto-suggestion { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 9px; background: rgba(255, 255, 255, 0.03); }
 .auto-suggestion-main { min-width: 0; }
 .auto-suggestion-title { display: block; overflow: hidden; color: rgba(255, 255, 255, 0.84); font-size: 10.5px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .auto-suggestion-meta { margin: 3px 0 0; overflow: hidden; color: var(--ink-faint); font-size: 9.5px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
-.auto-suggestion-actions { display: flex; align-items: center; gap: 4px; }
-.auto-action { flex: none; height: 24px; padding: 0 8px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 7px; background: transparent; color: rgba(255, 255, 255, 0.55); font: inherit; font-size: 9.5px; cursor: pointer; }
-.auto-action:hover { border-color: rgba(255, 255, 255, 0.26); color: #fff; background: rgba(255, 255, 255, 0.06); }
+.auto-suggestion-actions { display: flex; align-items: center; gap: 5px; }
+/* 行内操作统一 26px 胶囊：链接与按钮同规格（打开页面 / 重新抓取 / 应用 / 忽略）。 */
+.auto-action { flex: none; height: 26px; padding: 0 11px; display: inline-flex; align-items: center; border: 1px solid rgba(255, 255, 255, 0.11); border-radius: 7px; background: rgba(255, 255, 255, 0.045); color: rgba(255, 255, 255, 0.6); font: inherit; font-size: 10px; text-decoration: none; cursor: pointer; transition: border-color 0.18s, background 0.18s, color 0.18s; }
+.auto-action:hover { border-color: rgba(255, 255, 255, 0.28); color: #fff; background: rgba(255, 255, 255, 0.09); }
+.auto-action:active { transform: translateY(1px); }
 .auto-action.adopt { border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08); color: #f5f5f7; }
 .auto-action.adopt:hover { background: rgba(255, 255, 255, 0.16); }
 /* 收藏补全：正文采集与标题建议 */
-.enrich-body { display: grid; gap: 8px; margin-top: 10px; }
+/* 待确认建议与体检报告同样在卡片内滚动：高度封顶，避免 500 条列表撑破整页。 */
+.enrich-body {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  margin-top: 10px;
+  max-height: 340px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.enrich-body::-webkit-scrollbar { width: 5px; }
+.enrich-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 3px; }
 .enrich-toolbar { display: flex; flex-wrap: wrap; gap: 6px; }
-.enrich-all { justify-self: start; height: 28px; font-size: 10px; }
+.enrich-all { justify-self: start; height: 30px; padding: 0 12px; font-size: 10.5px; }
 .enrich-tags { margin: 3px 0 0; color: rgba(168, 198, 255, 0.72); font-size: 9.5px; letter-spacing: 0.02em; }
 .enrich-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 9px; background: rgba(255, 255, 255, 0.025); }
 .enrich-main { min-width: 0; }
@@ -1972,6 +2498,154 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 #organizer-dialog .organizer-command-bar .organizer-search-label input:focus { border-color: var(--workspace-border-strong); background: rgba(10,12,16,.5); box-shadow: 0 0 0 3px rgba(255,255,255,.045); }
 #organizer-dialog .organizer-body { margin-top: 3px; }
 #workspace-search .settings-grid { grid-template-columns: 1fr; }
+
+/* 搜索概览与子页：入口保持轻量，详细配置各占一页。 */
+#workspace-search [hidden] { display: none !important; }
+.search-overview { display: grid; gap: 10px; }
+.search-entry {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; padding: 18px 20px; text-align: left; font: inherit;
+  color: var(--ink); border: 1px solid var(--workspace-border); border-radius: 13px;
+  background: var(--workspace-card); cursor: pointer;
+}
+.search-entry:hover { border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.065); }
+.search-entry:focus-visible, .search-breadcrumb button:focus-visible { outline: 2px solid var(--workspace-teal); outline-offset: 3px; }
+.search-entry > span:first-child { min-width: 0; }
+.search-entry strong { display: block; font-size: 13px; font-weight: 500; color: rgba(255,255,255,.88); }
+.search-entry small { display: block; margin-top: 6px; font-size: 11px; line-height: 1.6; color: var(--ink-faint); }
+.search-entry-status { display: block; margin-top: 8px; color: rgba(255,255,255,.48); font-size: 10px; line-height: 1.6; overflow-wrap: anywhere; }
+.search-entry-status:empty { display: none; }
+.search-entry-arrow { flex: none; color: var(--ink-faint); font-size: 24px; }
+.search-breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; font-size: 12px; color: rgba(255,255,255,.8); }
+.search-breadcrumb button { padding: 4px 0; border: 0; background: none; color: var(--ink-faint); font: inherit; cursor: pointer; }
+.search-breadcrumb button:hover { color: #fff; }
+.search-breadcrumb > span[aria-hidden] { color: rgba(255,255,255,.25); }
+.search-subpage { min-width: 0; }
+.pipeline-records { display: grid; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--workspace-border); }
+/* 子页列表统一固定高度，更多条目在列表内滚动，避免撑长整个页面。 */
+.search-subpage .auto-rule-list,
+.search-subpage .auto-pending-list,
+.search-subpage .auto-archive-history,
+.search-subpage .enrich-body,
+.search-subpage .pipeline-records {
+  height: clamp(360px, calc(100dvh - 380px), 760px);
+  max-height: none;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-content: start;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.15) transparent;
+}
+
+/* ---------------- 正文采集与 RAG ---------------- */
+/* 三层结构：状态概览 → 操作与反馈 → 可滚动明细。
+   内层不再叠卡片，用留白、分隔线和状态点建立层级。 */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.rag-card { padding: 18px 18px 16px; }
+.rag-card .automation-heading { align-items: flex-start; gap: 16px; }
+.rag-card .automation-title { min-width: 0; flex: 1; }
+.rag-card .automation-title-line { display: flex; align-items: center; gap: 9px; margin-top: 4px; }
+.rag-card .automation-step { font-size: 9px; }
+.rag-card .automation-heading h3 { margin: 0; color: rgba(255,255,255,.92); font-size: 14.5px; font-weight: 550; letter-spacing: -.01em; }
+.rag-card .automation-description { margin: 7px 0 0; max-width: 44em; font-size: 11px; line-height: 1.6; }
+.rag-card .switch { flex: none; margin-top: 6px; }
+.rag-state { flex: none; padding: 2px 8px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; background: rgba(255,255,255,.04); color: rgba(255,255,255,.46); font-size: 9px; line-height: 1.6; letter-spacing: .02em; white-space: nowrap; }
+.rag-state[data-tone="on"] { border-color: rgba(145,223,207,.22); background: rgba(145,223,207,.08); color: rgba(165,232,216,.88); }
+.rag-state[data-tone="busy"] { border-color: rgba(160,200,255,.2); background: rgba(160,200,255,.07); color: rgba(186,215,255,.9); }
+.rag-state[data-tone="paused"] { border-color: rgba(230,192,123,.2); background: rgba(230,192,123,.07); color: rgba(236,206,146,.88); }
+
+/* 收录概况：四个关键数字直接落在卡片上，完整口径收进 aria-label 与悬浮提示。 */
+.rag-overview { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.07); }
+.rag-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rag-stat { min-width: 0; padding: 0 16px; border-left: 1px solid rgba(255,255,255,.07); }
+.rag-stat:first-child { padding-left: 0; border-left: 0; }
+.rag-stat span { display: block; color: rgba(255,255,255,.46); font-size: 9.5px; letter-spacing: .04em; }
+.rag-stat strong { display: block; margin-top: 4px; color: rgba(255,255,255,.88); font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.15; }
+.rag-stat.is-zero strong { color: rgba(255,255,255,.32); }
+.rag-stat.is-danger strong { color: #f5a09a; }
+.rag-overview .automation-path { min-height: 0; margin: 13px 0 0; gap: 8px; font-size: 9.5px; color: rgba(255,255,255,.42); }
+.rag-overview .automation-path b { color: rgba(255,255,255,.18); }
+
+.rag-alert { position: relative; margin: 13px 0 0; padding: 9px 12px 9px 26px; border: 1px solid rgba(236,206,146,.16); border-radius: 9px; background: rgba(236,206,146,.05); color: rgba(240,224,190,.82); font-size: 10.5px; line-height: 1.55; overflow-wrap: anywhere; }
+.rag-alert::before { content: ""; position: absolute; top: 14px; left: 13px; width: 5px; height: 5px; border-radius: 50%; background: rgba(236,206,146,.75); }
+.rag-alert:empty { display: none; }
+
+.rag-card .rag-actions { margin-top: 14px; gap: 8px; }
+.rag-card .rag-actions .btn-ghost { height: 31px; padding: 0 13px; border-radius: 8px; font-size: 10.5px; }
+.rag-card #pipeline-start { border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.1); color: #f5f5f7; }
+.rag-card #pipeline-start:hover { border-color: rgba(255,255,255,.38); background: rgba(255,255,255,.16); }
+.rag-card #pipeline-retry { border-color: rgba(245,160,154,.2); background: rgba(245,160,154,.06); color: rgba(255,184,178,.88); }
+.rag-card .rag-actions .btn-ghost:focus-visible,
+.pipeline-retry:focus-visible,
+.rag-pause:focus-visible { outline: 2px solid var(--workspace-teal); outline-offset: 1px; }
+
+/* 折叠设置是操作区与明细之间的过渡行，不再单独加分隔线。 */
+.rag-card .automation-details { margin-top: 12px; padding-top: 0; border-top: 0; }
+.rag-card .automation-details > summary { padding: 4px 0; color: rgba(255,255,255,.46); font-size: 10.5px; }
+.rag-settings-body { display: grid; gap: 13px; }
+.rag-card .switch-row { min-height: 28px; }
+.rag-card .switch-row .label { color: rgba(255,255,255,.62); font-size: 11px; }
+.rag-interval { display: flex; align-items: center; justify-content: space-between; gap: 14px; color: rgba(255,255,255,.58); font-size: 11px; }
+.rag-interval-control { display: inline-flex; align-items: center; gap: 7px; color: rgba(255,255,255,.34); font-size: 10px; }
+.rag-interval .text-input { width: 62px; height: 30px; padding: 0 8px; text-align: center; }
+.rag-note { margin: 0; color: rgba(255,255,255,.38); font-size: 9.5px; line-height: 1.65; }
+.rag-card .rag-pause { height: 28px; padding: 0 11px; border-color: rgba(255,255,255,.09); background: rgba(255,255,255,.025); color: rgba(255,255,255,.46); font-size: 10px; }
+.rag-card .rag-pause:hover { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.06); color: rgba(255,255,255,.82); }
+
+/* 明细列表：单一表面内的紧凑行，失败项排在前面，行内只保留一个轻量重试。 */
+.rag-card .pipeline-records { display: flex; flex-direction: column; gap: 2px; height: clamp(360px, calc(100dvh - 430px), 620px); margin-top: 16px; padding-top: 12px; padding-right: 4px; border-top: 1px solid rgba(255,255,255,.07); }
+.rag-card .pipeline-records::-webkit-scrollbar { width: 5px; }
+.rag-card .pipeline-records::-webkit-scrollbar-thumb { border-radius: 3px; background: rgba(255,255,255,.14); }
+.pipeline-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0; padding: 0 8px 8px; }
+.pipeline-head strong { color: rgba(255,255,255,.5); font-size: 9.5px; font-weight: 500; letter-spacing: .06em; }
+.pipeline-head em { color: rgba(255,255,255,.38); font-size: 9.5px; font-style: normal; font-variant-numeric: tabular-nums; }
+.pipeline-record { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 9px 8px; border: 0; border-radius: 8px; background: transparent; transition: background .16s; }
+.pipeline-record:hover { background: rgba(255,255,255,.035); }
+.pipeline-dot { flex: none; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: rgba(255,255,255,.2); }
+.pipeline-record[data-status="done"] .pipeline-dot { background: rgba(145,223,207,.75); }
+.pipeline-record[data-status="failed"] .pipeline-dot { background: #f09186; box-shadow: 0 0 0 3px rgba(240,145,134,.08); }
+.pipeline-record[data-status="paused"] .pipeline-dot { background: #e6c07b; box-shadow: 0 0 0 3px rgba(230,192,123,.07); }
+.pipeline-record[data-status="running"] .pipeline-dot { background: #9cc8ff; box-shadow: 0 0 0 3px rgba(156,200,255,.08); }
+.pipeline-main { flex: 1; min-width: 0; }
+.pipeline-title { margin: 0; overflow: hidden; color: rgba(255,255,255,.8); font-size: 11px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.pipeline-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 3px 0 0; color: rgba(255,255,255,.42); font-size: 9.5px; line-height: 1.5; }
+.pipeline-meta i { color: rgba(255,255,255,.18); font-style: normal; }
+.pipeline-chip { padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,.05); color: rgba(255,255,255,.46); font-size: 8.5px; line-height: 1.5; }
+.pipeline-record[data-status="failed"] .pipeline-chip { background: rgba(240,145,134,.1); color: rgba(255,174,166,.86); }
+.pipeline-record[data-status="paused"] .pipeline-chip { background: rgba(230,192,123,.09); color: rgba(236,204,141,.82); }
+.pipeline-record[data-status="running"] .pipeline-chip { background: rgba(156,200,255,.08); color: rgba(178,212,255,.82); }
+.pipeline-error { margin: 3px 0 0; overflow: hidden; color: rgba(240,145,134,.78); font-size: 9.5px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.pipeline-retry { flex: none; align-self: center; margin-left: auto; height: 26px; padding: 0 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: transparent; color: rgba(255,255,255,.48); font: inherit; font-size: 9.5px; cursor: pointer; transition: color .16s, background .16s, border-color .16s; }
+.pipeline-retry:hover { border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.06); color: rgba(255,255,255,.88); }
+.pipeline-retry:active { transform: translateY(1px); }
+.pipeline-more { align-self: center; margin: 8px 8px 2px; height: 30px; padding: 0 14px; border-radius: 8px; font-size: 10px; }
+.rag-card .pipeline-records .auto-empty { padding: 16px 8px; }
+
+@media (max-width: 760px) {
+  .rag-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; }
+  .rag-stat:nth-child(3) { padding-left: 0; border-left: 0; }
+  .rag-stat:nth-child(n+3) { padding-top: 12px; border-top: 1px solid rgba(255,255,255,.06); }
+}
+@media (max-width: 650px) {
+  .rag-card { padding: 15px 14px; }
+  .rag-interval { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
+
 @media (max-width: 1050px) { .automation-grid { grid-template-columns: 1fr; } }
 @media (max-width: 650px) {
   .automation-grid { display: grid; gap: 10px; }
@@ -2211,9 +2885,8 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .tag-list:empty { display: none; }
 /* 只有展开后才限高滚动；折叠态只有 6 行，不需要也不该限高（限高会截断末行） */
 .tag-list.is-scroll {
-  /* 行高固定 48px + 2px 间距 + 4px 内边距：8 行 = 8*50+2 = 402px，
-     滚动边界永远落在两行之间，不会出现半行。 */
-  max-height: calc(8 * 50px + 2px);
+  /* 展开后利用窗口高度，内容超过上限时保留内部滚动。 */
+  max-height: clamp(360px, calc(100dvh - 380px), 760px);
   overflow-y: auto;
   overscroll-behavior: contain;
   /* 底部只做极浅的提示渐隐，避免把最后一行文字压暗 */
@@ -2291,7 +2964,7 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
 .tag-status[hidden] { display: none; }
 .tag-undo {
   padding: 0; border: 0; background: none; color: var(--workspace-accent);
-  font: inherit; font-size: 11px; cursor: pointer; text-decoration: underline;
+  font: inherit; font-size: 11px; cursor: pointer; text-decoration: none;
 }
 
 /* 窄屏：合并单列；用 display:contents 让四张卡回到同一流向，
@@ -2306,5 +2979,9 @@ input[type="range"]::-webkit-slider-thumb { background: #e5e7eb; }
   .tag-col.is-main > .settings-card { flex: none; }
   .tag-col.is-main .tag-list { flex: none; }
   .tag-manager-grid > .tag-col.is-side > .settings-card:first-child { min-height: 0; }
-  .tag-list.is-scroll { max-height: calc(6 * 50px + 2px); }
 }
+
+/* 工作台链接以颜色和焦点边框提示交互，不显示默认下划线。 */
+#panel a, #panel a:hover, #panel a:focus-visible { text-decoration: none; }
+#panel a:focus-visible { outline: 2px solid var(--workspace-teal); outline-offset: 2px; }
+#panel a.enrich-current:hover, #panel a.enrich-host:hover { color: rgba(255,255,255,.95); }

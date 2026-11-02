@@ -165,9 +165,7 @@
     document.querySelector('#organizer-open').addEventListener('click', function () { Workspace.open('bookmarks'); });
     document.querySelector('#organizer-close').addEventListener('click', function () { Workspace.close(); });
     document.querySelector('#organizer-sync-settings').addEventListener('click', function () {
-      Workspace.open('search');
-      var section = document.querySelector('#workspace-search .settings-section');
-      if (section) section.scrollIntoView({ block: 'start' });
+      Workspace.open('search', 'rag');
     });
     document.addEventListener('workspace:view', function (event) {
       if (event.detail === 'bookmarks') refresh().catch(function () { status.textContent = '无法读取书签，请在扩展页面使用'; });

@@ -84,3 +84,27 @@ test('语义召回可以找到关键词未命中的书签，模型空选择不�
   assert.equal(result.hits.length, 1);
   assert.match(result.message, /可能相关/);
 });
+
+test('账号模式本机状态重建后沿用服务端文档 ID，兼容旧实例元数据', async () => {
+  const api = server();
+  let stored = false;
+  const { c } = fixture({ fetch: async (url, options = {}) => {
+    if (url.endsWith('/ingest')) {
+      if (stored) return new Response(JSON.stringify({ code: 'OK', data: { doc_id: 'persisted-document', unchanged: true } }));
+      stored = true;
+      options.body.set('doc_id', 'persisted-document');
+    }
+    return api.fetch(url, options);
+  } });
+  const accountCfg = { ...cfg, authToken: 'session-token' };
+  const row = { id: '3', title: '项目文档', url: 'https://example.com/a', text: '项目内容' };
+  const doc = await documentFor(c, row);
+  await c.Rag.upsertDocument(accountCfg, doc, {});
+  await c.AgentDB.setMeta(await c.Rag.stateKey(accountCfg), null);
+  await c.AgentDB.setMeta('rag:client', 'another-browser-instance');
+  await c.Rag.upsertDocument(accountCfg, doc, {});
+  const saved = await c.AgentDB.getMeta(await c.Rag.stateKey(accountCfg));
+  assert.equal(saved[doc.id].docId, 'persisted-document');
+  assert.equal(api.docs.size, 1);
+  assert.equal((await c.Rag.retrieve(accountCfg, '项目', [row])).length, 1);
+});

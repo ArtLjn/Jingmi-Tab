@@ -23,8 +23,18 @@
     engine: 'bing',
     /* 普通输入时的全网联想（走当前搜索引擎的 suggest 接口） */
     suggest: { enabled: true },
-    /* @ 快捷标签：enabled 关掉后 @ 退回普通搜索字符 */
-    tags: { enabled: true },
+    /* @ 快捷标签：enabled 关掉后 @ 退回普通搜索字符；aiSuggest 控制面板 AI 短名 */
+    tags: { enabled: true, aiSuggest: true },
+    /* 自建服务端备份：配置只存本机，token 永不写入备份文件 */
+    backup: {
+      serverUrl: 'https://api.jingmi.lllcnm.cn',
+      token: '',
+      deviceId: 'default',
+      auto: true,
+      /* 账号登录后保存的会话令牌与用户名；密码永不落盘 */
+      authToken: '',
+      username: ''
+    },
     ai: {
       enabled: false,
       baseUrl: 'http://43.155.217.74:9000/v1',
@@ -36,7 +46,8 @@
     },
     rag: {
       enabled: false,
-      baseUrl: 'https://rag.lllcnm.cn',
+      /* RAG 地址/Key 由后台代理持有；collection 登录后从 /api/rag/config 只读获取 */
+      baseUrl: '',
       apiKey: '',
       collection: '',
       retrieveTimeout: 5000,
@@ -81,7 +92,15 @@
     return out;
   }
 
-  function load() {
+  async function load() {
+    if (global.Profiles) {
+      await Profiles.ready();
+      var saved = await Profiles.read(STORAGE_KEY);
+      var result = merge(DEFAULTS, saved);
+      var account = Profiles.current();
+      result.backup = Object.assign({}, DEFAULTS.backup, { authToken: account.token, username: account.user ? account.user.username : '' });
+      return result;
+    }
     return new Promise(function (resolve) {
       if (hasChromeStorage) {
         chrome.storage.local.get(STORAGE_KEY, function (res) {
@@ -95,7 +114,11 @@
     });
   }
 
-  function save(settings) {
+  async function save(settings) {
+    if (global.Profiles) {
+      var value = clone(settings); delete value.backup;
+      return Profiles.write(STORAGE_KEY, value);
+    }
     return new Promise(function (resolve) {
       if (hasChromeStorage) {
         var payload = {};
@@ -114,7 +137,8 @@
   var VERSION = 1;
   var dbPromise = null;
 
-  function openDB() {
+  async function openDB() {
+    if (global.Profiles) { await Profiles.initial(); DB_NAME = Profiles.dbName('newtab-media'); }
     if (dbPromise) return dbPromise;
     dbPromise = new Promise(function (resolve, reject) {
       var req = indexedDB.open(DB_NAME, VERSION);

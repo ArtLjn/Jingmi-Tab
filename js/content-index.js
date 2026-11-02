@@ -2,7 +2,7 @@
 (function (global) {
   'use strict';
 
-  var VERSION = 3;
+  var VERSION = 4;
   var OK_TTL = 30 * 864e5;
   var FAIL_TTL = 864e5;
 
@@ -18,8 +18,10 @@
     if (!page) return false;
     if (page.source === 'capture' && page.status === 'ok') return true;
     if (page.version !== VERSION) return false;
+    var transient = /^(timeout|network|http_(408|429|500|502|503|504))$/.test(page.refreshError || page.reason || '');
+    var ttl = page.status === 'ok' && !page.refreshError ? (page.partial ? 3600e3 : OK_TTL) : transient ? 5 * 60e3 : FAIL_TTL;
     return (now || Date.now()) - (page.checkedAt || page.fetchedAt) <
-      (page.status === 'ok' && !page.refreshError ? OK_TTL : FAIL_TTL);
+      ttl;
   }
 
   function apply(rows, pages) {

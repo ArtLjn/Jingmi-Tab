@@ -20,6 +20,29 @@ function seeded(tags) {
   return c;
 }
 
+/** 带 chrome.storage 替身的上下文：可延迟读盘，验证首屏竞态 */
+function storageContext(initial, delayRead) {
+  const c = { URL, setTimeout, clearTimeout };
+  const store = {};
+  if (initial) store['newtab.tags.v1'] = initial;
+  const pending = [];
+  c.chrome = {
+    storage: {
+      local: {
+        get(key, cb) {
+          const run = () => cb({ [key]: store[key] });
+          if (delayRead) pending.push(run); else run();
+        },
+        set(obj, cb) { Object.assign(store, obj); if (cb) cb(); }
+      }
+    }
+  };
+  c.self = c;
+  vm.createContext(c);
+  vm.runInContext(fs.readFileSync(path.join(root, 'js', 'quick-tags.js'), 'utf8'), c);
+  return { c, store, release: () => pending.splice(0).forEach(fn => fn()) };
+}
+
 test('地址归一：补协议、拒非 http、保留路径', () => {
   const c = context();
   assert.equal(c.QuickTags.normalizeUrl('oa.hongdi.com'), 'http://oa.hongdi.com/');
@@ -28,6 +51,14 @@ test('地址归一：补协议、拒非 http、保留路径', () => {
   assert.equal(c.QuickTags.normalizeUrl('chrome://extensions'), '');
   assert.equal(c.QuickTags.normalizeUrl('随便写点什么'), '');
   assert.equal(c.QuickTags.normalizeUrl(''), '');
+});
+
+test('localhost 带端口/路径可创建，localhostfoo 不算地址', () => {
+  const c = context();
+  assert.equal(c.QuickTags.normalizeUrl('localhost:5173'), 'http://localhost:5173/');
+  assert.equal(c.QuickTags.normalizeUrl('localhost:5173/admin?x=1'), 'http://localhost:5173/admin?x=1');
+  assert.equal(c.QuickTags.normalizeUrl('localhost'), 'http://localhost/');
+  assert.equal(c.QuickTags.normalizeUrl('localhostfoo'), '');
 });
 
 test('空查询按手写顺序，有查询时名称前缀优先于域名命中', () => {
@@ -200,4 +231,89 @@ test('导出只带固定标签，导入按地址去重', () => {
   ] }));
   assert.equal(two.added, 1);
   assert.equal(two.skipped, 1);
+});
+
+test('空查询按使用频率排序，同频/从未使用回落手写顺序', () => {
+  const now = Date.now();
+  const c = seeded([
+    { id: 'a', label: 'A', url: 'https://a.com', pin: 0, hits: 1, lastUsed: now },
+    { id: 'b', label: 'B', url: 'https://b.com', pin: 1, hits: 10, lastUsed: now },
+    { id: 'c', label: 'C', url: 'https://c.com', pin: 2, hits: 0, lastUsed: 0 }
+  ]);
+  assert.deepEqual(Array.from(c.QuickTags.search('', {}).pinned, t => t.id), ['b', 'a', 'c']);
+});
+
+test('URL 形态查询生成创建条目；已有同 URL 标签时不重复创建', () => {
+  const c = seeded([]);
+  const cand = c.QuickTags.createCandidate('localhost:5173');
+  assert.equal(cand.kind, 'create');
+  assert.equal(cand.url, 'http://localhost:5173/');
+
+  c.QuickTags.add({ url: 'localhost:5173' });
+  assert.equal(c.QuickTags.createCandidate('localhost:5173'), null, '已存在时回车的语义是打开');
+  assert.equal(c.QuickTags.createCandidate('随便写点什么'), null);
+});
+
+test('AI 条目只映射当前候选，并与常用区按 host 去重', () => {
+  const c = seeded([]);
+  const topSites = [
+    { url: 'https://oa.hongdi.com/', title: 'OA 打卡' },
+    { url: 'https://github.com/', title: 'GitHub' }
+  ];
+  const r = c.QuickTags.search('', { topSites }, [{ host: 'oa.hongdi.com', name: '打卡', rank: 0 }]);
+  assert.equal(r.ai.length, 1);
+  assert.equal(r.ai[0].label, '打卡');
+  assert.equal(r.ai[0].url, 'https://oa.hongdi.com/');
+  assert.ok(!r.candidates.some(x => x.host === 'oa.hongdi.com'), 'AI 已占用的 host 不应在常用区重复出现');
+
+  const missing = c.QuickTags.search('', { topSites }, [{ host: 'nope.com', name: 'X', rank: 0 }]);
+  assert.equal(missing.ai.length, 0, '缓存里不存在的站点必须丢弃');
+});
+
+test('固定自动候选时继承已使用次数，频率不从 0 开始', () => {
+  const c = seeded([]);
+  const entry = { id: 'auto_oa.hongdi.com', kind: 'auto', host: 'oa.hongdi.com' };
+  c.QuickTags.touch(entry);
+  c.QuickTags.touch(entry);
+  const res = c.QuickTags.add({ url: 'https://oa.hongdi.com/', label: '打卡' });
+  assert.equal(res.tag.hits, 2);
+  assert.ok(res.tag.lastUsed > 0);
+});
+
+test('flush 立即落盘，不等 200ms 防抖', async () => {
+  const { c, store } = storageContext({});
+  await c.QuickTags.load();
+  c.QuickTags.add({ url: 'https://x.com' });
+  await c.QuickTags.flush();
+  assert.equal(store['newtab.tags.v1'].tags.length, 1);
+});
+
+test('首屏读盘未完成时新建的标签不会被旧状态覆盖', async () => {
+  const { c, store, release } = storageContext({
+    version: 1,
+    tags: [{ id: 'old', label: '旧站', url: 'https://old.com/', pin: 0 }]
+  }, true);
+
+  const loading = c.QuickTags.load();
+  const res = c.QuickTags.add({ url: 'localhost:5173' });
+  assert.equal(res.ok, true);
+  release();
+  await loading;
+
+  const saved = store['newtab.tags.v1'];
+  assert.equal(saved.tags.length, 2);
+  assert.ok(saved.tags.some(t => t.url === 'http://localhost:5173/'));
+  assert.ok(saved.tags.some(t => t.url === 'https://old.com/'));
+});
+
+test('备份快照：replace 整体替换，merge 按 URL 合并', async () => {
+  const c = seeded([{ id: 'a', label: 'A', url: 'https://a.com', pin: 0, hits: 5, lastUsed: Date.now() }]);
+  const snap = c.QuickTags.snapshot();
+  assert.equal(snap.tags[0].hits, 5);
+
+  await c.QuickTags.restoreState({ tags: [{ label: 'B', url: 'https://b.com' }] });
+  assert.deepEqual(Array.from(c.QuickTags.list(), t => t.label), ['B']);
+
+  await c.QuickTags.restoreState(snap, { mode: 'merge' });
+  assert.deepEqual(Array.from(c.QuickTags.list(), t => t.label).sort(), ['A', 'B']);
 });

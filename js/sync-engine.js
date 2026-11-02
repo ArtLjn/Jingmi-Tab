@@ -16,6 +16,7 @@
     var rows = Bookmarks.flatten(await chrome.bookmarks.getTree());
     var groups = await Documents.reconcile(rows);
     var cfg = await Settings.load();
+    cfg.rag = Rag.withAuth(cfg.rag, cfg.backup);
     var period = Math.max(1, Number(cfg.rag.refreshDays) || 7) * 864e5;
     var docs = await AgentDB.allRecords('documents');
     /* 一次读出任务再逐文档比对，避免为每条文档各开一次事务。 */
@@ -23,8 +24,9 @@
     var jobMap = new Map(jobs.map(function (job) { return [job.id, job]; }));
     for (var doc of docs) {
       var changed = groups.has(doc.id) && groups.get(doc.id).changed;
-      var stale = !doc.deleted && Date.now() - (doc.checkedAt || doc.fetchedAt || 0) > period;
+      var stale = !doc.deleted && Date.now() - (doc.checkedAt || doc.fetchedAt || doc.indexedAt || doc.createdAt || 0) > period;
       var job = jobMap.get(doc.id);
+      if (job && job.status === 'paused' && RetryPolicy.resumed(job.errorCode, job.finishedAt)) { await enqueue(doc.id, true, doc.deleted ? 'delete' : 'upsert'); continue; }
       if (force || changed || !job || job.documentRevision !== doc.revision || (doc.deleted && doc.syncState !== 'deleted' && job.status !== 'pending' && job.status !== 'running') || (stale && job.status === 'done')) await enqueue(doc.id, force || stale, doc.deleted ? 'delete' : 'upsert');
     }
     /* 一次迁移清除旧版按书签 ID 入库的记录，同一文档不重复保留。 */
@@ -59,13 +61,17 @@
       return Object.assign(current, { status: 'running', owner: owner, leaseUntil: now + 60000 });
     });
   }
-  async function finish(job, status, error, retryable) {
+  async function finish(job, status, error, retryable, errorCode) {
     var doc = job.legacyId ? null : await Documents.get(job.id);
     await AgentDB.updateRecord('jobs', job.id, function (current) {
       if (!current || current.owner !== job.owner || current.generation !== job.generation) return current;
       if (doc) current.documentRevision = doc.revision;
-      current.attempts += 1; current.error = error || ''; current.finishedAt = Date.now();
-      if (retryable && current.attempts < 5) { current.status = 'pending'; current.nextAt = Date.now() + Math.min(3600000, 30000 * Math.pow(2, current.attempts - 1)); }
+      current.attempts += 1; current.error = error || ''; current.errorCode = errorCode || '';
+      var policy = RetryPolicy.classify(current.errorCode, current.attempts);
+      if (error && !policy.auto) retryable = false;
+      if (error && ['manual', 'paused'].includes(policy.kind)) status = 'paused';
+      else if (error && !retryable) status = 'failed'; current.finishedAt = Date.now();
+      if (retryable && current.attempts < 5) { current.status = 'pending'; current.nextAt = Date.now() + policy.delay; }
       else current.status = retryable ? 'failed' : status;
       delete current.owner; delete current.leaseUntil;
       return current;
@@ -94,6 +100,11 @@
         });
       }
     }
+    if (blocked) {
+      var receipts = await AgentDB.getMeta(await Rag.stateKey(cfg.rag)) || {};
+      // 更新采集失败时保留云端成功版本，不将错误状态重新写入云端。
+      if (receipts[doc.id] && receipts[doc.id].docId) return { status: blocked.retryable ? 'pending' : 'paused', error: blocked.message, errorCode: blocked.code, retryable: blocked.retryable };
+    }
     /* 不再为每个任务全量拍平书签树和 reconcile 全部文档：
        数百条文档时这是 O(任务 × 文档)，会把同步拖到几十秒以上。
        文档的删除状态由 run 开头的 reconcile 统一维护。 */
@@ -106,7 +117,7 @@
       }
       return current;
     });
-    return blocked ? { status: blocked.retryable ? 'pending' : 'paused', error: blocked.message, retryable: blocked.retryable } : { status: 'done' };
+    return blocked ? { status: blocked.retryable ? 'pending' : 'paused', error: blocked.message, errorCode: blocked.code, retryable: blocked.retryable } : { status: 'done' };
   }
   async function run() {
     if (running) return summary();
@@ -114,6 +125,7 @@
     var owner = crypto.randomUUID(); var leased = false;
     try {
       var cfg = await Settings.load();
+      cfg.rag = Rag.withAuth(cfg.rag, cfg.backup);
       if (await AgentDB.getMeta('pipeline:paused')) return summary();
       var manual = await AgentDB.getMeta('pipeline:manual');
       if (!Rag.available(cfg.rag) || (cfg.rag.autoSync === false && !manual)) return summary();
@@ -140,7 +152,7 @@
         return (rank[a.kind] === undefined ? 1 : rank[a.kind]) - (rank[b.kind] === undefined ? 1 : rank[b.kind]) || a.nextAt - b.nextAt;
       });
       if (jobs.length) {
-        var serviceScope = await Documents.hash(cfg.rag.baseUrl + cfg.rag.collection + cfg.rag.apiKey);
+        var serviceScope = await Documents.hash(cfg.rag.baseUrl + cfg.rag.collection + cfg.rag.apiKey + cfg.rag.authToken);
         var backoff = await AgentDB.getMeta('pipeline:serviceBackoff');
         if (backoff && backoff.scope === serviceScope && (backoff.blocked || backoff.nextAt > Date.now())) return summary();
         try {
@@ -157,14 +169,16 @@
         if (Date.now() - start > 18000) break;
         if (await AgentDB.getMeta('pipeline:paused')) break;
         var currentCfg = await Settings.load();
-        if (!Rag.available(currentCfg.rag) || currentCfg.rag.baseUrl !== cfg.rag.baseUrl || currentCfg.rag.collection !== cfg.rag.collection || (currentCfg.rag.autoSync === false && !await AgentDB.getMeta('pipeline:manual'))) break;
+        currentCfg.rag = Rag.withAuth(currentCfg.rag, currentCfg.backup);
+        if (!Rag.available(currentCfg.rag) || currentCfg.rag.baseUrl !== cfg.rag.baseUrl || currentCfg.rag.collection !== cfg.rag.collection || currentCfg.rag.authToken !== cfg.rag.authToken || (currentCfg.rag.autoSync === false && !await AgentDB.getMeta('pipeline:manual'))) break;
         await AgentDB.updateMeta('pipeline:lease', function (value) { if (!value || value.owner !== owner) throw new Error('任务租约已变化'); return { owner: owner, until: Date.now() + 60000 }; });
         var job = await claim(candidate, owner);
         if (!job || job.owner !== owner) continue;
-        try { var result = await process(job, cfg); await finish(job, result.status, result.error, result.retryable); }
+        try { var result = await process(job, cfg); await finish(job, result.status, result.error, result.retryable, result.errorCode); }
         catch (e) {
           if (!job.legacyId) await Documents.update(job.id, function (doc) { if (doc) { doc.syncState = 'failed'; doc.syncError = e.message; } return doc; });
-          await finish(job, 'failed', e.message, true);
+          var gated = ['daily_limit', 'http_409', 'http_429'].indexOf(e.code) >= 0;
+          await finish(job, gated ? 'paused' : 'failed', e.message, !gated, e.code || 'unknown');
         }
       }
       if (!(await AgentDB.allRecords('jobs')).some(function (j) { return j.status === 'pending' || j.status === 'running'; })) await AgentDB.setMeta('pipeline:manual', false);
@@ -181,21 +195,37 @@
     var jobs = await AgentDB.allRecords('jobs'); var docs = await AgentDB.allRecords('documents');
     var counts = { pending: 0, running: 0, done: 0, paused: 0, failed: 0 };
     jobs.forEach(function (job) { counts[job.status] = (counts[job.status] || 0) + 1; });
-    return { jobs: counts, queuePaused: !!(await AgentDB.getMeta('pipeline:paused')), manual: !!(await AgentDB.getMeta('pipeline:manual')), documents: docs.filter(function (d) { return !d.deleted; }).length,
+    var jobMap = new Map(jobs.map(function (job) { return [job.id, job]; }));
+    var records = docs.filter(function (doc) { return !doc.deleted; }).map(function (doc) {
+      var job = jobMap.get(doc.id);
+      return { id: doc.id, url: doc.identity && doc.identity.canonicalUrl || '', title: doc.title || (doc.identity && doc.identity.canonicalUrl) || '未命名收藏',
+        capture: Documents.captureLabel(doc), sync: doc.syncState || 'pending',
+        status: job ? job.status : 'pending', error: job && job.error || '',
+        policy: job && job.error ? RetryPolicy.classify(job.errorCode, job.attempts) : null,
+        at: doc.indexedAt || doc.checkedAt || doc.fetchedAt || 0 };
+    }).sort(function (a, b) {
+      var rank = { failed: 0, paused: 1, running: 2, pending: 3, done: 4 };
+      return (rank[a.status] === undefined ? 5 : rank[a.status]) - (rank[b.status] === undefined ? 5 : rank[b.status]) || b.at - a.at;
+    });
+    return { retryableJobs: jobs.filter(function (j) { return ['failed', 'paused'].includes(j.status) && RetryPolicy.classify(j.errorCode, j.attempts).bulk; }).length, collection: await CollectionStats.read({ docs: docs, jobs: jobs }), records: records, jobs: counts, queuePaused: !!(await AgentDB.getMeta('pipeline:paused')), manual: !!(await AgentDB.getMeta('pipeline:manual')), documents: docs.filter(function (d) { return !d.deleted; }).length,
       indexed: docs.filter(function (d) { return !d.deleted && d.syncState === 'synced'; }).length,
       error: await AgentDB.getMeta('pipeline:lastError'), details: jobs.filter(function (j) { return j.error; }).slice(0, 8).map(function (j) { return { id: j.id, status: j.status, error: j.error, attempts: j.attempts }; }) };
   }
   async function retry(id) {
+    if (id) {
+      var existing = await AgentDB.getRecord('jobs', id);
+      if (existing && existing.errorCode && !RetryPolicy.classify(existing.errorCode, 0).allowManual) throw new Error(RetryPolicy.classify(existing.errorCode, 0).message);
+    }
     await AgentDB.setMeta('pipeline:serviceBackoff', null);
     await AgentDB.setMeta('pipeline:paused', false);
     await AgentDB.setMeta('pipeline:manual', true);
     if (id) await enqueue(id, true);
-    else { await markDirty(true); await AgentDB.setMeta('pipeline:manual', true); }
+    else await markDirty(true);
     return run();
   }
   async function retryFailed() {
     var jobs = await AgentDB.allRecords('jobs');
-    for (var job of jobs) if (job.status === 'failed' || job.status === 'paused') await enqueue(job.id, true);
+    for (var job of jobs) if (['failed', 'paused'].includes(job.status) && RetryPolicy.classify(job.errorCode, job.attempts).bulk) await enqueue(job.id, true);
     return request({ manual: true });
   }
   async function pause() { await AgentDB.setMeta('pipeline:paused', true); await AgentDB.setMeta('pipeline:manual', false); return summary(); }

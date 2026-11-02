@@ -10,7 +10,9 @@
      用一次 debounce 换掉一整套容易出错的增量状态机。
    ============================================================ */
 
-importScripts('js/db.js', 'js/bookmarks.js', 'js/content-index.js', 'js/organizer.js', 'js/organizer-moves.js', 'js/pageinfo.js', 'js/ai.js', 'js/store.js', 'js/bookmark-auto.js', 'js/bookmark-enrich.js', 'js/documents.js', 'js/rag.js', 'js/capture-adapters.js', 'js/sync-engine.js');
+importScripts('js/profiles.js', 'js/db.js', 'js/bookmarks.js', 'js/content-index.js', 'js/resource-gate.js', 'js/retry-policy.js', 'js/collection-stats.js', 'js/organizer.js', 'js/organizer-moves.js', 'js/pageinfo.js', 'js/ai.js', 'js/store.js', 'js/backup.js', 'js/bookmark-auto.js', 'js/bookmark-enrich.js', 'js/documents.js', 'js/rag.js', 'js/capture-adapters.js', 'js/sync-engine.js');
+
+Profiles.restoreLanding().catch(function () {});
 
 var REBUILD_DELAY = 1500;   /* 连续变更（如导入一大批）合并成一次重建 */
 var HISTORY_DAYS = 90;
@@ -108,6 +110,9 @@ if (chrome.bookmarks) {
       BookmarkEnrich.onCreated(id, node).catch(function () {});
     });
   }
+  if (chrome.bookmarks.onChanged) chrome.bookmarks.onChanged.addListener(function (id, changes) {
+    if (changes.url) chrome.bookmarks.get(String(id)).then(function (nodes) { return BookmarkEnrich.onCreated(id, nodes[0]); }).catch(function () {});
+  });
   if (chrome.bookmarks.onMoved) {
     chrome.bookmarks.onMoved.addListener(function (id, info) {
       AutoOrganizer.onMoved(id, info).catch(function () {});
@@ -120,7 +125,7 @@ if (chrome.bookmarks) {
   if (chrome.bookmarks.onImportEnded) {
     chrome.bookmarks.onImportEnded.addListener(function () {
       AutoOrganizer.setImporting(false);
-      rebuild().then(function () { return AutoOrganizer.relearn(); }).catch(function () {});
+      rebuild().then(async function () { await AutoOrganizer.relearn(); return AutoOrganizer.scanInbox(); }).catch(function () {});
     });
   }
 }
@@ -128,23 +133,34 @@ if (chrome.bookmarks) {
 chrome.runtime.onInstalled.addListener(function () {
   rebuild().then(function () { return SyncEngine.request(); }).catch(function () {});
   AutoOrganizer.bootstrap().catch(function () {});
-  BookmarkEnrich.alarm().catch(function () {});
+  BookmarkEnrich.alarm().then(function () { return BookmarkEnrich.maintain(); }).catch(function () {});
+  Backup.ensureAlarms();
+  Backup.autoRun().catch(function () {});
 });
 
 chrome.runtime.onStartup.addListener(function () {
   rebuild().then(function () { return SyncEngine.request(); }).catch(function () {});
   AutoOrganizer.bootstrap().catch(function () {});
-  BookmarkEnrich.alarm().then(function () { return BookmarkEnrich.run(); }).catch(function () {});
+  BookmarkEnrich.alarm().then(function () { return BookmarkEnrich.maintain(); }).catch(function () {});
+  Backup.ensureAlarms();
+  Backup.autoRun().catch(function () {});
 });
 
 /* 后台每次启动都补建 alarm，队列与租约保存在 IndexedDB。 */
 if (chrome.alarms) {
   chrome.alarms.onAlarm.addListener(function (alarm) {
     if (alarm.name === SyncEngine.ALARM) return SyncEngine.run();
-    if (alarm.name === BookmarkEnrich.ALARM) return BookmarkEnrich.run();
+    if (alarm.name === AutoOrganizer.ALARM) return AutoOrganizer.classifyPending();
+    if (alarm.name === BookmarkEnrich.ALARM) return BookmarkEnrich.maintain();
+    if (alarm.name === 'backup:debounce' || alarm.name === 'backup:periodic') return Backup.autoRun();
   });
   SyncEngine.alarm().catch(function () {});
+  Backup.ensureAlarms();
 }
+/* 标签或设置变化后标脏，由 alarm 合并成一次上传；状态键自身不触发，避免循环 */
+if (chrome.storage && chrome.storage.onChanged) chrome.storage.onChanged.addListener(function (changes, area) {
+  try { Backup.onStorageChanged(changes, area); } catch (e) { /* ignore */ }
+});
 if (chrome.permissions && chrome.permissions.onAdded) chrome.permissions.onAdded.addListener(function () { SyncEngine.request({ force: true }).catch(function () {}); });
 if (chrome.storage && chrome.storage.onChanged) chrome.storage.onChanged.addListener(function (changes, area) {
   var change = changes['newtab.settings.v1'];
@@ -193,6 +209,7 @@ chrome.action.onClicked.addListener(async function (tab) {
 
 var HANDLERS = {
   'organizer:status': function () { return OrganizerMoves.summary(); },
+  'auto:scan': function () { return AutoOrganizer.scanInbox(); },
   'auto:status': function () { return AutoOrganizer.status(); },
   'auto:toggle': function (msg) { return AutoOrganizer.toggle(msg.enabled); },
   'auto:relearn': async function () { memRows = null; return AutoOrganizer.relearn(); },
@@ -207,8 +224,9 @@ var HANDLERS = {
   },
   'enrich:status': function () { return BookmarkEnrich.status(); },
   'enrich:toggle': function (msg) { return BookmarkEnrich.toggle(msg.enabled); },
-  'enrich:scan': function (msg) { return BookmarkEnrich.scan({ mode: 'enrich', limit: msg.limit || 20 }); },
-  'enrich:capture': function (msg) { return BookmarkEnrich.scan({ mode: 'capture', limit: msg.limit || 30 }); },
+  'enrich:scan': async function () { await BookmarkEnrich.scan({ mode: 'enrich' }); return BookmarkEnrich.status(); },
+  'enrich:capture': async function () { await BookmarkEnrich.scan({ mode: 'capture' }); return BookmarkEnrich.status(); },
+  'enrich:retry-failed': async function () { await BookmarkEnrich.scan({ retryFailed: true }); return BookmarkEnrich.status(); },
   'enrich:apply': async function (msg) { var result = await BookmarkEnrich.apply(msg.id); memRows = null; chrome.runtime.sendMessage({ type: 'enrich:updated' }).catch(function () {}); return result; },
   'enrich:apply-all': async function () { var result = await BookmarkEnrich.applyAll(); memRows = null; chrome.runtime.sendMessage({ type: 'enrich:updated' }).catch(function () {}); return result; },
   'enrich:undo': async function () { var result = await BookmarkEnrich.undoLast(); memRows = null; chrome.runtime.sendMessage({ type: 'enrich:updated' }).catch(function () {}); return result; },
@@ -268,6 +286,17 @@ var HANDLERS = {
     memRows = null;
     await rebuild();
     return { ok: true };
+  },
+
+  'backup:status': async function () {
+    return { status: await Backup.readStatus() };
+  },
+  'backup:schedule': function () {
+    Backup.ensureAlarms();
+    return { ok: true };
+  },
+  'backup:run': function () {
+    return Backup.autoRun();
   }
 };
 

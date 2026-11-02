@@ -11,6 +11,8 @@
     var body = document.getElementById('auto-organize-body');
     var relearn = document.getElementById('auto-organize-relearn');
     var details = document.getElementById('auto-organize-details');
+    var history = document.getElementById('auto-organize-history');
+    var historyLimit = 20;
     var busy = false;
 
     function el(tag, text, className) {
@@ -31,10 +33,10 @@
     function renderRules(rules) {
       var block = el('section', '', 'auto-block');
       var head = el('div', '', 'auto-block-head');
-      head.append(el('span', '域名记忆'), el('span', rules.length + ' 条'));
+      head.append(el('span', '归档规则'), el('span', rules.length + ' 条'));
       var list = el('div', '', 'auto-rule-list');
       if (!rules.length) {
-        list.append(el('p', '还没有可学习的目录模式。把同一站点的两条收藏放进同一个目录，或直接收藏一次到目标目录，就会自动记住。', 'auto-empty'));
+        list.append(el('p', '确认 AI 建议或手动选择目录后，会记住该站点内对应页面范围；历史学习仅供推荐参考。', 'auto-empty'));
       }
       rules.forEach(function (rule) {
         var row = el('div', '', 'auto-rule');
@@ -64,7 +66,7 @@
         main.append(el('strong', item.title || item.host, 'auto-suggestion-title'));
         var meta = el('p', '', 'auto-suggestion-meta');
         meta.textContent = item.host + (item.path ? '  →  ' + item.path
-          : item.analyzed ? '  ·  AI 暂未给出建议，可忽略后重新收藏' : '  ·  AI 正在分析目录…');
+          : item.analyzed ? '  ·  AI 暂未给出建议，收藏保留原位' : '  ·  AI 正在分析目录…');
         if (item.why) meta.textContent += '（' + item.why + '）';
         main.append(meta);
         var actions = el('div', '', 'auto-suggestion-actions');
@@ -88,18 +90,47 @@
     function render(state) {
       if (!state) return;
       toggle.checked = !!state.enabled;
-      if (state.enabled) {
+      if (state.enabled && !state.aiReady) {
+        status.textContent = '已启用 · 已确认规则照常归档；配置 AI 后可分析待整理收藏';
+      } else if (state.enabled) {
         var line = state.totalRules
-          ? '已启用 · 记住 ' + state.totalRules + ' 个域名 · 已自动归档 ' + state.filed + ' 条'
-          : '已启用 · 暂无规则，把站点归对一个目录后自动记住';
+          ? '已启用 · 记住 ' + state.totalRules + ' 条归档规则 · 已自动归档 ' + state.filed + ' 条'
+          : '已启用 · 暂无规则，可整理“其他书签”获取建议';
         status.textContent = line;
       } else {
         status.textContent = '已暂停 · 新收藏保持原位置，规则仍会继续记录';
       }
-      summary.textContent = '域名规则 ' + state.totalRules + (state.pending.length ? ' · 待确认 ' + state.pending.length : '');
+      summary.textContent = '归档规则 ' + state.totalRules + (state.pending.length ? ' · 待确认 ' + state.pending.length : '');
       body.replaceChildren();
       if (state.pending.length) body.append(renderPending(state.pending));
       body.append(renderRules(state.rules));
+      if (history) {
+        history.replaceChildren();
+        var records = state.archiveRecords || [];
+        var head = el('div', '', 'auto-block-head');
+        head.append(el('span', '归档记录'), el('span', '最近 ' + records.length + ' 条'));
+        history.append(head);
+        if (!records.length) history.append(el('p', '暂无归档记录，成功归档后会显示在这里。', 'auto-empty'));
+        records.slice(0, historyLimit).forEach(function (item) {
+          var row = el('div', '', 'auto-archive-record');
+          var title = el('div', '', 'auto-archive-title');
+          title.append(el('strong', item.title || '未命名书签'));
+          title.append(el('span', item.state === 'restored' ? '已撤销' : '已归档', 'auto-rule-source'));
+          row.append(title, el('p', item.from + ' → ' + item.to, 'auto-archive-path'));
+          if (item.why) row.append(el('p', item.why === 'domain-rule' ? '命中已确认的归档规则' : item.why === 'confirmed' ? '已确认归档建议' : item.why, 'auto-suggestion-meta'));
+          if (item.movedAt) {
+            var time = el('time', new Date(item.movedAt).toLocaleString('zh-CN', { hour12: false }), 'auto-archive-time');
+            time.dateTime = new Date(item.movedAt).toISOString(); row.append(time);
+          }
+          history.append(row);
+        });
+        if (records.length > historyLimit) {
+          var more = el('button', '查看更多记录', 'btn-ghost');
+          more.type = 'button';
+          more.addEventListener('click', function () { historyLimit += 20; render(state); });
+          history.append(more);
+        }
+      }
     }
 
     async function refresh() {
@@ -127,6 +158,10 @@
       act(function () { return send('auto:toggle', { enabled: toggle.checked }); });
     });
 
+    document.getElementById('auto-organize-scan').addEventListener('click', function () {
+      act(function () { return send('auto:scan'); });
+    });
+
     relearn.addEventListener('click', function () {
       if (busy) return;
       status.textContent = '正在从现有书签学习域名归属…';
@@ -145,6 +180,12 @@
     details.addEventListener('toggle', function () { if (details.open) refresh(); });
     document.addEventListener('workspace:view', function (event) {
       if (event.detail === 'search') refresh();
+    });
+    document.addEventListener('workspace:search-page', function (event) {
+      if (event.detail === 'organize') refresh();
+    });
+    if (chrome.runtime.onMessage) chrome.runtime.onMessage.addListener(function (message) {
+      if (message.type === 'auto:updated') refresh();
     });
     refresh();
     return { refresh: refresh };

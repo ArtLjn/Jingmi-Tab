@@ -14,7 +14,8 @@
 
   var dbPromise = null;
 
-  function open() {
+  async function open() {
+    if (global.Profiles) { await Profiles.initial(); DB_NAME = Profiles.dbName('newtab-agent'); }
     if (dbPromise) return dbPromise;
     dbPromise = new Promise(function (resolve, reject) {
       var req = indexedDB.open(DB_NAME, VERSION);
@@ -116,6 +117,68 @@
   }
   function setMeta(k, v) { return updateMeta(k, function () { return v; }); }
 
+  /** 全量读取 meta，供备份打包；只取 k/v，不暴露游标 */
+  function getAllMeta() {
+    return allRecords(S_META).then(function (rows) {
+      var map = {};
+      (rows || []).forEach(function (r) { if (r && r.k) map[r.k] = r.v; });
+      return map;
+    }).catch(function () { return {}; });
+  }
+
+  /** 批量写入，单个事务，避免恢复时一半成功一半失败 */
+  function setMetaMany(entries) {
+    var keys = Object.keys(entries || {});
+    if (!keys.length) return Promise.resolve(0);
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(S_META, 'readwrite');
+        var st = tx.objectStore(S_META);
+        keys.forEach(function (k) { st.put({ k: k, v: entries[k] }); });
+        tx.oncomplete = function () { resolve(keys.length); };
+        tx.onerror = function () { reject(tx.error); };
+        tx.onabort = function () { reject(tx.error); };
+      });
+    });
+  }
+
+  /**
+   * 备份恢复：owned 白名单内的旧 key 先删掉，再写入备份内容。
+   * 非 owned 的缓存（队列、摘要、同步进度）保持不动。
+   */
+  function replaceMeta(entries, isOwned) {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(S_META, 'readwrite');
+        var st = tx.objectStore(S_META);
+        var keysReq = st.getAllKeys();
+        keysReq.onsuccess = function () {
+          (keysReq.result || []).forEach(function (k) {
+            if (isOwned(String(k))) st.delete(k);
+          });
+          Object.keys(entries || {}).forEach(function (k) {
+            if (!isOwned(String(k))) return;
+            st.put({ k: k, v: entries[k] });
+          });
+        };
+        tx.oncomplete = function () { resolve(Object.keys(entries || {}).length); };
+        tx.onerror = function () { reject(tx.error); };
+        tx.onabort = function () { reject(tx.error); };
+      });
+    });
+  }
+
+  function removeMeta(k) {
+    return open().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction(S_META, 'readwrite');
+        tx.objectStore(S_META).delete(k);
+        tx.oncomplete = function () { resolve(true); };
+        tx.onerror = function () { resolve(false); };
+      });
+    }).catch(function () { return false; });
+  }
+
   /* ------------------------- 页面摘要缓存 ------------------------- */
 
   function getPages(urls) {
@@ -181,6 +244,10 @@
     replaceAll: replaceAll,
     getMeta: getMeta,
     setMeta: setMeta,
+    setMetaMany: setMetaMany,
+    getAllMeta: getAllMeta,
+    replaceMeta: replaceMeta,
+    removeMeta: removeMeta,
     updateMeta: updateMeta,
     getPages: getPages,
     putPage: putPage,
