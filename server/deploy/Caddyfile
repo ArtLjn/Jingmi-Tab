@@ -1,0 +1,9 @@
+# 你的备份服务域名；Caddy 会自动申请 HTTPS 证书。
+# 生产环境放在 /etc/caddy/conf.d/jingmi-backup.caddy（主 Caddyfile 已 import conf.d/*.caddy）。
+api.jingmi.lllcnm.cn {
+    encode zstd gzip
+    request_body {
+        max_size 3MB
+    }
+    reverse_proxy 127.0.0.1:8790
+}

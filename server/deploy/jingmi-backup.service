@@ -1,0 +1,18 @@
+[Unit]
+Description=Jingmi newtab backup service
+After=network.target mysql.service
+
+[Service]
+# 生产部署在 /root/workspace/jingmi-backup；代码位于 /root 内，因此不能启用 ProtectHome。
+User=root
+Group=root
+WorkingDirectory=/root/workspace/jingmi-backup/server
+EnvironmentFile=/etc/jingmi-backup.env
+# 8787 在该机器上已被其他服务占用，改用 8790；换机器或换端口时同步 Caddyfile。
+ExecStart=/root/workspace/jingmi-backup/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8790 --workers 2
+Restart=always
+RestartSec=3
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
