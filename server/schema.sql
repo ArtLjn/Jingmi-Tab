@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'active',
   rag_collection VARCHAR(80) NULL UNIQUE,
+  rag_unlimited TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

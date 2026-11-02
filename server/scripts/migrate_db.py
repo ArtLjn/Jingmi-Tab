@@ -22,6 +22,7 @@ USERS_COLUMNS = {
     "password_hash": "VARCHAR(255) NULL AFTER username",
     "status": "VARCHAR(16) NOT NULL DEFAULT 'active' AFTER password_hash",
     "rag_collection": "VARCHAR(80) NULL UNIQUE AFTER status",
+    "rag_unlimited": "TINYINT(1) NOT NULL DEFAULT 0 AFTER rag_collection",
     "updated_at": "DATETIME(3) NULL AFTER created_at",
 }
 

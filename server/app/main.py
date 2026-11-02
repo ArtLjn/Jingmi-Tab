@@ -12,6 +12,7 @@ import hmac
 import json
 import logging
 import re
+from threading import Lock
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -80,6 +81,8 @@ def create_app(settings: Settings | None = None, repository: BackupRepository | 
     app = FastAPI(title="jingmi-newtab-backup", version="1.1.0")
     app.state.settings = settings
     app.state.repo = repo
+    register_attempts: dict[str, list[datetime]] = {}
+    register_lock = Lock()
 
     app.add_middleware(
         CORSMiddleware,
@@ -144,41 +147,56 @@ def create_app(settings: Settings | None = None, repository: BackupRepository | 
     # ------------------------- 账号 -------------------------
 
     @app.post("/api/auth/register")
-    def register(body: RegisterIn) -> dict[str, Any]:
-        username = body.username.strip()
+    def register(body: RegisterIn, request: Request) -> Any:
+        # 只使用 ASGI 已确认的来源地址，不直接信任调用方伪造的转发头。
+        ip = request.client.host if request.client else "unknown"
+        now = datetime.now(timezone.utc)
+        with register_lock:
+            for old_ip in list(register_attempts):
+                register_attempts[old_ip] = [t for t in register_attempts[old_ip] if now - t < LOGIN_WINDOW]
+                if not register_attempts[old_ip]:
+                    del register_attempts[old_ip]
+            recent = register_attempts.setdefault(ip, [])
+            if len(recent) >= LOGIN_MAX_FAILS:
+                return _error(429, "registration_rate_limited", "注册尝试过于频繁，请 10 分钟后再试")
+            recent.append(now)
+        configured = settings.register_code.strip()
+        if not configured:
+            return _error(403, "registration_closed", "暂未开放邀请注册，请联系维护者")
         code = body.invite_code.strip()
+        if not code:
+            return _error(403, "invite_required", "注册需要邀请码，请联系维护者获取")
+        if not hmac.compare_digest(hash_token(code), hash_token(configured)):
+            return _error(403, "invalid_invite", "邀请码无效，请联系维护者确认")
 
-        legacy_ok = bool(settings.backup_token_sha256) and hmac.compare_digest(
-            hash_token(code), settings.backup_token_sha256
+        username = body.username.strip()
+        legacy_code = body.legacy_token.strip()
+        legacy_ok = bool(legacy_code and settings.backup_token_sha256) and hmac.compare_digest(
+            hash_token(legacy_code), settings.backup_token_sha256
         )
-        register_ok = bool(settings.register_code) and hmac.compare_digest(code, settings.register_code)
-        if code and not (legacy_ok or register_ok):
-            raise HTTPException(status_code=403, detail="注册需要有效邀请码")
-
-        # 普通注册只需邮箱和密码；旧客户端可继续用邀请码迁移旧账号。
-        if not code and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", username):
+        if legacy_code and not legacy_ok:
+            raise HTTPException(status_code=403, detail="旧数据迁移凭据无效")
+        if not legacy_code and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", username):
             raise HTTPException(status_code=422, detail="请输入有效的邮箱地址")
-        if code and not re.fullmatch(r"[A-Za-z0-9_.@+\-]+", username):
+        if legacy_code and not re.fullmatch(r"[A-Za-z0-9_.@+\-]+", username):
             raise HTTPException(status_code=422, detail="账号格式不正确")
-
         if repo.user_by_username(username):
             raise HTTPException(status_code=409, detail="该账号已注册，请直接登录")
 
         password_hash = hash_password(body.password)
-        user = None
-
-        # 首次用旧版令牌注册：接管 user_id=1，继承已有的单令牌备份
         if legacy_ok:
+            # 迁移凭据与邀请码分开；迁移只能接管一次，不能变成通用注册口令。
             legacy = repo.user_by_id(DEFAULT_USER_ID)
-            if legacy and not legacy.get("password_hash"):
-                user = repo.claim_user(DEFAULT_USER_ID, username, password_hash)
-
-        if not user:
+            if not legacy or legacy.get("password_hash"):
+                raise HTTPException(status_code=409, detail="旧账号已迁移，请直接登录")
+            user = repo.claim_user(DEFAULT_USER_ID, username, password_hash)
+            if not user:
+                raise HTTPException(status_code=409, detail="旧账号已迁移，请直接登录")
+        else:
             try:
                 user = repo.create_user(username, password_hash)
             except pymysql.err.IntegrityError:
                 raise HTTPException(status_code=409, detail="该账号已注册，请直接登录")
-
         return issue_session(user)
 
     @app.post("/api/auth/login")
@@ -227,10 +245,11 @@ def create_app(settings: Settings | None = None, repository: BackupRepository | 
             raise HTTPException(status_code=403, detail="请先登录账号")
         try:
             collection = repo.rag_collection(auth.user_id)
+            unlimited = repo.rag_unlimited(auth.user_id)
         except Exception:
             logger.exception("读取 RAG 集合失败")
             raise HTTPException(status_code=500, detail="读取 RAG 集合失败")
-        return {"ok": True, "data": {"enabled": rag_ready(), "collection": collection}}
+        return {"ok": True, "data": {"enabled": rag_ready(), "collection": collection, "unlimited": unlimited}}
 
     @app.api_route(
         "/api/rag/{path:path}",

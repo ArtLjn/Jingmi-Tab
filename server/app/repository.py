@@ -91,6 +91,13 @@ class BackupRepository:
             row = cursor.fetchone() or {}
             return {"id": user_id, "username": username, "rag_collection": row.get("rag_collection")}
 
+    def rag_unlimited(self, user_id: int) -> bool:
+        """仅由数据库运维设置的账号采集额度豁免。"""
+        with transaction(self.settings) as cursor:
+            cursor.execute("SELECT rag_unlimited FROM users WHERE id=%s", (user_id,))
+            row = cursor.fetchone()
+            return bool(row and row["rag_unlimited"])
+
     def rag_collection(self, user_id: int) -> str:
         """读取账号的 RAG 集合；旧账号没有时生成一次并固定。"""
         with transaction(self.settings) as cursor:
@@ -279,7 +286,10 @@ class BackupRepository:
                 return {"action": "blocked", "doc_id": doc_id}
             cursor.execute("INSERT IGNORE INTO rag_daily (user_id,usage_day) VALUES (%s,UTC_DATE())", (user_id,))
             cursor.execute("SELECT writes FROM rag_daily WHERE user_id=%s AND usage_day=UTC_DATE() FOR UPDATE", (user_id,))
-            if cursor.fetchone()["writes"] >= 500:
+            used = cursor.fetchone()["writes"]
+            cursor.execute("SELECT rag_unlimited FROM users WHERE id=%s", (user_id,))
+            user = cursor.fetchone()
+            if used >= 500 and not (user and user["rag_unlimited"]):
                 return {"action": "limited", "doc_id": doc_id}
             cursor.execute("UPDATE rag_daily SET writes=writes+1 WHERE user_id=%s AND usage_day=UTC_DATE()", (user_id,))
             cursor.execute(

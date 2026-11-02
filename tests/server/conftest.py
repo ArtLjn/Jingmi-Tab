@@ -16,6 +16,7 @@ from server.app.config import Settings  # noqa: E402
 from server.app.main import create_app  # noqa: E402
 
 TOKEN = "test-token"
+INVITE = "仅测试使用的邀请码"
 TOKEN_SHA = hashlib.sha256(TOKEN.encode()).hexdigest()
 
 
@@ -61,6 +62,9 @@ class FakeRepo:
         user["password_hash"] = password_hash
         user.setdefault("rag_collection", "chrome_tab_legacy")
         return user
+
+    def rag_unlimited(self, user_id):
+        return bool(self.users.get(int(user_id), {}).get("rag_unlimited"))
 
     def rag_collection(self, user_id):
         user = self.users.get(int(user_id))
@@ -165,7 +169,7 @@ def base_settings(**overrides):
         db_password="x",
         db_name="jingmi_newtab",
         backup_token_sha256=TOKEN_SHA,
-        register_code="",
+        register_code=INVITE,
         session_days=90,
         rag_base_url="https://rag.test",
         rag_api_key="rag-key",

@@ -125,6 +125,8 @@ def test_真实仓库SQL的持久记录配额及删除状态(monkeypatch):
     connection = sqlite3.connect(':memory:')
     connection.row_factory = sqlite3.Row
     connection.executescript('''
+        CREATE TABLE users(id INTEGER PRIMARY KEY,rag_unlimited INTEGER DEFAULT 0);
+        INSERT INTO users(id) VALUES (1),(2);
         CREATE TABLE rag_writes(user_id INTEGER,page_key TEXT,payload_hash TEXT DEFAULT '',doc_id TEXT DEFAULT '',state TEXT DEFAULT 'new',updated_at TEXT,PRIMARY KEY(user_id,page_key));
         CREATE TABLE rag_daily(user_id INTEGER,usage_day TEXT,writes INTEGER DEFAULT 0,PRIMARY KEY(user_id,usage_day));
     ''')
@@ -166,5 +168,12 @@ def test_真实仓库SQL的持久记录配额及删除状态(monkeypatch):
         connection.execute('UPDATE rag_daily SET writes=500 WHERE user_id=1')
         connection.commit()
         assert repo.reserve_rag_write(1, 'another', 'v1', 'id')['action'] == 'limited'
+        connection.execute('UPDATE users SET rag_unlimited=1 WHERE id=1')
+        connection.commit()
+        assert repo.reserve_rag_write(1, 'another', 'v1', 'id')['action'] == 'write'
+        assert connection.execute('SELECT writes FROM rag_daily WHERE user_id=1').fetchone()[0] == 501
+        connection.execute('UPDATE rag_daily SET writes=500 WHERE user_id=2')
+        connection.commit()
+        assert repo.reserve_rag_write(2, 'another', 'v1', 'id2')['action'] == 'limited'
     finally:
         connection.close()

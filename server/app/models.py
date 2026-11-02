@@ -32,6 +32,7 @@ class RegisterIn(BaseModel):
     username: str = Field(min_length=3, max_length=254)
     password: str = Field(min_length=8, max_length=128)
     invite_code: str = Field(default="", max_length=128)
+    legacy_token: str = Field(default="", max_length=256)
 
     _normalize_username = field_validator("username", mode="before")(normalize_account)
 
