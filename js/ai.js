@@ -83,6 +83,7 @@
     '- 只能从候选里选，id 必须原样照抄',
     '- 理由要具体，指明是 host、摘要、路径、时间还是标题对上了',
     '- 没有合适的就返回空数组，宁可空也不要凑数',
+    '- 组合主题需要匹配核心内容；仅提及某个词、演示入口或目录占位，不等于包含用户要找的方案与资料',
     '',
     '示例——意图：上周存的那个应收凭证的文档',
     '候选：[{"id":"7","title":"文档 - 飞书","site":"飞书","host":"open.feishu.cn","folder":"工作 / 财务","days":8,"desc":"A19 财务系统对接 YonSuite 应收凭证接口说明"},{"id":"9","title":"部署手册","site":"GitHub","host":"github.com","folder":"工作 / 运维","days":3}]',
@@ -100,14 +101,17 @@
   }
 
   var REWRITE_SYSTEM = [
-    '把用户的口语化书签检索意图，转成 2-5 个用于本地关键词匹配的词。',
-    '要求：去口语（「上次」「那个」「帮我找」），保留领域词，同义词也给出。',
+    '把用户的口语化书签检索意图，转成简洁主题 q 和 2-5 个用于本地与语义检索的词 k。',
+    '要求：去口语（「上次」「那个」「帮我找」），q 保留完整组合主题，k 包含主题词及必要的同义词、中英文术语。',
+    '保留用户指定的名称、编号、限定条件；不要把组合主题拆成无关泛词，不猜测未提供的个人信息。',
+    '宽泛或多义的短词保持原意，不擅自限定领域；输入是检索资料的请求，不要回答它。',
+    'intent：找回、定位收藏用 lookup；解释、总结、比较内容用 answer。复合请求按最终目的判断。',
     '如果意图是类别（电商、设计工具、云服务），再补 1-2 个常见具体站点名，方便命中用户收藏的站点标题。',
     '',
     '示例——意图：我之前用的电商网站有哪些',
-    '输出：{"k":["电商","购物","淘宝","京东","商城"]}',
+    '输出：{"q":"电商网站","k":["电商","购物","淘宝","京东","商城"],"intent":"lookup"}',
     '',
-    '只输出 JSON：{"k":["词1","词2"]}'
+    '只输出 JSON：{"q":"简洁检索主题","k":["词1","词2"],"intent":"lookup 或 answer"}'
   ].join('\n');
 
   /* 取第一个括号配平的 JSON 对象；模型在前后夹带示例或说明时也能解析。 */
@@ -437,7 +441,7 @@
 
   async function rewriteFresh(cfg, query, signal, key) {
     var r = await chat(cfg, REWRITE_SYSTEM, query, {
-      maxTokens: 120,
+      maxTokens: 200,
       temperature: 0.2,
       timeout: REWRITE_TIMEOUT,
       signal: signal,
@@ -448,13 +452,19 @@
     var obj = parseJSONLoose(r.content);
     var list = obj && Array.isArray(obj.k) ? obj.k : [];
 
+    var seen = new Set();
     var keywords = list
-      .map(function (k) { return String(k).trim(); })
-      .filter(function (k) { return k && k.length <= 12; })
+      .filter(function (k) { return typeof k === 'string'; })
+      .map(function (k) { return k.trim(); })
+      .filter(function (k) {
+        var normalized = k.normalize('NFKC').toLowerCase();
+        if (!k || k.length > 40 || seen.has(normalized)) return false;
+        seen.add(normalized); return true;
+      })
       .slice(0, 5);
 
     /* 模型没按 JSON 返回时，从短句里兜底提取关键词，避免整条改写失效。 */
-    if (!keywords.length) {
+    if (!keywords.length && !obj) {
       var plain = String(r.content || '');
       if (plain.length <= 200) {
         keywords = plain.replace(/```[\s\S]*?```/g, ' ').replace(/[{}"“”\[\]]/g, ' ')
@@ -467,7 +477,9 @@
 
     if (!keywords.length) return { ok: false, error: 'no_keywords' };
 
-    var output = { ok: true, keywords: keywords, ms: r.ms };
+    var topic = obj && typeof obj.q === 'string' && obj.q.trim().length <= 160 ? obj.q.trim() : '';
+    var output = { ok: true, query: topic || query, keywords: keywords,
+      intent: obj && ['lookup', 'answer'].includes(obj.intent) ? obj.intent : '', ms: r.ms };
     if (rewriteCache.size >= 100) rewriteCache.delete(rewriteCache.keys().next().value);
     rewriteCache.set(key, { at: Date.now(), value: output });
     return output;

@@ -71,7 +71,8 @@
     var cfg = options.cfg;
     // 界面明确进入问答模式时，关键词、英文和省略问号的表达也要生成回答。
     var answerRequested = options.answer === true || isQuestion(q);
-    var current = options.current || function () { return true; };
+    var isCurrent = options.current || function () { return true; };
+    var current = function () { return !(options.signal && options.signal.aborted) && isCurrent(); };
     var progress = options.progress || function () {};
     var onAnswer = options.onAnswer || function () {};
     var local = Bookmarks.query(rows, q, 30);
@@ -106,17 +107,27 @@
     progress(local.length ? '本地已找到 ' + local.length + ' 条，AI 正在回答…' : '正在查找相关收藏…', local);
     var cands = local;
     var remote = { hits: [] };
-    if (!cands.length || (isQuestion(q) && cands.length >= 3)) {
-      var remoteTask = options.rag && typeof Rag !== 'undefined' && Rag.available(options.rag)
-        ? Rag.retrieve(options.rag, q, rows).then(function (hits) { return { hits: hits }; }, function (e) { return { hits: [], failed: true, error: e.message }; })
-        : Promise.resolve({ hits: [] });
-      var rewriteTask = AI.available(cfg)
-        ? AI.rewrite({ cfg: cfg, query: q, signal: options.signal }).catch(function () { return { ok: false }; })
-        : Promise.resolve({ ok: false });
-      var results = await Promise.all([rewriteTask, remoteTask]);
+    var retrievalQuery = q;
+    var retrievalIntent = '';
+    var identityMatch = personal.rows.length || numericIdentifiers(q).some(function (id) {
+      return local.some(function (hit) { return String(hit.row.title || '').includes(id); });
+    });
+    // 少量字面命中不代表口语长句已找到主题；编号/个人入口维持本地快路径。
+    var longQuestion = isQuestion(q) && q.length > 12 && !identityMatch;
+    if (!cands.length || (isQuestion(q) && cands.length >= 3) || longQuestion) {
+      var rewritten = AI.available(cfg)
+        ? await AI.rewrite({ cfg: cfg, query: q, signal: options.signal }).catch(function () { return { ok: false }; })
+        : { ok: false };
       if (!current()) return null;
-      var terms = [q].concat(results[0].ok ? results[0].keywords : []).concat(localExpansions(q));
-      remote = results[1];
+      retrievalQuery = rewritten.ok && rewritten.query || q;
+      retrievalIntent = rewritten.ok && rewritten.intent || '';
+      var keywords = rewritten.ok ? rewritten.keywords : [];
+      var remoteQuery = Array.from(new Set([retrievalQuery].concat(keywords))).join(' ');
+      remote = options.rag && typeof Rag !== 'undefined' && Rag.available(options.rag)
+        ? await Rag.retrieve(options.rag, remoteQuery, rows).then(function (hits) { return { hits: hits }; }, function (e) { return { hits: [], failed: true, error: e.message }; })
+        : { hits: [] };
+      if (!current()) return null;
+      var terms = [q, retrievalQuery].concat(keywords).concat(localExpansions(q));
       var byBookmark = new Map();
       var fused = new Map();
       [Bookmarks.recall(rows, Array.from(new Set(terms)), 30), remote.hits].forEach(function (list) {
@@ -126,10 +137,16 @@
           fused.set(id, (fused.get(id) || 0) + 1 / (20 + rank));
         });
       });
+      // 召回扩展不能丢掉已有结果，也不为同一条本地结果重复计票。
+      local.forEach(function (hit, rank) {
+        var id = String(hit.row.id);
+        if (!byBookmark.has(id)) { byBookmark.set(id, hit); fused.set(id, 1 / (20 + rank)); }
+      });
       cands = Array.from(fused).sort(function (a, b) { return b[1] - a[1]; })
         .slice(0, 30).map(function (entry) { return byBookmark.get(entry[0]); });
       if (cands.length) progress('AI 正在回答…', cands);
     }
+    cands = Bookmarks.uniquePages(cands);
     if (!cands.length) return fallback([], remote.failed
       ? '云端检索暂不可用，本地也未找到相关收藏' : '没有找到相关收藏，可先采集正文后重试', answerRequested);
     if (!AI.available(cfg)) return fallback(cands, remote.failed ? 'RAG 检索失败 · ' + remote.error + ' · 已显示本地结果' : remote.hits.length ? 'RAG 已召回 ' + remote.hits.length + ' 条收藏 · 未配置 AI 回答' : '已显示本地收藏 · 未配置 AI 回答', answerRequested);
@@ -147,9 +164,21 @@
         evidenceIds.add(id);
         evidenceCands.push(hit);
       });
+      if (retrievalIntent === 'lookup') {
+        // 复用已有候选筛选，避免回答把“排除项”也当成推荐来源。
+        var selected;
+        try { selected = await AI.rerank({ cfg: cfg, query: q, hits: evidenceCands, signal: options.signal }); }
+        catch (e) { selected = { ok: false }; }
+        if (!current()) return null;
+        if (selected.ok) {
+          var chosen = selected.picks.filter(function (pick) { return byId.has(String(pick.id)); });
+          if (!chosen.length) return fallback(cands, '未找到明确匹配的收藏，以下是可能相关的结果', true);
+          evidenceCands = chosen.map(function (pick) { return byId.get(String(pick.id)); });
+        }
+      }
       try {
         streamed = await BookmarkAnswer.runStream({
-          cfg: cfg, query: q, cands: evidenceCands,
+          cfg: cfg, query: q, retrievalQuery: retrievalQuery, cands: evidenceCands,
           shouldContinue: current, signal: options.signal,
           onDelta: function (delta, full) { onAnswer({ text: full, sources: [], streaming: true }); }
         });

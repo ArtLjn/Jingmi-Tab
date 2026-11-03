@@ -19,6 +19,116 @@ function context(indexedDB = new IDBFactory(), extra = {}) {
 function rows(c) {
   return c.Bookmarks.flatten([{ children: [{ id: '1', title: '项目文档', url: 'https://example.com/a' }] }]);
 }
+
+test('口语长句只有弱命中时先改写主题，改写词同时用于本地和一次 RAG 召回', async () => {
+  const c = context();
+  const data = c.Bookmarks.flatten([{ children: [
+    { id: '1', title: 'Agent 工具接入', url: 'https://example.com/tools' },
+    { id: '2', title: '长期记忆架构', url: 'https://example.com/memory' }
+  ] }]);
+  const events = [];
+  c.AI.available = () => true;
+  c.AI.rewrite = async () => { events.push('改写'); return { ok: true, query: 'Agent 记忆架构', keywords: ['长期记忆', 'Memory architecture'] }; };
+  c.Rag = { available: () => true, retrieve: async (cfg, query) => {
+    events.push('RAG'); assert.match(query, /Agent 记忆架构/); assert.match(query, /长期记忆/);
+    assert.doesNotMatch(query, /帮我找|之前收藏/); return [];
+  } };
+  c.BookmarkAnswer.runStream = async options => {
+    assert.ok(options.cands.some(hit => hit.row.id === '2'));
+    assert.equal(options.retrievalQuery, 'Agent 记忆架构');
+    return { ok: true, answer: '找到了这篇长期记忆架构资料。', sources: [{ id: '2' }] };
+  };
+  const result = await c.BookmarkSearch.run({ rows: data, query: '帮我找之前收藏的 Agent 记忆架构', cfg: {}, rag: {}, answer: true });
+  assert.deepEqual(events, ['改写', 'RAG']); assert.equal(result.hits[0].row.id, '2');
+});
+
+test('改写结束后查询已取消，不继续发送云端召回', async () => {
+  const c = context(); let current = true; let calls = 0;
+  c.AI.available = () => true;
+  c.AI.rewrite = async () => { current = false; return { ok: true, query: '记忆架构', keywords: ['记忆'] }; };
+  c.Rag = { available: () => true, retrieve: async () => { calls++; return []; } };
+  assert.equal(await c.BookmarkSearch.run({ rows: [], query: '找记忆架构', cfg: {}, rag: {}, current: () => current }), null);
+  assert.equal(calls, 0);
+});
+
+test('仅传取消信号也能阻止改写之后的 RAG 请求', async () => {
+  const c = context(); const controller = new AbortController(); let calls = 0;
+  c.AI.available = () => true;
+  c.AI.rewrite = async () => { controller.abort(); return { ok: false, error: 'cancelled' }; };
+  c.Rag = { available: () => true, retrieve: async () => { calls++; return []; } };
+  const result = await c.BookmarkSearch.run({ rows: [], query: '找记忆架构', cfg: {}, rag: {}, signal: controller.signal });
+  assert.equal(result, null); assert.equal(calls, 0);
+});
+
+test('改写失败仍用原句检索，RAG 失败后保留弱命中的本地收藏', async () => {
+  const c = context(); let recalls = 0;
+  c.AI.available = () => true; c.AI.rewrite = async () => { throw new Error('改写失败'); };
+  c.Rag = { available: () => true, retrieve: async (cfg, query) => { recalls++; assert.equal(query, '帮我找之前收藏的 Agent 记忆架构'); throw new Error('检索失败'); } };
+  const data = c.Bookmarks.flatten([{ children: [{ id: '1', title: 'Agent 工具接入', url: 'https://example.com', dateAdded: Date.now() }] }]);
+  c.BookmarkAnswer.runStream = async () => ({ ok: false, error: 'network' });
+  const result = await c.BookmarkSearch.run({ rows: data, query: '帮我找之前收藏的 Agent 记忆架构', cfg: {}, rag: {}, answer: true });
+  assert.equal(recalls, 1); assert.equal(result.hits[0].row.id, '1');
+});
+
+test('相同网页去重并保留更完整片段，不合并不同路由、不修改原始索引', () => {
+  const c = context();
+  const input = [
+    { row: { id: '1', title: '测试页', url: 'https://example.com/app?utm_source=bookmark#/test', text: '本地正文' } },
+    { row: { id: '2', title: '重复收藏', url: 'https://example.com/app#/test', retrievedText: '云端命中的测试正文' } },
+    { row: { id: '3', title: '另一页面', url: 'https://example.com/app#/memory' } }
+  ];
+  const unique = c.Bookmarks.uniquePages(input);
+  assert.equal(unique.length, 2); assert.equal(unique[0].row.id, '1');
+  assert.match(unique[0].row.retrievedText, /云端命中/); assert.equal(input[0].row.retrievedText, undefined);
+  const restricted = c.Bookmarks.uniquePages([{ row: { ...input[0].row, admissionState: 'excluded' } }, input[1]]);
+  assert.equal(restricted[0].row.retrievedText, undefined);
+});
+
+test('宽泛关键词优先选择主题命中的证据，同网页只占一个引用位置', () => {
+  const c = context();
+  const candidates = Array.from({ length: 6 }, (_, i) => ({ row: { id: String(i), title: '其他资料' + i, url: 'https://example.com/other/' + i, text: '正文偶然提及测试' } }));
+  candidates.push({ row: { id: 'target', title: 'API 测试工具', url: 'https://example.com/test', text: '创建请求与响应比较。' } });
+  candidates.push({ row: { id: 'duplicate', title: 'API 测试工具副本', url: 'https://example.com/test', text: '创建请求与响应比较。' } });
+  const evidence = c.BookmarkAnswer.buildEvidence(candidates, '测试');
+  assert.equal(evidence[0].id, 'target'); assert.equal(evidence.length, 6);
+  assert.equal(evidence.filter(item => item.id === 'target' || item.id === 'duplicate').length, 1);
+});
+
+test('LLM 改写保留组合主题和较长英文检索词，并过滤重复与非字符串', async () => {
+  const c = context(undefined, { fetch: async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ q: 'Agent 记忆架构', k: ['Memory architecture', '长期记忆', '长期记忆', { fake: true }] }) } }] })) });
+  const result = await c.AI.rewrite({ cfg: { enabled: true, apiKey: 'test', baseUrl: 'https://api.example.com/v1', model: 'test' }, query: '帮我找之前收藏的 Agent 记忆架构' });
+  assert.equal(result.query, 'Agent 记忆架构');
+  assert.deepEqual(Array.from(result.keywords), ['Memory architecture', '长期记忆']);
+});
+
+test('找回意图复用候选筛选，排除项不进入回答证据或引用', async () => {
+  const c = context();
+  const data = c.Bookmarks.flatten([{ children: [
+    { id: '1', title: 'Agent 记忆架构', url: 'https://example.com/memory' },
+    { id: '2', title: 'Agent 测试页', url: 'https://example.com/demo' }
+  ] }]);
+  c.AI.available = () => true;
+  c.AI.rewrite = async () => ({ ok: true, query: 'Agent 记忆架构', keywords: ['记忆'], intent: 'lookup' });
+  c.AI.rerank = async () => ({ ok: true, picks: [{ id: '1', why: '架构资料' }, { id: 'fake' }] });
+  c.BookmarkAnswer.runStream = async options => {
+    assert.deepEqual(Array.from(options.cands, hit => hit.row.id), ['1']);
+    return { ok: true, answer: '这篇记忆架构资料与你的主题相关。[1]', sources: [{ id: '1', marker: 1 }] };
+  };
+  const result = await c.BookmarkSearch.run({ rows: data, query: '帮我找之前收藏的 Agent 记忆架构', cfg: {}, answer: true });
+  assert.equal(result.answer.sources.length, 1); assert.equal(result.answer.sources[0].id, '1');
+});
+
+test('找回筛选无明确匹配时保留相关候选，不再生成推荐答案', async () => {
+  const c = context(); let answers = 0;
+  const data = c.Bookmarks.flatten([{ children: [{ id: '1', title: 'Agent 测试页面', url: 'https://example.com/demo', dateAdded: Date.now() }] }]);
+  c.AI.available = () => true;
+  c.AI.rewrite = async () => ({ ok: true, query: 'Agent 记忆架构', keywords: ['记忆'], intent: 'lookup' });
+  c.AI.rerank = async () => ({ ok: true, picks: [] });
+  c.BookmarkAnswer.runStream = async () => { answers++; return { ok: true, answer: '不应生成的推荐' }; };
+  const result = await c.BookmarkSearch.run({ rows: data, query: '帮我找之前收藏的 Agent 记忆架构', cfg: {}, answer: true });
+  assert.equal(answers, 0); assert.equal(result.hits[0].row.id, '1');
+  assert.equal(result.answer.notice, true); assert.match(result.message, /未找到明确匹配/);
+});
 const html = '<html><head><title>项目文档</title><meta name="description" content="财务接口介绍"></head><body><nav>无关导航</nav><article><h1>系统对接</h1><p>应收凭证支持按订单同步。</p><script>危险脚本</script><form>私密输入</form><div hidden>隐藏内容</div></article></body></html>';
 
 test('采集正文，排除脚本、表单和隐藏内容', () => {

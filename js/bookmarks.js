@@ -277,6 +277,31 @@
     return (start ? '…' : '') + text.slice(start, start + 160) + (text.length > start + 160 ? '…' : '');
   }
 
+  /** 检索结果按网页身份去重；保留首条入口和更完整证据，不改动浏览器索引。 */
+  function uniquePages(hits) {
+    var pages = new Map();
+    (hits || []).forEach(function (hit) {
+      var row = hit.row || hit;
+      var key = 'id:' + row.id;
+      try {
+        if (global.Documents) key = Documents.identity(row.url).key;
+        else {
+          var url = new URL(row.url);
+          Array.from(url.searchParams.keys()).forEach(function (name) { if (/^utm_|^(fbclid|gclid)$/i.test(name)) url.searchParams.delete(name); });
+          url.searchParams.sort(); key = url.href;
+        }
+      } catch (e) { /* 没有有效网址时按收藏 id 区分。 */ }
+      var previous = pages.get(key);
+      if (!previous) { pages.set(key, Object.assign({}, hit.row ? hit : {}, { row: Object.assign({}, row) })); return; }
+      var restricted = ['invalid', 'excluded', 'metadata'];
+      if (restricted.includes(previous.row.admissionState) || restricted.includes(row.admissionState)) return;
+      ['text', 'retrievedText', 'desc'].forEach(function (field) {
+        if (String(row[field] || '').length > String(previous.row[field] || '').length) previous.row[field] = row[field];
+      });
+    });
+    return Array.from(pages.values());
+  }
+
   global.Bookmarks = {
     SITE_MAP: SITE_MAP,
     parseUrl: parseUrl,
@@ -286,6 +311,7 @@
     score: score,
     query: query,
     recall: recall,
-    snippet: snippet
+    snippet: snippet,
+    uniquePages: uniquePages
   };
 })(typeof self !== 'undefined' ? self : window);

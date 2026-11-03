@@ -27,6 +27,7 @@
   var $ = function (sel) { return document.querySelector(sel); };
 
   var els = {
+    boot: $('#boot'),
     bg: $('#bg-image'),
     bgLoader: $('#bg-loader'),
     clock: $('#clock'),
@@ -99,6 +100,27 @@
     toast: $('#toast'),
     dropHint: $('#drop-hint')
   };
+
+  /* ------------------------- 启动画面 ------------------------- */
+  var bootShownAt = Date.now();
+  var bootReady = false;
+
+  /* 壁纸绘制完成后再退场；最短停留 420ms，避免缓存命中时闪一下。 */
+  function finishBoot() {
+    if (bootReady) return;
+    bootReady = true;
+    var wait = Math.max(0, 420 - (Date.now() - bootShownAt));
+    setTimeout(function () {
+      if (!els.boot) return;
+      els.boot.classList.add('is-done');
+      setTimeout(function () {
+        if (els.boot && els.boot.parentNode) els.boot.parentNode.removeChild(els.boot);
+      }, 700);
+    }, wait);
+  }
+
+  /* 兜底：设置读取或图片解码异常时，不长期遮挡首屏 */
+  setTimeout(finishBoot, 2600);
 
   /* ------------------------- 状态 ------------------------- */
   var settings = null;
@@ -425,6 +447,7 @@
     els.bg.style.backgroundImage = gradientCss(settings.bg.gradient);
     els.bg.style.backgroundColor = '#10161f';
     updateWallpaperQuality(null);
+    finishBoot();
   }
 
   /* 图片先解码再交给 CSS 背景，加载层负责镜片扫光，避免大图解码时的白闪。 */
@@ -446,6 +469,7 @@
         els.bg.style.backgroundColor = '#000';
       }
       if (els.bgLoader) els.bgLoader.classList.remove('is-on');
+      finishBoot();
     }
     probe.onload = function () {
       var decoded = probe.decode ? probe.decode().catch(function () {}) : Promise.resolve();

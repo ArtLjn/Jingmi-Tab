@@ -38,6 +38,72 @@ html, body {
   text-rendering: optimizeLegibility;
 }
 
+/* ---------------- 启动画面 ---------------- */
+/* 与页面底色同源，先于设置和壁纸出现；只动画 opacity / transform，避免重排。 */
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  background:
+    radial-gradient(52% 46% at 28% 22%, rgba(255, 211, 182, 0.09), transparent 70%),
+    radial-gradient(48% 42% at 74% 80%, rgba(137, 174, 214, 0.10), transparent 72%),
+    #0a0d12;
+  pointer-events: none;
+  transition: opacity 0.55s var(--ease), visibility 0s linear 0.55s;
+}
+.boot.is-done { opacity: 0; visibility: hidden; }
+
+.boot-mark {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 13px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.36);
+  animation: boot-breathe 2.8s ease-in-out infinite;
+}
+.boot-mark img { display: block; width: 100%; height: 100%; }
+/* 品牌标记上一道慢扫光，与背景加载层的镜片语言保持一致 */
+.boot-mark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(112deg, transparent 34%, rgba(255, 255, 255, 0.26) 50%, transparent 66%);
+  background-size: 240% 100%;
+  animation: boot-sheen 1.9s ease-in-out infinite;
+}
+
+.boot-caption {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--ink-faint);
+  animation: boot-fade 2.4s ease-in-out infinite;
+}
+
+@keyframes boot-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+@keyframes boot-sheen {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+@keyframes boot-fade {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot, .boot-mark, .boot-mark::after, .boot-caption { animation: none; transition: none; }
+  .boot.is-done { display: none; }
+}
+
 /* ---------------- 背景层 ---------------- */
 .bg-layer {
   position: fixed;

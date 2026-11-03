@@ -58,6 +58,9 @@ test('浏览器回归：背景动效、指针视差与减少动态效果降级',
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(origin + '/newtab.html');
 
+    /* 启动层在背景绘制后退场，且不拦截首屏交互。 */
+    await page.waitForFunction(() => !document.getElementById('boot'), null, { timeout: 5000 });
+
     await page.waitForFunction(() => document.body.classList.contains('ambient-motion'));
     assert.equal(await page.locator('#bg-image').evaluate(el => getComputedStyle(el).animationName), 'bg-drift');
     assert.equal(await page.locator('.ambient-light-a').evaluate(el => getComputedStyle(el).animationName), 'ambient-drift-a');
