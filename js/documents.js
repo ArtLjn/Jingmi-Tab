@@ -52,6 +52,7 @@
   }
   async function reconcile(rows) {
     var grouped = await groups(rows);
+    var annotations = global.PersonalTargets ? await PersonalTargets.records() : new Map();
     var classes = typeof Organizer !== 'undefined' ? await Organizer.records(rows) : {};
     var pages = await AgentDB.getPages(rows.map(function (r) { return ContentIndex.normUrl(r.url); }));
     for (var pair of grouped) {
@@ -65,6 +66,9 @@
         var doc = current || { id: info.id, identity: info, title: refs[0].title, captureState: 'pending', syncState: 'pending', createdAt: Date.now() };
         changed = !current || !!doc.deleted || JSON.stringify(stableRefs(doc.bookmarks)) !== JSON.stringify(refs) || stableClasses(doc.classificationSignature) !== stableClasses(classificationSignature);
         doc.classificationSignature = classificationSignature;
+        var personal = annotations.get(info.id) || [];
+        if (JSON.stringify(doc.userAnnotations || []) !== JSON.stringify(personal)) changed = true;
+        doc.userAnnotations = personal;
         doc.bookmarks = refs; doc.deleted = false;
         if (page && (!doc.fetchedAt || page.fetchedAt > doc.fetchedAt)) {
           var incoming = { text: page.text || '', desc: page.desc || '', title: page.title || refs[0].title,
@@ -121,6 +125,7 @@
     return ({ pending: '等待采集', metadata: '仅元数据', partial: '部分正文', ready: '正文已采集', waiting_open: '待打开文档', waiting_auth: '待页面授权', waiting_permission: '待站点授权', failed: '采集失败' })[doc.captureState] || '仅标题';
   }
   function syncLabel(doc) {
+    if (doc && doc.syncState === 'synced' && doc.indexedQuality === 'personal') return '个人备注和别名已入库，未收录正文';
     if (doc && doc.admissionState === 'invalid') return doc.syncState === 'deleted' ? '页面已失效，已从知识库移除' : '页面已失效，等待云端清理';
     if (doc && doc.admissionState === 'metadata' && doc.syncState !== 'synced') return '仅保存入口，未收录正文';
     if (doc && doc.captureError && doc.syncState === 'synced') return '使用历史正文，本次采集失败';

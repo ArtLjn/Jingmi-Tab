@@ -6,6 +6,10 @@
     var auto = $('rag-enabled'); var status = $('rag-status'); var progress = $('pipeline-status');
     var recordLimit = 20;
     var failureLimit = 20;
+    var bookmarkLimit = 40;
+    var activeTab = 'processing';
+    var bookmarkFilter = 'all';
+    var latestCollection = null;
     var lastPipelineError = '';
     var retrying = false;
     var starting = false;
@@ -32,20 +36,48 @@
       var breakdown = CollectionStats.breakdown(collection);
       var summary = '收录概况。' + CollectionStats.format(collection) + (breakdown ? '。' + breakdown : '');
       stats.setAttribute('aria-label', summary); stats.title = summary;
+      latestCollection = collection;
+      $('rag-collected-count').textContent = collection.collected;
       $('rag-uncollected-count').textContent = collection.uncollected;
-      $('rag-uncollected-breakdown').textContent = breakdown;
-      var body = $('rag-uncollected-items'); body.replaceChildren();
-      var stateLabels = { queue: '处理中', failed: '处理失败', manual: '需补充条件', unarranged: '未安排' };
-      (collection.uncollectedItems || []).forEach(function (item) {
+      if (activeTab === 'collected' || activeTab === 'uncollected') renderBookmarks();
+    }
+    function renderBookmarks() {
+      var collected = activeTab === 'collected';
+      var collection = latestCollection || {};
+      var source = collected ? collection.collectedItems : collection.uncollectedItems;
+      var items = source || [];
+      $('rag-bookmarks-panel').setAttribute('aria-labelledby', collected ? 'rag-collected-tab' : 'rag-uncollected-tab');
+      $('rag-bookmark-description').textContent = collected ? '这些书签的内容已入库，可以检索。最近更新失败时，已有内容仍会保留。' : '这些书签尚未入库。请按具体原因处理：未取得正文不等于网络失败，需要打开网页后采集正文。';
+      $('rag-bookmark-filter-label').hidden = collected;
+      if (!Array.isArray(source) && (collected ? collection.collected : collection.uncollected) > 0) {
+        $('rag-bookmark-status').textContent = '后台列表尚未更新，请在扩展管理页重新加载扩展后打开此页。';
+        $('rag-bookmark-records').replaceChildren();
+        return;
+      }
+      var filter = $('rag-bookmark-filter');
+      var reasons = new Map();
+      items.forEach(function (item) { var key = item.reasonKey || item.state || 'other'; var value = reasons.get(key) || { label: item.reasonLabel || '其他', count: 0 }; value.count++; reasons.set(key, value); });
+      filter.replaceChildren();
+      var all = document.createElement('option'); all.value = 'all'; all.textContent = '全部原因（' + items.length + '）'; filter.append(all);
+      if (bookmarkFilter !== 'all' && !reasons.has(bookmarkFilter)) reasons.set(bookmarkFilter, { label: '当前原因', count: 0 });
+      reasons.forEach(function (value, key) { var option = document.createElement('option'); option.value = key; option.textContent = value.label + '（' + value.count + '）'; filter.append(option); });
+      filter.value = bookmarkFilter;
+      var visible = items.filter(function (item) { return collected || bookmarkFilter === 'all' || (item.reasonKey || item.state || 'other') === bookmarkFilter; });
+      $('rag-bookmark-status').textContent = (collected ? '已收录' : '未收录') + '共 ' + (collected ? collection.collected || 0 : collection.uncollected || 0) + ' 个书签 · 当前筛选 ' + visible.length + ' 个';
+      var body = $('rag-bookmark-records'); body.replaceChildren();
+      visible.slice(0, bookmarkLimit).forEach(function (item) {
         var row = document.createElement('div'); row.className = 'pipeline-record';
-        var main = document.createElement('div'); main.className = 'pipeline-main';
+        var main = document.createElement(/^https?:\/\//i.test(item.url) ? 'a' : 'div'); main.className = 'pipeline-main';
+        if (main.tagName === 'A') { main.href = item.url; main.target = '_blank'; main.rel = 'noopener noreferrer'; }
         var title = document.createElement('p'); title.className = 'pipeline-title'; title.textContent = item.title; title.title = item.url;
-        var reason = document.createElement('p'); reason.className = 'pipeline-meta'; reason.textContent = stateLabels[item.state] + ' · ' + item.reason;
+        var reason = document.createElement('p'); reason.className = 'pipeline-meta'; reason.textContent = (item.reasonLabel || (collected ? '已收录' : '尚未收录')) + ' · ' + item.reason;
         var url = document.createElement('p'); url.className = 'pipeline-meta'; url.textContent = item.url;
         main.append(title, reason, url); row.append(main); body.append(row);
       });
-      if (!collection.uncollected) body.textContent = '全部书签已收录。';
+      if (!visible.length) { var empty = document.createElement('p'); empty.className = 'auto-empty'; empty.textContent = '当前列表暂无书签。'; body.append(empty); }
+      if (visible.length > bookmarkLimit) { var more = document.createElement('button'); more.type = 'button'; more.className = 'btn-ghost pipeline-more'; more.textContent = '查看更多书签'; more.addEventListener('click', function () { bookmarkLimit += 40; renderBookmarks(); }); body.append(more); }
     }
+    $('rag-bookmark-filter').addEventListener('change', function () { bookmarkFilter = this.value; bookmarkLimit = 40; renderBookmarks(); $('rag-bookmark-records').scrollTop = 0; });
     /* 重试已重新排队时以当前任务为准，避免旧同步状态阻止它返回处理列表。 */
     function isFailure(item) {
       return CollectionStats.taskKind(item) === 'failed';
@@ -84,16 +116,18 @@
     });
 
     function selectTab(name, focus) {
-      var failures = name === 'failures';
+      activeTab = name; bookmarkFilter = 'all'; bookmarkLimit = 40;
       document.querySelectorAll('[data-rag-tab]').forEach(function (tab) {
         var active = tab.dataset.ragTab === name;
         tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1;
         if (active && focus) tab.focus();
       });
-      $('rag-processing-panel').hidden = failures;
-      $('rag-failures-panel').hidden = !failures;
+      $('rag-processing-panel').hidden = name !== 'processing';
+      $('rag-failures-panel').hidden = name !== 'failures';
+      $('rag-bookmarks-panel').hidden = name !== 'collected' && name !== 'uncollected';
+      if (name === 'collected' || name === 'uncollected') { renderBookmarks(); $('rag-bookmark-records').scrollTop = 0; }
       var page = $('rag-flow-card').closest('[data-search-page]');
-      page.dataset.pageDetail = failures ? '失败任务' : '处理任务';
+      page.dataset.pageDetail = { processing: '处理任务', failures: '失败任务', collected: '已收录', uncollected: '未收录' }[name];
       if (!page.hidden && $('search-page-detail')) $('search-page-detail').textContent = page.dataset.pageDetail;
     }
     document.querySelectorAll('[data-rag-tab]').forEach(function (tab) {
@@ -101,7 +135,9 @@
       tab.addEventListener('keydown', function (event) {
         if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(event.key) < 0) return;
         event.preventDefault();
-        selectTab(event.key === 'Home' ? 'processing' : event.key === 'End' ? 'failures' : tab.dataset.ragTab === 'processing' ? 'failures' : 'processing', true);
+        var names = ['processing', 'failures', 'collected', 'uncollected'];
+        var index = names.indexOf(tab.dataset.ragTab);
+        selectTab(event.key === 'Home' ? names[0] : event.key === 'End' ? names[names.length - 1] : names[(index + (event.key === 'ArrowLeft' ? -1 : 1) + names.length) % names.length], true);
       });
     });
 

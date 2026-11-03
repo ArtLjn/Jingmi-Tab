@@ -164,6 +164,9 @@ if (chrome.storage && chrome.storage.onChanged) chrome.storage.onChanged.addList
 if (chrome.permissions && chrome.permissions.onAdded) chrome.permissions.onAdded.addListener(function () { SyncEngine.request({ force: true }).catch(function () {}); });
 if (chrome.storage && chrome.storage.onChanged) chrome.storage.onChanged.addListener(function (changes, area) {
   var settingsKey; try { settingsKey = Profiles.key('newtab.settings.v1'); } catch (e) { return; }
+  if (area === 'local' && changes[Profiles.key('newtab.tags.v1')]) {
+    QuickTags.reload().then(function () { return SyncEngine.request(); }).catch(function () {});
+  }
   var change = changes[settingsKey];
   if (area !== 'local' || !change) return;
   var oldRag = change.oldValue && change.oldValue.rag || {};

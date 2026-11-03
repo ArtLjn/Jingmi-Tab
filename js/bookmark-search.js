@@ -81,7 +81,7 @@
     if (personal.ambiguous) return fallback(personal.rows.map(function (row) { return { row: row, score: 120 }; }), '此称呼对应多个入口，请先选择或补充具体名称', answerRequested);
     if (personal.rows.length) local = personal.rows.map(function (row) { return { row: row, score: 120 }; });
     if (personal.rows.length || local.some(function (hit) { return String(hit.row.id).startsWith('quick:'); })) {
-      if (!local.some(function (hit) { return String(hit.row.text || hit.row.retrievedText || '').trim(); })) return fallback(local, '已找到相关入口，但尚无可用正文，无法据此回答具体流程', answerRequested);
+      if (!local.some(function (hit) { return String(hit.row.text || hit.row.retrievedText || hit.row.personalEvidence || '').trim(); })) return fallback(local, '已找到相关入口，但尚无可用正文，无法据此回答具体流程', answerRequested);
       q = personal.query;
     }
     if (isQuestion(q)) {

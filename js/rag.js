@@ -139,17 +139,19 @@
   }
   async function upsertDocument(cfg, doc, classifications) {
     if (!available(cfg)) throw new Error('RAG 尚未配置完成');
+    if (!global.IngestPolicy) throw new Error('收录策略未加载，已停止上传');
     var isPrivate = !!doc.private || ['capture', 'feishu_api'].indexOf(doc.source) >= 0;
-    if (doc.deleted || (isPrivate && !cfg.includePrivate)) {
+    if (doc.deleted || (isPrivate && !cfg.includePrivate && !IngestPolicy.personal(doc))) {
       var removed = await removeDocument(cfg, doc.id, { revision: doc.revision, reason: doc.deleted ? 'deleted' : 'private' });
       if (removed && removed.stale) return { stale: true };
       return { excluded: !doc.deleted, deleted: !!doc.deleted };
     }
-    if (!global.IngestPolicy) throw new Error('收录策略未加载，已停止上传');
+    var includeBody;
     {
       var prior = await AgentDB.getMeta(await stateKey(cfg)) || {};
       var verdict = IngestPolicy.evaluate(doc, cfg, { receipt: prior[doc.id] });
       if (verdict.action !== 'upsert') return { held: true, admission: verdict.state, reason: verdict.reason };
+      includeBody = verdict.includeBody !== false;
     }
     return withLease(cfg, async function (key) {
       var operationKey = key + ':operation:' + doc.id;
@@ -157,7 +159,10 @@
       if (intent && ['pending', 'unknown'].includes(intent.status)) { var pending = new Error('上次云端操作结果待核验，禁止自动重发'); pending.code = 'outcome_unknown'; throw pending; }
       var current = await Documents.get(doc.id);
       if (current && (current.deleted || current.revision !== doc.revision)) return { stale: true };
-      if (global.Settings && IngestPolicy.privateDoc(doc)) { var latest = await Settings.load(); if (latest.rag && !latest.rag.includePrivate) return { held: true, admission: 'excluded' }; }
+      if (includeBody && global.Settings && IngestPolicy.privateDoc(doc)) { var latest = await Settings.load(); if (latest.rag && !latest.rag.includePrivate) return { held: true, admission: 'excluded' }; }
+      var personal = doc.userAnnotations || [];
+      if (global.PersonalTargets && JSON.stringify((await PersonalTargets.records()).get(doc.id) || []) !== JSON.stringify(personal)) return { stale: true };
+      var quality = includeBody ? 'body' : 'personal';
       var saved = await AgentDB.getMeta(key) || {};
       var id = await clientId(); var docId = cfg.authToken ? (saved[doc.id] && saved[doc.id].docId || 'page-' + doc.id) : id + '-' + doc.id;
       var refs = doc.bookmarks || [];
@@ -166,12 +171,14 @@
       var metadata = { schema_version: 2, page_id: doc.id, client_id: id,
         canonical_url: doc.identity.canonicalUrl, provider: doc.identity.provider, document_type: doc.identity.kind,
         provider_document_id: doc.identity.token || '', title: doc.title, bookmarks: refs, tags: tags,
-        content_hash: doc.contentHash || '', captured_at: doc.fetchedAt || null, coverage: doc.coverage || 'metadata',
-        headings: doc.headings || [], capture_note: doc.captureNote || '', capture_state: doc.captureState, capture_source: doc.source || 'metadata', private: isPrivate,
-        source_revision: doc.sourceRevision || null, source_updated_at: doc.sourceUpdatedAt || null };
+        content_hash: includeBody ? doc.contentHash || '' : '', captured_at: includeBody ? doc.fetchedAt || null : null, coverage: includeBody ? doc.coverage || 'html' : 'personal',
+        headings: includeBody ? doc.headings || [] : [], capture_note: includeBody ? doc.captureNote || '' : '仅用户填写的称呼和用途，未收录网页正文', capture_state: includeBody ? 'partial' : 'personal', capture_source: includeBody ? doc.source || 'public' : 'user', private: includeBody && isPrivate,
+        user_annotations: personal, record_quality: quality,
+        source_revision: includeBody ? doc.sourceRevision || null : null, source_updated_at: includeBody ? doc.sourceUpdatedAt || null : null };
       var text = [doc.title, '网址：' + doc.identity.canonicalUrl, '收藏入口：' + refs.map(function (r) { return r.title + ' / ' + r.folder + ' / 收藏时间 ' + (r.addedAt ? new Date(r.addedAt).toISOString() : '未知'); }).join('；'),
-        '分类：' + category, '标签：' + tags.join('、'), '内容覆盖：' + (doc.captureState || 'metadata'),
-        '文档版本：' + (doc.sourceRevision || doc.contentHash || '仅元数据'), doc.desc || '', doc.text || ''].join('\n');
+        '分类：' + category, '标签：' + tags.join('、'), '内容覆盖：' + quality,
+        '文档版本：' + (includeBody ? doc.sourceRevision || doc.contentHash || '' : '用户资料'),
+        includeBody ? doc.desc || '' : '', includeBody ? doc.text || '' : '', global.PersonalTargets ? PersonalTargets.describe(personal) : ''].join('\n');
       /* 变更指纹只取稳定字段：captured_at 等采集时间每次刷新都会变，
          放进指纹会让“内容没变”的定时刷新重复 ingest，产生残留向量。 */
       var signature = {
@@ -179,14 +186,14 @@
         provider_document_id: metadata.provider_document_id, title: metadata.title, bookmarks: metadata.bookmarks,
         tags: metadata.tags, content_hash: metadata.content_hash, coverage: metadata.coverage, headings: metadata.headings,
         capture_state: metadata.capture_state, capture_source: metadata.capture_source, private: metadata.private,
-        source_revision: metadata.source_revision
+        source_revision: metadata.source_revision, user_annotations: personal, record_quality: quality
       };
       var hash = await Documents.hash(JSON.stringify([text, signature]));
       /* 本地实例标识变化时旧记录会查不到：入库新 ID 后再删旧记录，避免同页两份。 */
       var staleDocId = saved[doc.id] && saved[doc.id].docId && saved[doc.id].docId !== docId ? saved[doc.id].docId : '';
       if (!saved[doc.id] || saved[doc.id].hash !== hash || staleDocId) {
         metadata.ingest_hash = hash;
-        await AgentDB.setMeta(operationKey, { kind: 'ingest', docId: docId, hash: hash, contentHash: doc.contentHash || '', revision: doc.revision, status: 'pending', at: Date.now() });
+        await AgentDB.setMeta(operationKey, { kind: 'ingest', docId: docId, hash: hash, contentHash: metadata.content_hash, quality: quality, annotations: JSON.stringify(personal), revision: doc.revision, status: 'pending', at: Date.now() });
         var form = new FormData();
         Object.entries({ collection: cfg.collection, doc_id: docId, text: text, file_type: 'txt', source: doc.identity.canonicalUrl,
           category: category, chunk_size: '1000', chunk_overlap: '160', metadata_json: JSON.stringify(metadata)
@@ -202,7 +209,7 @@
           try { await request(cfg, '/collections/' + encodeURIComponent(cfg.collection) + '/documents/' + encodeURIComponent(staleDocId), undefined, 'DELETE', 15000); }
           catch (e) { if (!/（404）/.test(e.message)) throw e; }
         }
-        await AgentDB.updateMeta(key, function (value) { value = value || {}; value[doc.id] = { hash: hash, docId: docId, pageId: doc.id, url: doc.identity.canonicalUrl, quality: 'body', contentHash: doc.contentHash || '', revision: doc.revision }; return value; });
+        await AgentDB.updateMeta(key, function (value) { value = value || {}; value[doc.id] = { hash: hash, docId: docId, pageId: doc.id, url: doc.identity.canonicalUrl, quality: quality, annotations: JSON.stringify(personal), contentHash: metadata.content_hash, revision: doc.revision }; return value; });
       }
       await AgentDB.setMeta(operationKey, null);
       return { docId: docId, unchanged: !!(saved[doc.id] && saved[doc.id].hash === hash) };
@@ -215,6 +222,7 @@
     if (!data || !Array.isArray(data.results)) throw new Error('RAG 返回格式异常');
     var saved = cfg.authToken ? await AgentDB.getMeta(await stateKey(cfg)) || {} : {};
     var hits = new Map();
+    var annotations = global.PersonalTargets ? await PersonalTargets.records() : new Map();
     for (var result of data.results) {
       var extra = result.metadata && result.metadata.extra || {};
       if ((!cfg.authToken && extra.client_id !== id) || (extra.private && !cfg.includePrivate)) continue;
@@ -226,14 +234,15 @@
         group = { info: await Documents.forUrl(legacy.url), rows: [legacy] };
       } else if (!group || result.doc_id !== (cfg.authToken ? (saved[group.info.id] && saved[group.info.id].docId || 'page-' + group.info.id) : id + '-' + group.info.id) || extra.canonical_url !== group.info.canonicalUrl) continue;
       var doc = await Documents.get(group.info.id);
+      if (extra.user_annotations && JSON.stringify(extra.user_annotations) !== JSON.stringify(annotations.get(group.info.id) || [])) continue;
       if (extra.capture_state === 'failed' || extra.coverage === 'metadata' || doc && (doc.deleted || doc.admissionState === 'invalid' || doc.admissionState === 'excluded')) continue;
       var receipt = (await AgentDB.getMeta(await stateKey(cfg)) || {})[group.info.id];
-      var expectedHash = receipt && receipt.contentHash || doc && doc.contentHash;
+      var expectedHash = extra.record_quality === 'personal' ? '' : receipt && receipt.contentHash || doc && doc.contentHash;
       if (expectedHash && extra.content_hash && expectedHash !== extra.content_hash) continue;
       var hit = hits.get(group.info.id);
       if (!hit) {
         hit = { row: Object.assign({}, group.rows[0], { documentId: group.info.id, relatedBookmarks: group.rows.length,
-          captureSource: extra.capture_source || '云端', contentStatus: doc ? Documents.captureLabel(doc) : '云端内容', syncStatus: '已入库' }),
+          captureSource: extra.capture_source || '云端', contentStatus: extra.record_quality === 'personal' ? '用户备注和别名' : doc ? Documents.captureLabel(doc) : '云端内容', syncStatus: '已入库' }),
           score: Number(result.score) || 0, source: 'rag', chunks: [] };
         hits.set(group.info.id, hit);
       }
@@ -249,7 +258,7 @@
     var data = await request(cfg, '/retrieve', { collection: cfg.collection, query: doc.identity.canonicalUrl, mode: 'hybrid', top_k: 60, candidate_k: 100, rerank: false }, 'POST', 8000);
     var found = (data.results || []).find(function (result) { var extra = result.metadata && result.metadata.extra || {}; return result.doc_id === op.docId && extra.page_id === documentId && extra.canonical_url === doc.identity.canonicalUrl && extra.ingest_hash === op.hash; });
     if (!found) return false;
-    await AgentDB.updateMeta(key, function (saved) { saved = saved || {}; saved[documentId] = { docId: op.docId, pageId: documentId, url: doc.identity.canonicalUrl, hash: op.hash, contentHash: op.contentHash, revision: op.revision, quality: 'body' }; return saved; });
+    await AgentDB.updateMeta(key, function (saved) { saved = saved || {}; saved[documentId] = { docId: op.docId, pageId: documentId, url: doc.identity.canonicalUrl, hash: op.hash, contentHash: op.contentHash, revision: op.revision, quality: op.quality || 'body', annotations: op.annotations }; return saved; });
     await AgentDB.setMeta(key + ':operation:' + documentId, null); return true;
   }
   global.Rag = {

@@ -80,6 +80,7 @@
 
     var noteInput = field('note', '个人说明', tag.note, true);
     noteInput.placeholder = '例如：公司内部入口，办理报销和请假';
+    form.append(node('p', '开启 RAG 同步后，关联书签的名称、别名和个人说明会同步，用于 AI 查找。'));
 
     /* 没有现成网址时，先在书签里搜一个目标，而不是让用户手动拼网址。 */
     if (!tag.url && options.rows && options.rows.length) {

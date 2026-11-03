@@ -120,7 +120,7 @@ test('任务标签随后台状态自动分流，重试返回处理区并支持�
       __listeners.forEach(listener => listener({ type: 'pipeline:updated' }));
     });
     await page.waitForFunction(() => document.querySelector('#rag-failure-count').textContent === '1');
-    await page.locator('#rag-processing-tab').press('End');
+    await page.locator('#rag-processing-tab').press('ArrowRight');
     assert.equal(await page.locator('#rag-failures-panel').isVisible(), true);
     await page.setViewportSize({ width: 760, height: 900 });
     assert.equal(await page.locator('.rag-task-tabs').evaluate(el => el.scrollWidth <= el.clientWidth), true);
@@ -198,44 +198,52 @@ test('处理页只展示实际队列，手动批量处理；失败类型筛选�
   } finally { await browser.close(); }
 });
 
-test('总书签与收录数相加一致，未收录明细完整列出任务之外的每个书签', { skip: !fs.existsSync(executablePath), timeout: 30000 }, async () => {
+test('已收录和未收录标签展示完整书签，未取得正文可筛选且不冒充失败任务', { skip: !fs.existsSync(executablePath), timeout: 30000 }, async () => {
   const browser = await chromium.launch({ executablePath, headless: true });
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     const html = fs.readFileSync(path.join(root, 'newtab.html'), 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '').replace(/<link\b[^>]*>/g, '');
     await page.setContent(html); await page.addStyleTag({ path: path.join(root, 'css/newtab.css') });
     await page.evaluate(() => {
-      // 此处为构造的统计样例，用于验证每条未收录书签都能找到。
-      const items = Array.from({ length: 175 }, (_, i) => ({ id: String(i), title: '未收录书签 ' + i, url: 'https://example.com/' + i, state: i < 140 ? 'failed' : 'unarranged', reason: i < 140 ? '网络异常' : '尚未安排处理任务' }));
-      window.__data = { collection: { total: 403, collected: 228, uncollected: 175, queue: 99, failed: 23, uncollectedItems: items, uncollectedBreakdown: { queue: 0, failed: 140, manual: 0, unarranged: 35 } }, records: items.slice(0, 140).map(item => ({ ...item, status: 'failed', error: '网络异常' })) };
+      const items = Array.from({ length: 171 }, (_, i) => ({ id: String(i), title: '未收录书签 ' + i, url: 'https://example.com/' + i, reasonKey: i < 128 ? 'failed' : 'no_body', reasonLabel: i < 128 ? '采集或同步失败' : '未取得正文', reason: i < 128 ? '网络异常' : '仅保存入口，请打开网页后采集正文' }));
+      const collectedItems = Array.from({ length: 228 }, (_, i) => ({ id: 'collected-' + i, title: '已收录书签 ' + i, url: 'https://example.com/collected/' + i, reasonLabel: '已收录', reason: '内容已入库，可用于检索' }));
+      window.__data = { collection: { total: 399, collected: 228, uncollected: 171, collectedItems, uncollectedItems: items }, records: items.slice(0, 128).map(item => ({ ...item, status: 'failed', error: '网络异常' })) };
       window.chrome = { runtime: { sendMessage: async () => ({ ok: true, data: __data }) } };
       window.Rag = { check: async () => ({ checkedAt: Date.now() }) };
     });
     for (const name of ['collection-stats', 'workspace', 'rag-settings']) await page.addScriptTag({ path: path.join(root, 'js', name + '.js') });
     await page.evaluate(() => { RagSettings.mount({ settings: () => ({ rag: {}, backup: {} }), persist() {} }); Workspace.open('search', 'rag'); });
-    await page.waitForFunction(() => document.querySelector('#rag-stat-total').textContent === '403');
+    await page.waitForFunction(() => document.querySelector('#rag-stat-total').textContent === '399');
     assert.equal(await page.locator('#rag-stat-collected').textContent(), '228');
-    assert.equal(await page.locator('#rag-stat-uncollected').textContent(), '175');
+    assert.equal(await page.locator('#rag-stat-uncollected').textContent(), '171');
     assert.equal(await page.locator('#rag-stat-failed').textContent(), await page.locator('#rag-failure-count').textContent());
-    assert.equal(await page.locator('#rag-stat-queue').textContent(), await page.locator('#rag-processing-count').textContent());
-    assert.equal(await page.locator('#rag-stat-failed').textContent(), '140');
-    assert.equal(await page.locator('#rag-stat-queue').textContent(), '0');
-    assert.equal(await page.locator('#rag-uncollected-details').getAttribute('open'), null);
-    assert.equal(await page.locator('#rag-uncollected-breakdown').isVisible(), true, '未收录分类默认可见，不需要展开明细');
-    await page.locator('#rag-uncollected-details > summary').click();
-    assert.equal(await page.locator('#rag-uncollected-items .pipeline-record').count(), 175);
-    assert.match(await page.locator('#rag-uncollected-breakdown').textContent(), /未收录 175 个书签 = 处理中 0 \+ 处理失败 140 \+ 需补充条件 0 \+ 未安排 35/);
-    assert.match(await page.locator('#rag-uncollected-items').textContent(), /未收录书签 174/);
-    await page.locator('#rag-uncollected-details > summary').click();
-    assert.equal(await page.locator('#rag-uncollected-breakdown').isVisible(), true, '收起明细仍保留分类数字');
-    await page.evaluate(() => {
-      __data.collection.uncollectedBreakdown = { queue: 0, failed: 132, manual: 43, unarranged: 0 };
-      document.dispatchEvent(new CustomEvent('workspace:search-page', { detail: 'rag' }));
-    });
-    await page.waitForFunction(() => document.querySelector('#rag-uncollected-breakdown').textContent.includes('处理失败 132 + 需补充条件 43'));
+    assert.equal(await page.locator('[data-rag-tab]').count(), 4);
+    await page.locator('#rag-collected-tab').click();
+    assert.match(await page.locator('#rag-bookmark-status').textContent(), /已收录共 228/);
+    assert.equal(await page.locator('#rag-bookmark-records .pipeline-record').count(), 40);
+    assert.equal(await page.locator('#rag-bookmark-filter-label').isVisible(), false);
+    assert.equal(await page.locator('#rag-bookmark-records a').first().getAttribute('target'), '_blank');
+    await page.locator('#rag-uncollected-tab').click();
+    assert.match(await page.locator('#rag-bookmark-status').textContent(), /未收录共 171/);
+    assert.equal(await page.locator('#search-page-detail').textContent(), '未收录');
+    await page.locator('#rag-bookmark-filter').selectOption('no_body');
+    assert.match(await page.locator('#rag-bookmark-status').textContent(), /当前筛选 43/);
+    assert.match(await page.locator('#rag-bookmark-description').textContent(), /不等于网络失败/);
+    await page.getByRole('button', { name: '查看更多书签' }).click();
+    assert.equal(await page.locator('#rag-bookmark-records .pipeline-record').count(), 43);
+    assert.match(await page.locator('#rag-bookmark-records').textContent(), /未收录书签 170/);
+    await page.evaluate(() => document.dispatchEvent(new CustomEvent('workspace:search-page', { detail: 'rag' })));
+    await page.waitForFunction(() => document.querySelector('#rag-bookmark-filter').value === 'no_body');
+    assert.equal(await page.locator('#rag-bookmark-records .pipeline-record').count(), 43);
+    await page.locator('#rag-uncollected-tab').press('ArrowLeft');
+    assert.equal(await page.locator('#rag-collected-tab').getAttribute('aria-selected'), 'true');
+    await page.locator('#rag-collected-tab').press('Home');
+    assert.equal(await page.locator('#rag-processing-panel').isVisible(), true);
+    await page.locator('#rag-processing-tab').press('End');
+    assert.equal(await page.locator('#rag-bookmarks-panel').isVisible(), true);
+    assert.equal(await page.locator('#rag-bookmark-filter').inputValue(), 'all');
     await page.setViewportSize({ width: 760, height: 900 });
-    assert.equal(await page.locator('#rag-stats').evaluate(el => el.scrollWidth <= el.clientWidth), true);
-    assert.equal(await page.locator('#rag-uncollected-breakdown').isVisible(), true);
-    await page.screenshot({ path: '/tmp/chrome-tab-counts-and-details.png', animations: 'disabled' });
+    assert.equal(await page.locator('.rag-task-tabs').evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    await page.screenshot({ path: '/tmp/chrome-tab-bookmark-list-tabs.png', animations: 'disabled' });
   } finally { await browser.close(); }
 });

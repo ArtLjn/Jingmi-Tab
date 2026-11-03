@@ -136,3 +136,38 @@ test('任务归类只把实际排队或运行项计入队列，失败、完成�
   assert.equal(kind({ status: 'waiting', error: '网络失败' }), 'failed');
   assert.equal(kind({ status: 'running', outcomeUnknown: true }), 'failed');
 });
+
+test('没有正文的完成任务展示实际原因，不被旧暂停状态算作失败', async () => {
+  const f = setup(); const { doc, key } = await seed(f);
+  await f.c.AgentDB.setMeta(key, {});
+  await f.c.Documents.update(doc.id, value => ({ ...value, text: '', captureState: 'waiting_open', captureError: 'no_content', admissionState: 'metadata', syncState: 'paused' }));
+  await f.c.AgentDB.updateRecord('jobs', doc.id, () => ({ id: doc.id, status: 'done', error: '' }));
+  const stats = await f.c.CollectionStats.read();
+  const items = stats.uncollectedItems.filter(item => ['3', '4'].includes(item.id));
+  assert.equal(items.length, 2);
+  assert.ok(items.every(item => item.reasonKey === 'no_body' && item.reasonLabel === '未取得正文'));
+  assert.equal(f.c.CollectionStats.taskKind({ status: 'done', admission: 'metadata', sync: 'paused' }), '');
+  assert.equal(f.c.CollectionStats.taskKind({ status: 'done', admission: 'metadata', sync: 'paused', outcomeUnknown: true }), 'failed');
+});
+
+test('登录、授权、隐私开关、不支持地址与网络失败分别说明原因，重新排队优先展示处理中', () => {
+  const f = setup(); const describe = f.c.CollectionStats.describeBookmark;
+  const cases = [
+    ['login_wall', 'login'], ['waiting_auth', 'auth'], ['unsupported', 'unsupported'],
+    ['network', 'network'], ['outcome_unknown', 'verify'], ['no_body', 'no_body'], ['daily_limit', 'quota']
+  ];
+  for (const [code, expected] of cases) assert.equal(describe({ captureError: code }, { status: 'paused', errorCode: code, error: '测试错误' }, {}).reasonKey, expected);
+  assert.equal(describe({ private: true, text: '本机正文' }, { status: 'done' }, {}).reasonKey, 'private');
+  assert.equal(describe({ text: '本机正文', captureError: 'network' }, { status: 'pending' }, {}).reasonKey, 'queue');
+});
+
+test('已收录列表与计数一致，同一网址的多个书签分别列出并保留更新失败说明', async () => {
+  const f = setup(); const { doc } = await seed(f);
+  await f.c.AgentDB.updateRecord('jobs', doc.id, () => ({ id: doc.id, status: 'failed', error: '更新失败' }));
+  const stats = await f.c.CollectionStats.read();
+  assert.equal(stats.collectedItems.length, stats.collected);
+  assert.equal(stats.uncollectedItems.length, stats.uncollected);
+  assert.equal(stats.collectedItems.length + stats.uncollectedItems.length, stats.total);
+  assert.deepEqual(Array.from(stats.collectedItems, item => item.id), ['3', '4']);
+  assert.ok(stats.collectedItems.every(item => item.reason.includes('最近一次更新失败')));
+});

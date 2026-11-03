@@ -3131,6 +3131,7 @@ a.pipeline-main:focus-visible { outline: 2px solid var(--workspace-teal); outlin
 .confirm-dialog .confirm-danger { border-color: rgba(240, 145, 134, .35); background: rgba(240, 145, 134, .1); color: rgba(255, 190, 183, .95); }
 .confirm-dialog .confirm-danger:hover { border-color: rgba(240, 145, 134, .52); background: rgba(240, 145, 134, .18); }
 
-.rag-uncollected-items { max-height: 320px; overflow-y: auto; margin-top: 8px; scrollbar-width: thin; }
-.rag-card .rag-count-breakdown { margin-top: 8px; color: rgba(255,255,255,.75); line-height: 1.7; }
-.rag-uncollected-items .pipeline-meta { overflow-wrap: anywhere; }
+
+.rag-bookmark-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; color: var(--ink-faint); font-size: 10.5px; }
+.rag-bookmark-filter select { width: auto; max-width: 100%; height: 30px; padding: 0 8px; font-size: 10.5px; }
+#rag-bookmark-records .pipeline-meta { overflow-wrap: anywhere; }

@@ -247,16 +247,10 @@
                     <div class="rag-stat" data-stat="total"><span>总书签</span><strong id="rag-stat-total">—</strong></div>
                     <div class="rag-stat" data-stat="collected"><span>已收录</span><strong id="rag-stat-collected">—</strong></div>
                     <div class="rag-stat" data-stat="uncollected"><span>未收录</span><strong id="rag-stat-uncollected">—</strong></div>
-                    <div class="rag-stat" data-stat="failed"><span>失败数量</span><strong id="rag-stat-failed">—</strong></div>
-                    <div class="rag-stat" data-stat="queue"><span>处理队列</span><strong id="rag-stat-queue">—</strong></div>
+                    <div class="rag-stat" data-stat="failed"><span>失败数量（任务）</span><strong id="rag-stat-failed">—</strong></div>
+                    <div class="rag-stat" data-stat="queue"><span>处理队列（任务）</span><strong id="rag-stat-queue">—</strong></div>
                   </div>
-                  <p class="hint">总书签 = 已收录 + 未收录（单位：书签）。失败数量、处理队列与下方列表一致（单位：任务）。</p>
-                  <p id="rag-uncollected-breakdown" class="hint rag-count-breakdown" role="status" aria-live="polite">正在读取未收录分类…</p>
-                  <details id="rag-uncollected-details" class="automation-details" data-collapsed>
-                    <summary>查看未收录明细（<span id="rag-uncollected-count">0</span> 个书签）</summary>
-                    <p class="hint">每个未收录书签均列在下面。同一网页的多个书签共用一个任务，已收录书签也可能有更新失败任务，不能直接用未收录数减去失败任务数。</p>
-                    <div id="rag-uncollected-items" class="rag-uncollected-items"></div>
-                  </details>
+                  <p class="hint">已收录 + 未收录 = 总书签。下方“已收录 / 未收录”按书签逐条展示，“处理任务 / 失败任务”按任务展示。</p>
                   <div class="automation-path" aria-label="同步流程：采集正文、同步入库、可搜索"><span>采集正文</span><b aria-hidden="true">→</b><span>同步入库</span><b aria-hidden="true">→</b><span>可搜索</span></div>
                 </div>
                 <p id="rag-connection-status" class="automation-progress" role="status" aria-live="polite">RAG 连接尚未检测</p>
@@ -264,9 +258,11 @@
                 <div class="inline-actions rag-actions"><button id="rag-check" class="btn-ghost" type="button">检测连接</button></div>
                 <div id="pipeline-audit-results" hidden role="region" aria-label="历史收录审查"></div>
                 <p id="pipeline-status" class="automation-progress visually-hidden" role="status" aria-live="polite">自动同步未开启</p>
-                <div class="rag-task-tabs" role="tablist" aria-label="同步任务">
+                <div class="rag-task-tabs" role="tablist" aria-label="书签收录与同步任务">
                   <button id="rag-processing-tab" type="button" role="tab" aria-selected="true" aria-controls="rag-processing-panel" data-rag-tab="processing">处理任务 <em id="rag-processing-count">0</em></button>
                   <button id="rag-failures-tab" type="button" role="tab" aria-selected="false" aria-controls="rag-failures-panel" tabindex="-1" data-rag-tab="failures">失败任务 <em id="rag-failure-count">0</em></button>
+                  <button id="rag-collected-tab" type="button" role="tab" aria-selected="false" aria-controls="rag-bookmarks-panel" tabindex="-1" data-rag-tab="collected">已收录 <em id="rag-collected-count">0</em></button>
+                  <button id="rag-uncollected-tab" type="button" role="tab" aria-selected="false" aria-controls="rag-bookmarks-panel" tabindex="-1" data-rag-tab="uncollected">未收录 <em id="rag-uncollected-count">0</em></button>
                 </div>
                 <div id="rag-processing-panel" role="tabpanel" aria-labelledby="rag-processing-tab">
                   <div class="inline-actions rag-actions"><button id="pipeline-start" class="btn-ghost action-primary" type="button">批量处理</button><button id="pipeline-pause" class="btn-ghost rag-pause" type="button">暂停处理</button></div>
@@ -298,6 +294,12 @@
                   <p id="pipeline-retry-status" class="hint" role="status" aria-live="polite"></p>
                   <p id="pipeline-delete-status" class="hint" role="status" aria-live="polite"></p>
                   <div id="rag-failure-records" class="pipeline-records"></div>
+                </div>
+                <div id="rag-bookmarks-panel" role="tabpanel" aria-labelledby="rag-collected-tab" hidden>
+                  <p id="rag-bookmark-description" class="automation-description"></p>
+                  <label id="rag-bookmark-filter-label" class="rag-bookmark-filter">未收录原因 <select id="rag-bookmark-filter" class="text-input" aria-label="按未收录原因筛选"><option value="all">全部原因</option></select></label>
+                  <p id="rag-bookmark-status" class="automation-progress" role="status" aria-live="polite"></p>
+                  <div id="rag-bookmark-records" class="pipeline-records"></div>
                 </div>
               </section>
           </div>

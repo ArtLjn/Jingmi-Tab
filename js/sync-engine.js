@@ -105,12 +105,12 @@
     if (!doc) return { status: 'done' };
     if (doc.outcomeUnknown) { var unknown = new Error('云端操作结果待核验，已停止自动重发'); unknown.code = 'outcome_unknown'; throw unknown; }
     if (job.kind === 'cleanup') {
-      if (doc.revision !== job.cleanupRevision || String(doc.text || '').trim()) return { status: 'done' };
+      if (doc.revision !== job.cleanupRevision || String(doc.text || '').trim() || IngestPolicy.personal(doc)) return { status: 'done' };
       var cleanupStale = await deleteCurrent(doc, cfg, 'historical_metadata');
       await Documents.update(doc.id, function (current) { if (!cleanupStale) { current.admissionState = 'metadata'; current.admissionReason = 'historical_metadata'; current.policyVersion = IngestPolicy.VERSION; current.lastEvaluatedError = current.captureError || ''; } return current; });
       return { status: 'done', stale: cleanupStale };
     }
-    if (doc.deleted || IngestPolicy.privateDoc(doc) && !cfg.rag.includePrivate) {
+    if (doc.deleted || IngestPolicy.privateDoc(doc) && !cfg.rag.includePrivate && !IngestPolicy.personal(doc)) {
       var deletionStale = await deleteCurrent(doc, cfg, doc.deleted ? 'deleted' : 'private');
       await Documents.update(doc.id, function (current) { if (!deletionStale) { current.admissionState = 'excluded'; current.policyVersion = IngestPolicy.VERSION; current.lastEvaluatedError = current.captureError || ''; current.syncState = current.deleted ? 'deleted' : 'excluded'; } return current; });
       return { status: 'done', stale: deletionStale };
@@ -119,7 +119,8 @@
     var blocked = null;
     var captureNeeded = job.force || !!doc.captureError || !doc.fetchedAt || doc.captureState === 'pending';
     var protectedCapture = IngestPolicy.privateDoc(doc);
-    if (captureNeeded && cfg.rag.autoCapture !== false && !protectedCapture) {
+    var personalOnly = IngestPolicy.personal(doc) && !doc.text && !job.force && !await AgentDB.getMeta('pipeline:manual');
+    if (captureNeeded && cfg.rag.autoCapture !== false && !protectedCapture && !personalOnly) {
       try { doc = await Documents.capture(doc.id, await CaptureAdapters.read(doc, cfg.rag, job.force)); }
       catch (e) {
         blocked = e;
@@ -152,7 +153,7 @@
     var updated = await Documents.update(doc.id, function (current) {
       if (current.revision === revision && !current.deleted) {
         current.syncState = result.held ? 'paused' : result.excluded ? 'excluded' : 'synced';
-        if (!result.held && !result.excluded) { current.indexedAt = Date.now(); current.indexedRevision = revision; }
+        if (!result.held && !result.excluded) { current.indexedAt = Date.now(); current.indexedRevision = revision; current.indexedQuality = verdict.includeBody === false ? 'personal' : 'body'; }
       }
       return current;
     });
@@ -380,8 +381,8 @@
     return (await AgentDB.allRecords('documents')).filter(function (doc) { return !doc.deleted && receipts[doc.id]; }).map(function (doc) {
       var receipt = receipts[doc.id]; var empty = !String(doc.text || '').trim();
       return { id: doc.id, title: doc.title, url: doc.identity.canonicalUrl, revision: doc.revision,
-        reason: empty ? '本地未保存正文，请核对是否仅元数据' : receipt.quality === 'body' ? '已确认正文版本，保留' : '历史记录资格未核验，保留',
-        selectable: empty && !doc.outcomeUnknown, quality: receipt.quality || 'unknown' };
+        reason: receipt.quality === 'personal' ? '已确认用户备注和别名，保留' : empty ? '本地未保存正文，请核对是否仅元数据' : receipt.quality === 'body' ? '已确认正文版本，保留' : '历史记录资格未核验，保留',
+        selectable: empty && !IngestPolicy.personal(doc) && receipt.quality !== 'personal' && !doc.outcomeUnknown, quality: receipt.quality || 'unknown' };
     });
   }
   async function clean(ids) {

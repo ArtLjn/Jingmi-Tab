@@ -206,6 +206,7 @@ test('浏览器回归：原有目录、RAG 正文同步、旧日志撤销和窄�
     assert.equal(await page.locator('#rag-enabled').isChecked(), false);
     assert.equal(model.node('1').parentId, '10');
     assert.match(Array.from(cloudDocs.values())[0].content, /应收凭证/);
+    assert.match(Array.from(cloudDocs.values())[0].content, /用户填写[\s\S]*书签空间直接编辑备注/);
     await page.screenshot({ path: '/tmp/chrome-tab-rag-bookmarks.png', animations: 'disabled' });
     await page.locator('#panel-close').click();
     await page.locator('#search-input').fill('/应收凭证');

@@ -1,7 +1,27 @@
-/* 个人入口的只读检索投影，不修改采集正文或云端元数据。 */
+/* 个人入口检索投影：人工资料与网页正文分别标记来源。 */
 (function (global) {
   'use strict';
   var identities = new Map();
+  async function records() {
+    var result = new Map();
+    if (!global.QuickTags || !global.Documents) return result;
+    await QuickTags.load();
+    for (var tag of QuickTags.list()) {
+      try {
+        var info = await Documents.forUrl(tag.url);
+        var items = result.get(info.id) || [];
+        items.push({ label: String(tag.label || '').trim(), aliases: Array.from(new Set(tag.aliases || [])).sort(), note: String(tag.note || '').trim() });
+        result.set(info.id, items);
+      } catch (e) { /* 不支持的网址不参与 RAG 关联。 */ }
+    }
+    result.forEach(function (items) { items.sort(function (a, b) { return JSON.stringify(a).localeCompare(JSON.stringify(b)); }); });
+    return result;
+  }
+  function describe(items) {
+    return (items || []).map(function (item) {
+      return '【用户填写，仅说明个人称呼和用途，不代表网页正文】\n快捷名称：' + item.label + '\n人工别名：' + item.aliases.join('、') + '\n个人备注：' + item.note;
+    }).join('\n\n');
+  }
   function key(url) { if (identities.has(url)) return identities.get(url); try { return global.Documents ? Documents.identity(url).key : new URL(url).href; } catch (e) { return ''; } }
   async function hydrate(rows) {
     identities.clear();
@@ -19,11 +39,12 @@
       if (!tags.length && !row.personalNames) return;
       row.personalNames = tags.flatMap(function (t) { return [t.label].concat(t.aliases || []); });
       row.personalNote = tags.map(function (t) { return t.note || ''; }).join(' ');
+      row.personalEvidence = describe(tags.map(function (t) { return { label: t.label, aliases: t.aliases || [], note: t.note || '' }; }));
       row.hay = [row.title, row.url, row.folder, row.site, (row.segs || []).join(' '), row.pageTitle, row.desc, row.text, (row.classTags || []).join(' '), row.aiSummary, (row.aiFacts || []).join(' '), row.personalNames.join(' '), row.personalNote].join(' ').normalize('NFKC').toLowerCase();
     });
     return rows;
   }
-  /* 内部代号只在本机解析；对外查询改为原始网页身份，不发送人工说明。 */
+  /* 先在本机解析内部代号；RAG 文档中的人工资料独立标注来源。 */
   function resolve(query, rows) {
     var q = String(query || ''); var normalized = global.QuickTags ? QuickTags.fold(q) : q.toLowerCase(); var hits = [];
     (rows || []).forEach(function (row) {
@@ -52,5 +73,5 @@
     var matched = new Set(QuickTags.search(query, {}).pinned.map(function (t) { return 'quick:' + t.id; }));
     return all.filter(function (row) { return exact.has(row.id) || matched.has(row.id); });
   }
-  global.PersonalTargets = { hydrate: hydrate, apply: apply, resolve: resolve, independent: independent };
+  global.PersonalTargets = { records: records, describe: describe, hydrate: hydrate, apply: apply, resolve: resolve, independent: independent };
 })(typeof self !== 'undefined' ? self : window);

@@ -151,6 +151,81 @@ test('不同飞书 token 不合并，wiki 只有解析到真实文档后才关�
 
 module.exports = { setup };
 
+function manualEntry(note = '办理报销和请假', aliases = ['007', 'OA']) {
+  return { id: 'manual', label: '公司平台', aliases, note, url: 'https://example.com/a' };
+}
+test('无正文的人工备注和别名单独入库，无需访问源站且不会被元数据清理选中', async () => {
+  const f = setup({ permission: false }); f.c.QuickTags._inject({ tags: [manualEntry()] });
+  await f.c.SyncEngine.request();
+  const doc = (await f.c.AgentDB.allRecords('documents'))[0];
+  const saved = Array.from(f.docs.values())[0];
+  assert.equal(f.calls().publicCalls, 0); assert.equal(f.docs.size, 1);
+  assert.match(saved.content, /用户填写[\s\S]*公司平台[\s\S]*007[\s\S]*报销和请假/);
+  assert.equal(saved.metadata.record_quality, 'personal'); assert.equal(saved.metadata.coverage, 'personal');
+  assert.equal(doc.text, undefined); assert.equal(doc.indexedQuality, 'personal');
+  assert.match(f.c.Documents.syncLabel(doc), /未收录正文/);
+  assert.equal((await f.c.SyncEngine.audit())[0].selectable, false);
+  const stats = await f.c.CollectionStats.read(); assert.equal(stats.collected, 2);
+  const rows = f.c.Bookmarks.flatten(f.tree);
+  assert.equal((await f.c.Rag.retrieve(f.config.rag, '人员报销系统', rows)).length, 1);
+  await f.c.SyncEngine.request(); assert.equal(f.calls().ingests, 1);
+});
+test('登录失败不妨碍备注收录，登录页内容不会混入检索资料', async () => {
+  const f = setup(); f.c.QuickTags._inject({ tags: [manualEntry()] });
+  const original = f.c.fetch;
+  f.c.fetch = (url, init) => url.startsWith(f.config.rag.baseUrl) ? original(url, init) : Promise.resolve(new Response('<title>登录</title><body>扫码输入密码</body>', { headers: { 'content-type': 'text/html' } }));
+  await f.c.SyncEngine.request({ force: true });
+  const saved = Array.from(f.docs.values())[0];
+  assert.match(saved.content, /办理报销和请假/); assert.doesNotMatch(saved.content, /扫码输入密码/);
+  assert.equal((await f.c.AgentDB.allRecords('jobs'))[0].status, 'done');
+});
+test('备注和别名修改会更新指纹，旧人工信息在同步前即停止召回；全部删除后清理云端', async () => {
+  const f = setup(); f.c.QuickTags._inject({ tags: [manualEntry()] });
+  await f.c.SyncEngine.request();
+  const rows = f.c.Bookmarks.flatten(f.tree);
+  f.c.QuickTags._inject({ tags: [manualEntry('仅办理请假', ['008'])] });
+  assert.equal((await f.c.Rag.retrieve(f.config.rag, '报销', rows)).length, 0);
+  await f.c.SyncEngine.request(); assert.equal(f.calls().ingests, 2); assert.equal(f.docs.size, 1);
+  const saved = Array.from(f.docs.values())[0];
+  assert.match(saved.content, /008[\s\S]*仅办理请假/); assert.doesNotMatch(saved.content, /007|报销/);
+  f.c.QuickTags._inject({ tags: [] });
+  assert.equal((await f.c.Rag.retrieve(f.config.rag, '请假', rows)).length, 0);
+  f.config.rag.autoCapture = false;
+  await f.c.SyncEngine.request(); assert.equal(f.docs.size, 0);
+});
+test('正文与人工信息共同更新，移除备注不会丢失合格旧正文', async () => {
+  const f = setup(); await f.c.SyncEngine.request();
+  const old = (await f.c.AgentDB.allRecords('documents'))[0];
+  f.c.QuickTags._inject({ tags: [manualEntry()] }); await f.c.SyncEngine.request();
+  assert.match(Array.from(f.docs.values())[0].content, /订单会自动生成[\s\S]*个人备注/);
+  const original = f.c.fetch;
+  f.c.fetch = (url, init) => url.startsWith(f.config.rag.baseUrl) ? original(url, init) : Promise.reject(new Error('断网'));
+  f.c.QuickTags._inject({ tags: [] }); await f.c.SyncEngine.request({ force: true });
+  const saved = Array.from(f.docs.values())[0];
+  assert.match(saved.content, /订单会自动生成/); assert.doesNotMatch(saved.content, /个人备注|007/);
+  assert.equal(saved.metadata.record_quality, 'body');
+  assert.equal((await f.c.Documents.get(old.id)).text, old.text);
+});
+test('备注可单独收录，关闭私有正文上传后不携带私有正文或描述', async () => {
+  const f = setup(); await f.c.SyncEngine.reconcile(false);
+  const doc = (await f.c.AgentDB.allRecords('documents'))[0];
+  await f.c.Documents.capture(doc.id, { text: '私有机密正文', desc: '私有页面描述', source: 'capture', private: true, coverage: 'rendered', captureState: 'partial' });
+  f.c.QuickTags._inject({ tags: [manualEntry()] });
+  f.config.rag.includePrivate = true; await f.c.SyncEngine.request();
+  assert.match(Array.from(f.docs.values())[0].content, /私有机密正文/);
+  f.config.rag.includePrivate = false; await f.c.SyncEngine.request({ force: true });
+  const saved = Array.from(f.docs.values())[0];
+  assert.doesNotMatch(saved.content, /私有机密正文|私有页面描述/);
+  assert.match(saved.content, /办理报销/); assert.equal(saved.metadata.private, false);
+  f.c.QuickTags._inject({ tags: [] }); await f.c.SyncEngine.request(); assert.equal(f.docs.size, 0);
+});
+test('同域不同路径的备注不串入，删除最后书签仍清理人工资料', async () => {
+  const f = setup(); f.c.QuickTags._inject({ tags: [{ ...manualEntry(), url: 'https://example.com/b' }] });
+  await f.c.SyncEngine.request(); assert.doesNotMatch(Array.from(f.docs.values())[0].content, /007|办理报销/);
+  f.c.QuickTags._inject({ tags: [manualEntry()] }); await f.c.SyncEngine.request();
+  f.node('1').children = []; await f.c.SyncEngine.request(); assert.equal(f.docs.size, 0);
+});
+
 test('服务不可用时使用持久化退避，不在每次唤醒重复连接', async () => {
   const f = setup(); let attempts = 0;
   f.c.Rag.ensure = async () => { attempts++; throw new Error('RAG 请求失败（503）'); };
