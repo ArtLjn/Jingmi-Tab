@@ -359,7 +359,7 @@ test('保存失败不发布新状态；不支持的新版拒绝写回', async ()
 
 test('字段限制不静默截断，拒绝凭据网址与冲突 URL', async () => {
   const c = seeded([{ id: 'a', label: '公司平台', url: 'https://portal.example.com/', note: '原说明' }]);
-  assert.equal(c.QuickTags.validate({ label: '名'.repeat(41), url: 'https://example.com' }).ok, false);
+  assert.equal(c.QuickTags.validate({ label: '名'.repeat(201), url: 'https://example.com' }).ok, false);
   assert.equal(c.QuickTags.validate({ label: '名称', note: '字'.repeat(501), url: 'https://example.com' }).ok, false);
   assert.equal(c.QuickTags.normalizeUrl('https://user:password@example.com/'), '');
   assert.equal((await c.QuickTags.save({ label: '重复入口', url: 'https://portal.example.com/' })).ok, false);
@@ -379,4 +379,25 @@ test('Unicode 名称按字符计数，保存与重载不截断合法的表情名
   assert.equal(added.ok, true); assert.equal(added.tag.label, label);
   await c.QuickTags.flush(); await c.QuickTags.reload(); assert.equal(c.QuickTags.list()[0].label, label);
   assert.equal(store['newtab.tags.v1'].tags[0].label, label);
+});
+
+test('长书签名称保存、改名和备份往返遵循相同上限且不截断', async () => {
+  const { c } = storageContext({ tags: [] }); await c.QuickTags.load();
+  const label = '仓储工时与薪资系统·排期 - 飞书云文档' + '完整标题'.repeat(10);
+  const saved = await c.QuickTags.save({ label, url: 'https://example.com/salary', aliases: ['suanxin', '算薪资'], note: '虹迪算薪排期表' });
+  assert.equal(saved.ok, true);
+  await c.QuickTags.reload(); assert.equal(c.QuickTags.list()[0].label, label);
+  assert.equal(c.QuickTags.search('suanxin', {}).pinned[0].note, '虹迪算薪排期表');
+  const dump = c.QuickTags.exportData();
+  const other = storageContext({ tags: [] }); await other.c.QuickTags.load();
+  assert.equal(other.c.QuickTags.importData(dump).added, 1);
+  await other.c.QuickTags.flush(); await other.c.QuickTags.reload();
+  assert.equal(other.c.QuickTags.list()[0].label, label);
+  const boundary = '😀'.repeat(200);
+  assert.equal(c.QuickTags.rename(saved.tag.id, boundary), true);
+  await c.QuickTags.flush(); await c.QuickTags.reload();
+  assert.equal(c.QuickTags.list()[0].label, boundary);
+  assert.equal(c.QuickTags.rename(saved.tag.id, boundary + '字'), false);
+  assert.equal(c.QuickTags.validate({ label: '  ', url: saved.tag.url }).ok, false);
+  assert.equal(c.QuickTags.validate({ label, url: saved.tag.url, aliases: ['别'.repeat(41)] }).ok, false);
 });

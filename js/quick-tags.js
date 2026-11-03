@@ -17,6 +17,7 @@
   var STORE_KEY = 'newtab.tags.v1';
   var STATE_VERSION = 3;       // v2：hits/lastUsed 参与排序，pin 只作同频兜底
   var MAX_MANUAL = 200;        // 手动标签上限，超出后拒绝新建
+  var MAX_LABEL = 200;         // 完整书签标题也可作为快捷名称
   var DISMISS_LIMIT = 3;       // 同一候选被隐藏 3 次后永久不再生成
   var RECENT_BM_DAYS = 120;    // 只看最近 120 天新增的书签做候选
   var MAX_CANDIDATES = 12;     // 候选池上限，面板只取前几条
@@ -553,7 +554,7 @@
     var tag = state.tags.filter(function (t) { return t.id === id; })[0];
     if (!tag) return false;
     var next = String(label || '').trim();
-    if (Array.from(next).length > 40 || !next) return false;
+    if (Array.from(next).length > MAX_LABEL || !next) return false;
     tag.label = next; tag.revision = (tag.revision || 0) + 1; tag.updatedAt = Date.now();
     persist();
     return true;
@@ -705,7 +706,7 @@
     var aliases = Array.isArray(input.aliases) ? input.aliases.map(function (v) { return String(v).trim(); }).filter(Boolean) : [];
     var note = String(input.note || '').trim();
     if (!url) return { ok: false, error: '请填写有效的网址，不能含登录凭据' };
-    if (!label || Array.from(label).length > 40) return { ok: false, error: '名称需为 1–40 个字' };
+    if (!label || Array.from(label).length > MAX_LABEL) return { ok: false, field: 'label', error: '名称需为 1–' + MAX_LABEL + ' 个字' };
     if (aliases.length > 20 || aliases.some(function (v) { return Array.from(v).length > 40; })) return { ok: false, error: '别名最多 20 个，每个不超过 40 个字' };
     if (Array.from(note).length > 500) return { ok: false, error: '个人说明不能超过 500 个字' };
     var seen = new Set([fold(label)]);
@@ -778,6 +779,6 @@
     _inject: function (raw) { state = normalize(raw); loaded = true; stateRev = 0; return state; },
     _state: function () { return state; },
     _freq: freqOf,
-    LIMITS: { MAX_MANUAL: MAX_MANUAL, DISMISS_LIMIT: DISMISS_LIMIT, PIN_LIMIT: PIN_LIMIT, CAND_LIMIT: CAND_LIMIT }
+    LIMITS: { MAX_LABEL: MAX_LABEL, MAX_MANUAL: MAX_MANUAL, DISMISS_LIMIT: DISMISS_LIMIT, PIN_LIMIT: PIN_LIMIT, CAND_LIMIT: CAND_LIMIT }
   };
 })(typeof self !== 'undefined' ? self : window);

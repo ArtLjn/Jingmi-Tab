@@ -72,6 +72,11 @@
     }
 
     var labelInput = field('label', '快捷名称', tag.label);
+    var labelHint = node('p');
+    labelHint.className = 'hint';
+    labelHint.id = 'tag-label-hint';
+    labelInput.setAttribute('aria-describedby', labelHint.id);
+    form.append(labelHint);
     labelInput.addEventListener('input', function () { labelTouched = true; });
 
     var aliasInput = field('aliases', '别名', (tag.aliases || (options.alias ? [options.alias] : [])).join('、'));
@@ -162,6 +167,10 @@
 
     function preview() {
       var value = values();
+      var length = Array.from(value.label.trim()).length;
+      var tooLong = length > QuickTags.LIMITS.MAX_LABEL;
+      labelHint.textContent = length + ' / ' + QuickTags.LIMITS.MAX_LABEL + ' 字' + (tooLong ? '，请缩短快捷名称' : '');
+      labelInput.setAttribute('aria-invalid', String(tooLong));
       var conflicts = QuickTags.conflicts(value, tag.id);
       output.textContent = '@' + (value.aliases[0] || value.label || '名称') + ' → ' + (value.label || '入口')
         + ' · ' + (QuickTags.hostOf(QuickTags.normalizeUrl(value.url)) || '填写网址')
@@ -174,7 +183,7 @@
       var host = QuickTags.hostOf(QuickTags.normalizeUrl(urlInput.value));
       if (host) labelInput.value = host;
     });
-    form.addEventListener('input', preview);
+    form.addEventListener('input', function () { error.textContent = ''; preview(); });
 
     var actions = node('div');
     actions.className = 'row';
@@ -191,6 +200,12 @@
     form.addEventListener('submit', async function (ev) {
       ev.preventDefault();
       if (save.disabled) return;
+      var checked = QuickTags.validate(values());
+      if (!checked.ok) {
+        error.textContent = checked.error;
+        if (checked.field && fields[checked.field]) fields[checked.field].focus();
+        return;
+      }
       save.disabled = true;
       cancel.disabled = true;
       var result = await QuickTags.save(values(), tag.id, tag.revision || 0);

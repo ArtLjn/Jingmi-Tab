@@ -190,6 +190,32 @@ test('浏览器回归：快捷标签管理页的改名、排序、撤销与恢�
     assert.equal(await page.locator('.tag-editor input[name="label"]').inputValue(), 'GitHub');
     await page.locator('.tag-editor').getByRole('button', { name: '保存', exact: true }).click();
     await page.waitForFunction(() => QuickTags.list().some(t => t.aliases.includes('zzz') && t.url === 'https://github.com/'));
+
+    /* 长书签标题可直接保存；纠正超限输入后旧错误及时清除。 */
+    const salaryTitle = '仓储工时与薪资系统·排期 - 飞书云文档';
+    const longTitle = salaryTitle + '完整书签标题'.repeat(8);
+    await page.evaluate(label => TagEditor.open({ tag: { label, url: 'https://salary.example.com/sheets/1' } }), longTitle);
+    await page.getByLabel('别名', { exact: true }).fill('suanxin,算薪资');
+    await page.getByLabel('个人说明', { exact: true }).fill('虹迪算薪排期表');
+    await page.locator('.tag-editor').getByRole('button', { name: '保存', exact: true }).click();
+    await page.locator('.tag-editor').waitFor({ state: 'hidden' });
+    await page.reload();
+    await page.waitForFunction(() => QuickTags.list().some(t => t.aliases.includes('suanxin')));
+    assert.equal(await page.evaluate(() => QuickTags.search('算薪资', {}).pinned[0].label), longTitle);
+    await page.evaluate(() => TagEditor.open({ tag: QuickTags.list().find(t => t.aliases.includes('suanxin')) }));
+    await page.getByLabel('快捷名称', { exact: true }).fill('名'.repeat(201));
+    await page.locator('.tag-editor').getByRole('button', { name: '保存', exact: true }).click();
+    assert.match(await page.locator('.tag-editor [role=alert]').innerText(), /1–200/);
+    assert.equal(await page.getByLabel('快捷名称', { exact: true }).getAttribute('aria-invalid'), 'true');
+    assert.equal(await page.evaluate(() => document.activeElement.name), 'label');
+    await page.getByLabel('快捷名称', { exact: true }).fill(salaryTitle);
+    assert.equal(await page.locator('.tag-editor [role=alert]').innerText(), '');
+    assert.equal(await page.getByLabel('快捷名称', { exact: true }).getAttribute('aria-invalid'), 'false');
+    await page.locator('.tag-editor').getByRole('button', { name: '保存', exact: true }).click();
+    await page.locator('.tag-editor').waitFor({ state: 'hidden' });
+    await page.reload();
+    await page.waitForFunction(() => QuickTags.list().some(t => t.label === '仓储工时与薪资系统·排期 - 飞书云文档'));
+    assert.equal(await page.evaluate(() => QuickTags.search('suanxin', {}).pinned[0].note), '虹迪算薪排期表');
   } finally {
     if (browser) await browser.close();
     server.close();
