@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "静谧新标签页",
   "short_name": "静谧",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "description": "极简新标签页：大时钟、农历日期、胶囊搜索框，背景可上传、粘贴、拖拽，也可从在线壁纸库一键更换。支持输入实时联想、本地书签检索、@ 快捷标签按频率直达与可选 AI 短名。每日一言多源轮换、自动去重；配置可备份到自建服务。",
   "chrome_url_overrides": {
     "newtab": "newtab.html"

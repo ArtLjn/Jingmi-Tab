@@ -11,10 +11,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.16.0-4C5FD5?style=flat-square" alt="v1.16.0">
+  <img src="https://img.shields.io/badge/version-1.17.0-4C5FD5?style=flat-square" alt="v1.17.0">
   <img src="https://img.shields.io/badge/Manifest-V3-1F6FEB?style=flat-square" alt="Manifest V3">
   <img src="https://img.shields.io/badge/JavaScript-原生实现-F7DF1E?style=flat-square" alt="Vanilla JS">
-  <img src="https://img.shields.io/badge/tests-143%20passing-2E7D32?style=flat-square" alt="143 tests">
+  <img src="https://img.shields.io/badge/tests-306%20passing-2E7D32?style=flat-square" alt="306 tests">
   <img src="https://img.shields.io/badge/local--first-仅本机存储-64748B?style=flat-square" alt="Local first">
 </p>
 
@@ -51,7 +51,7 @@
 | 工作台 | 外观、搜索与 AI、书签空间、快捷标签各自独立；设置页在导航最后只放时间/显示开关；左下角头像进入账号与备份 |
 | 数据 | IndexedDB 本机存储；完整配置可导出 JSON，或登录自建账号服务按账号备份到 MySQL（密码不落盘） |
 
-**当前版本：1.16.0**（`manifest.json`）
+**当前版本：1.17.0**（`manifest.json`）
 
 <a id="preview"></a>
 
@@ -167,7 +167,7 @@
 - 中文输入法组合期间不重算候选，避免列表在拼音中间态来回跳。
 - 快捷标签本身全部保存在本机、不申请 `history` 权限。关闭「偏好设置 → 快捷标签（@）」后，`@` 退回普通搜索字符；关闭「@ 面板 AI 短名」后完全停止 AI 请求。
 
-工作台「快捷标签」页负责管理：固定区可点击名称改名、上移 / 下移调序、删除（8 秒内可撤销）；「系统推荐」可一键固定或忽略；「已忽略」列出被隐藏的站点并支持恢复；「数据」支持导出 / 导入 JSON 与清空学习记录。导出的 JSON 只含固定标签，忽略记录与使用次数属于本地行为数据，不随文件流转。完整配置（含 AI Key 与自动化规则）请点击左下角头像，在「账号与备份」里操作。
+工作台「快捷标签」页负责管理：固定区可点击名称改名、上移 / 下移调序、删除（8 秒内可撤销）；快捷名称上限 200 个字符，可以直接保留完整书签标题，编辑器实时显示字数并在提交前校验；「系统推荐」可一键固定或忽略；「已忽略」列出被隐藏的站点并支持恢复；「数据」支持导出 / 导入 JSON 与清空学习记录。导出的 JSON 只含固定标签，忽略记录与使用次数属于本地行为数据，不随文件流转。完整配置（含 AI Key 与自动化规则）请点击左下角头像，在「账号与备份」里操作。
 
 设计取舍与后续规划见 [`docs/quick-tags-design.md`](docs/quick-tags-design.md)。
 
@@ -217,7 +217,7 @@
 - 描述式检索：把一整句描述拆成主体 / 场景 / 光线 / 风格 / 色调五类概念词，组合出最多 3 条检索式——国内图库用中文组合，海外图源用英文组合。结果按命中概念加权排序，同分保留图源原有配额，不会让某个图源被挤没。全部在本地词表完成，不联网也不依赖配置。
 - 搜索联想：输入时取描述里最靠前的两个概念，再补一个还没写到的氛围词，给出 3–4 条可直接点的短语；配置了 AI 时会多一个「AI 联想」，由模型把口语压成 2–5 个检索短语，失败自动退回本地建议。联想只产出检索词，不生成图片描述。
 - 使用历史：左侧「最近使用」卡片保留最近 12 条在线应用记录（来源、标题、缩略图、地址、尺寸、时间），点缩略图直接恢复——复用已解析的地址，不再请求图源；可一键清空。历史只存本机。
-- 加载顺序：缩略图按视口懒加载，首屏只请求可见区域附近，滚动后再补；本地图库与使用历史在外观页真正打开时才渲染，减少新标签页启动请求。背景图先解码再显示，期间用镜片扫光加载层过渡，解码失败保留当前背景。
+- 加载顺序：新标签页先显示启动画面遮罩，壁纸绘制完成后再淡出退场（最短停留 420ms，兜底 2.6 秒必退场）；缩略图按视口懒加载，首屏只请求可见区域附近，滚动后再补；本地图库与使用历史在外观页真正打开时才渲染，减少新标签页启动请求。背景图先解码再显示，期间用镜片扫光加载层过渡，解码失败保留当前背景。
 - 来源、原始图片和真实分辨率会记录在设置或离线图库中。默认更换图源不会删除已有背景或旧图库；线上地址失效时可重新选图，或使用此前主动保存的离线版本。
 - 拾光壁纸（gallery.timeline.ink）用于风格参考，未伪装为已接入图源：当前公开页面的聚合接口直接请求返回「授权 KEY 缺失」，需要按其开放接口授权方式单独对接。
 - 版权归原站与原作者，请仅作个人桌面使用。
@@ -370,7 +370,7 @@ git clone https://github.com/ArtLjn/Jingmi-Tab.git
 ## 项目结构
 
 ```
-manifest.json          扩展清单（MV3，版本 1.16.0）
+manifest.json          扩展清单（MV3，版本 1.17.0）
 newtab.html            页面结构
 css/newtab.css         样式（深色玻璃弹层与工作台布局）
 assets/                图标与 Logo 母版
@@ -430,8 +430,8 @@ tools/check-js.js      JavaScript 语法检查
 
 ```bash
 npm ci        # 安装开发依赖
-npm test      # 143 项自动化断言
-npm run lint  # 59 个 JavaScript 文件语法检查
+npm test      # 306 项自动化断言
+npm run lint  # 89 个 JavaScript 文件语法检查
 ```
 
 `npm test` 覆盖内容采集、IndexedDB 重载、缓存、任务恢复、IP 精确检索、问答引用、收藏补全、书签体检规则、模型路由、重复入库防护、原目录保持不变、域名记忆归档、搜索联想、快捷标签、AI 短名推荐与配置备份。浏览器回归使用本机 Chrome，其他系统可设置 `CHROME_PATH`。
