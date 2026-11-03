@@ -48,6 +48,7 @@
     var collected = new Set(), queued = new Set(), failed = new Set(), policies = new Map();
     var details = new Map();
     var bookmarkDocs = new Map();
+    var coverage = { body: 0, profile: 0, personal: 0 };
     groups.forEach(function (group, id) {
       var doc = docsById.get(id), job = jobsById.get(id);
       var current = doc && !doc.deleted;
@@ -56,8 +57,8 @@
       var written = current && receipt && receipt.docId && !['invalid', 'excluded', 'metadata'].includes(doc.admissionState) && receipt.quality !== 'metadata' && !(privateDoc && !cfg.includePrivate && receipt.quality !== 'personal');
       group.rows.forEach(function (row) {
         var key = String(row.id);
-        if (current) bookmarkDocs.set(key, { doc: doc, job: job });
-        if (written) collected.add(key);
+        if (current) bookmarkDocs.set(key, { doc: doc, job: job, quality: receipt && receipt.quality });
+        if (written) { collected.add(key); var quality = receipt.quality || 'body'; if (coverage[quality] !== undefined) coverage[quality]++; }
         if (!written && current) {
           var kind = taskKind({ status: job && job.status || 'unqueued', error: job && job.error, sync: doc.syncState, admission: doc.admissionState, outcomeUnknown: doc.outcomeUnknown });
           var state = kind || (job && job.status === 'done' ? 'manual' : 'unarranged');
@@ -104,10 +105,11 @@
     var collectedItems = rows.filter(function (row) { return collected.has(String(row.id)); }).map(function (row) {
       var info = bookmarkDocs.get(String(row.id));
       var updateFailed = info && taskKind({ status: info.job && info.job.status, error: info.job && info.job.error, sync: info.doc.syncState, admission: info.doc.admissionState, outcomeUnknown: info.doc.outcomeUnknown }) === 'failed';
-      return { id: String(row.id), documentId: info && info.doc.id, title: row.title || row.url, url: row.url, reasonKey: 'collected', reasonLabel: '已收录', reason: updateFailed ? '已有内容可检索；最近一次更新失败，可在失败任务中查看。' : '内容已入库，可用于检索。' };
+      var description = info && info.quality === 'profile' ? '网站资料可检索；尚未取得正文，不能据此回答具体文档内容。' : info && info.quality === 'personal' ? '用户备注和别名可检索；尚未收录正文。' : '内容已入库，可用于检索。';
+      return { id: String(row.id), documentId: info && info.doc.id, title: row.title || row.url, url: row.url, quality: info && info.quality, reasonKey: 'collected', reasonLabel: '已收录', reason: updateFailed ? '已有内容可检索；最近一次更新失败，可在失败任务中查看。' : description };
     });
     return { total: rows.length, collected: collected.size, uncollected: rows.length - collected.size,
-      collectedItems: collectedItems, uncollectedItems: uncollectedItems, uncollectedBreakdown: uncollectedBreakdown,
+      collectedItems: collectedItems, coverage: coverage, uncollectedItems: uncollectedItems, uncollectedBreakdown: uncollectedBreakdown,
       queue: states.queued, failed: states.failed, states: states, updates: updates };
   }
   function format(stats) {

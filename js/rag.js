@@ -162,7 +162,8 @@
       if (includeBody && global.Settings && IngestPolicy.privateDoc(doc)) { var latest = await Settings.load(); if (latest.rag && !latest.rag.includePrivate) return { held: true, admission: 'excluded' }; }
       var personal = doc.userAnnotations || [];
       if (global.PersonalTargets && JSON.stringify((await PersonalTargets.records()).get(doc.id) || []) !== JSON.stringify(personal)) return { stale: true };
-      var quality = includeBody ? 'body' : 'personal';
+      var quality = includeBody ? 'body' : verdict.quality || 'personal';
+      var profile = global.SiteProfile ? SiteProfile.build(doc) : null;
       var saved = await AgentDB.getMeta(key) || {};
       var id = await clientId(); var docId = cfg.authToken ? (saved[doc.id] && saved[doc.id].docId || 'page-' + doc.id) : id + '-' + doc.id;
       var refs = doc.bookmarks || [];
@@ -171,14 +172,15 @@
       var metadata = { schema_version: 2, page_id: doc.id, client_id: id,
         canonical_url: doc.identity.canonicalUrl, provider: doc.identity.provider, document_type: doc.identity.kind,
         provider_document_id: doc.identity.token || '', title: doc.title, bookmarks: refs, tags: tags,
-        content_hash: includeBody ? doc.contentHash || '' : '', captured_at: includeBody ? doc.fetchedAt || null : null, coverage: includeBody ? doc.coverage || 'html' : 'personal',
-        headings: includeBody ? doc.headings || [] : [], capture_note: includeBody ? doc.captureNote || '' : '仅用户填写的称呼和用途，未收录网页正文', capture_state: includeBody ? 'partial' : 'personal', capture_source: includeBody ? doc.source || 'public' : 'user', private: includeBody && isPrivate,
-        user_annotations: personal, record_quality: quality,
+        content_hash: includeBody ? doc.contentHash || '' : '', captured_at: includeBody ? doc.fetchedAt || null : null, coverage: includeBody ? doc.coverage || 'html' : quality,
+        headings: includeBody ? doc.headings || [] : [], capture_note: includeBody ? doc.captureNote || '' : '网站身份、公开介绍或用户填写资料，未收录网页正文', capture_state: includeBody ? 'partial' : quality, capture_source: includeBody ? doc.source || 'public' : quality === 'profile' ? 'site_profile' : 'user', private: includeBody && isPrivate,
+        user_annotations: personal, record_quality: quality, site_profile: profile,
         source_revision: includeBody ? doc.sourceRevision || null : null, source_updated_at: includeBody ? doc.sourceUpdatedAt || null : null };
       var text = [doc.title, '网址：' + doc.identity.canonicalUrl, '收藏入口：' + refs.map(function (r) { return r.title + ' / ' + r.folder + ' / 收藏时间 ' + (r.addedAt ? new Date(r.addedAt).toISOString() : '未知'); }).join('；'),
         '分类：' + category, '标签：' + tags.join('、'), '内容覆盖：' + quality,
         '文档版本：' + (includeBody ? doc.sourceRevision || doc.contentHash || '' : '用户资料'),
-        includeBody ? doc.desc || '' : '', includeBody ? doc.text || '' : '', global.PersonalTargets ? PersonalTargets.describe(personal) : ''].join('\n');
+        includeBody ? doc.desc || '' : '', includeBody ? doc.text || '' : '',
+        !includeBody && global.SiteProfile ? SiteProfile.describe(profile) : '', global.PersonalTargets ? PersonalTargets.describe(personal) : ''].join('\n');
       /* 变更指纹只取稳定字段：captured_at 等采集时间每次刷新都会变，
          放进指纹会让“内容没变”的定时刷新重复 ingest，产生残留向量。 */
       var signature = {
@@ -186,7 +188,7 @@
         provider_document_id: metadata.provider_document_id, title: metadata.title, bookmarks: metadata.bookmarks,
         tags: metadata.tags, content_hash: metadata.content_hash, coverage: metadata.coverage, headings: metadata.headings,
         capture_state: metadata.capture_state, capture_source: metadata.capture_source, private: metadata.private,
-        source_revision: metadata.source_revision, user_annotations: personal, record_quality: quality
+        source_revision: metadata.source_revision, user_annotations: personal, record_quality: quality, site_profile: profile
       };
       var hash = await Documents.hash(JSON.stringify([text, signature]));
       /* 本地实例标识变化时旧记录会查不到：入库新 ID 后再删旧记录，避免同页两份。 */
@@ -212,7 +214,7 @@
         await AgentDB.updateMeta(key, function (value) { value = value || {}; value[doc.id] = { hash: hash, docId: docId, pageId: doc.id, url: doc.identity.canonicalUrl, quality: quality, annotations: JSON.stringify(personal), contentHash: metadata.content_hash, revision: doc.revision }; return value; });
       }
       await AgentDB.setMeta(operationKey, null);
-      return { docId: docId, unchanged: !!(saved[doc.id] && saved[doc.id].hash === hash) };
+      return { docId: docId, quality: quality, unchanged: !!(saved[doc.id] && saved[doc.id].hash === hash) };
     });
   }
   async function retrieve(cfg, query, rows) {
@@ -237,12 +239,13 @@
       if (extra.user_annotations && JSON.stringify(extra.user_annotations) !== JSON.stringify(annotations.get(group.info.id) || [])) continue;
       if (extra.capture_state === 'failed' || extra.coverage === 'metadata' || doc && (doc.deleted || doc.admissionState === 'invalid' || doc.admissionState === 'excluded')) continue;
       var receipt = (await AgentDB.getMeta(await stateKey(cfg)) || {})[group.info.id];
-      var expectedHash = extra.record_quality === 'personal' ? '' : receipt && receipt.contentHash || doc && doc.contentHash;
+      if (extra.record_quality === 'profile' && doc && global.SiteProfile && JSON.stringify(extra.site_profile) !== JSON.stringify(SiteProfile.build(Object.assign({}, doc, { bookmarks: group.rows })))) continue;
+      var expectedHash = ['personal', 'profile'].includes(extra.record_quality) ? '' : receipt && receipt.contentHash || doc && doc.contentHash;
       if (expectedHash && extra.content_hash && expectedHash !== extra.content_hash) continue;
       var hit = hits.get(group.info.id);
       if (!hit) {
         hit = { row: Object.assign({}, group.rows[0], { documentId: group.info.id, relatedBookmarks: group.rows.length,
-          captureSource: extra.capture_source || '云端', contentStatus: extra.record_quality === 'personal' ? '用户备注和别名' : doc ? Documents.captureLabel(doc) : '云端内容', syncStatus: '已入库' }),
+          captureSource: extra.capture_source || '云端', contentStatus: extra.record_quality === 'profile' ? '网站资料，未收录正文' : extra.record_quality === 'personal' ? '用户备注和别名' : doc ? Documents.captureLabel(doc) : '云端内容', syncStatus: '已入库' }),
           score: Number(result.score) || 0, source: 'rag', chunks: [] };
         hits.set(group.info.id, hit);
       }

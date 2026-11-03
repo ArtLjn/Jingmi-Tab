@@ -1,7 +1,7 @@
 /* 收录纯策略：只描述下一动作，不直接上传或删除。 */
 (function (global) {
   'use strict';
-  var VERSION = 2;
+  var VERSION = 3;
   function personal(doc) { return !!(doc.userAnnotations && doc.userAnnotations.length); }
   function privateDoc(doc) { return !!doc.private || ['capture', 'feishu_api'].includes(doc.source); }
   function usable(doc) { return !!String(doc.text || '').trim() && !/^(failed|waiting_)/.test(doc.captureState || '') && !doc.captureError; }
@@ -37,6 +37,11 @@
       return verdict;
     }
     if (code === 'http_410') return result('invalid', cfg.cleanupEnabled ? 'delete' : 'hold', code, 7 * 864e5);
+    /* 只在没有合格旧正文时降级；有正文的临时失败继续按原规则保留。 */
+    if (!previous && global.SiteProfile && SiteProfile.build(doc) && !/^http_(400|422)$/.test(code)) {
+      if (!code && usable(doc)) return Object.assign(result('eligible', 'upsert', 'body'), { includeBody: true });
+      return Object.assign(result('eligible', 'upsert', 'site_profile'), { includeBody: false, quality: 'profile' });
+    }
     if (code) {
       if (['unsupported', 'not_html', 'no_content'].includes(code)) return result(previous ? 'deferred' : 'metadata', 'hold', code);
       var delay = /^(timeout|network|network_suspected)$/.test(code) ? 1800e3 : /^http_(408|5\d\d)$/.test(code) ? 7200e3 : /^(daily_limit|http_429)$/.test(code) ? 864e5 : 0;

@@ -10,7 +10,7 @@
      用一次 debounce 换掉一整套容易出错的增量状态机。
    ============================================================ */
 
-importScripts('js/profiles.js', 'js/db.js', 'js/bookmarks.js', 'js/content-index.js', 'js/quick-tags.js', 'js/personal-targets.js', 'js/network-status.js', 'js/ingest-policy.js', 'js/resource-gate.js', 'js/retry-policy.js', 'js/collection-stats.js', 'js/organizer.js', 'js/organizer-moves.js', 'js/pageinfo.js', 'js/ai.js', 'js/store.js', 'js/backup.js', 'js/bookmark-auto.js', 'js/bookmark-enrich.js', 'js/documents.js', 'js/rag.js', 'js/capture-adapters.js', 'js/sync-engine.js');
+importScripts('js/profiles.js', 'js/db.js', 'js/bookmarks.js', 'js/content-index.js', 'js/quick-tags.js', 'js/personal-targets.js', 'js/network-status.js', 'js/site-profile.js', 'js/ingest-policy.js', 'js/resource-gate.js', 'js/retry-policy.js', 'js/collection-stats.js', 'js/organizer.js', 'js/organizer-moves.js', 'js/pageinfo.js', 'js/ai.js', 'js/store.js', 'js/backup.js', 'js/bookmark-auto.js', 'js/bookmark-enrich.js', 'js/documents.js', 'js/rag.js', 'js/capture-adapters.js', 'js/sync-engine.js');
 
 Profiles.restoreLanding().catch(function () {});
 

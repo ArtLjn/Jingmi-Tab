@@ -6,12 +6,12 @@
   var CONCURRENCY = 4;
   var TIMEOUT = 5000;
   var RETRY_TIMEOUT = 8000;
-  var DESC_MAX = 180;
+  var DESC_MAX = 600;
   var TITLE_MAX = 80;
   var HTML_MAX = 1000000;
   var TEXT_MAX = 250000;
 
-  /* 抓回来是登录页，说明这条书签在墙后面，摘要没有意义 */
+  /* 登录提示不作为正文；有价值的公开介绍仍可单独保留。 */
   var LOGIN_HINT = /^(?:(?:登录|登陆)(?:\s|[-|·—]|$)|sign\s?in\b|log\s?in\b|请先登录|扫码登录)/i;
 
   function clean(s) {
@@ -33,6 +33,12 @@
   /* 只识别短提示，避免误伤讨论登录或浏览器兼容性的文章。 */
   function placeholder(text) {
     return /^(?:loading[. …]*|加载中[.。 …]*|正在加载[.。 …]*|please (?:enable|turn on) javascript[\s\S]*|you need to enable javascript[\s\S]*|请启用\s*javascript[\s\S]*|(?:your |this )?browser (?:is (?:not supported|unsupported)|not supported)[\s\S]*|unsupported browser[\s\S]*|(?:当前|您的)?浏览器不(?:受支持|支持)[\s\S]*|just a moment[. …]*|checking your browser[\s\S]*|access denied[\s\S]*)$/i.test(text);
+  }
+
+  function publicProfile(info, url) {
+    var description = String(info.desc || '').trim();
+    if (!description || placeholder(description) || /^(?:请先?登录|登录以|登录后|扫码|sign\s?in\b|log\s?in\b|please log|access denied|just a moment)/i.test(description)) return null;
+    return { description: description, sourceUrl: url, scope: 'page' };
   }
 
   /** 解析为独立文档，绝不把外部 HTML 插入扩展界面。 */
@@ -152,9 +158,10 @@
         reader.cancel().catch(function () {});
       }
       var info = extract(body);
+      var profile = new URL(res.url || url).origin === new URL(url).origin ? publicProfile(info, res.url || url) : null;
       info.truncated = !!info.truncated || bytes >= HTML_MAX;
-      if (LOGIN_HINT.test(info.title)) {
-        return { url: url, status: 'fail', reason: 'login_wall', fetchedAt: now };
+      if (LOGIN_HINT.test(info.title) || /(?:登录|登陆|sign\s?in|log\s?in)$/i.test(info.title) && /<input\b[^>]*type\s*=\s*["']?password/i.test(body)) {
+        return { url: url, status: 'fail', reason: 'login_wall', publicProfile: profile, fetchedAt: now };
       }
       var shell = (info.text || '').replace(/\s+/g, ' ').trim();
       var isShell = shell.length < 600 && placeholder(shell);
@@ -164,6 +171,7 @@
         return { url: url, status: 'fail', reason: readError ? (ctrl.signal.aborted ? 'timeout' : 'network') : isShell ? 'dynamic_shell' : 'no_content', title: info.title, fetchedAt: now };
       }
       info.coverage = info.text ? 'html' : 'metadata';
+      if (profile) info.publicProfile = profile;
       if (readError) { info.truncated = true; info.partial = true; }
       return Object.assign(info, { url: url, status: 'ok', source: 'public',
         version: ContentIndex.VERSION, fetchedAt: now });
@@ -180,10 +188,10 @@
   }
 
   /* 仅临时网络故障及服务器故障重试一次；不重试登录墙和权限拒绝。 */
-  async function fetchOne(url) {
+  async function fetchOne(url, options) {
     if (global.NetworkStatus && await NetworkStatus.waiting()) return { url: url, status: 'fail', reason: 'network_suspected', source: 'public', fetchedAt: Date.now(), operation: 'capture', requestSource: 'local' };
     var row = await fetchAttempt(url, TIMEOUT);
-    if (row.status !== 'ok' && /^(timeout|network|http_(408|500|502|503|504))$/.test(row.reason)) {
+    if (!(options && options.singleAttempt) && row.status !== 'ok' && /^(timeout|network|http_(408|500|502|503|504))$/.test(row.reason)) {
       row = await fetchAttempt(url, RETRY_TIMEOUT);
       row.attempts = 2;
     }
@@ -253,9 +261,9 @@
 
     var done = 0;
     await mapLimit(missing, CONCURRENCY, async function (u) {
-      var key = u + ':' + !!options.force;
+      var key = u + ':' + !!options.force + ':' + !!options.singleAttempt;
       var task = inFlight.get(key);
-      if (!task) { task = fetchOne(u); inFlight.set(key, task); }
+      if (!task) { task = fetchOne(u, options); inFlight.set(key, task); }
       var row;
       try { row = await task; } finally { if (inFlight.get(key) === task) inFlight.delete(key); }
       row = Object.assign({}, row);

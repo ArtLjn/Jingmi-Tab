@@ -105,7 +105,7 @@
     if (!doc) return { status: 'done' };
     if (doc.outcomeUnknown) { var unknown = new Error('云端操作结果待核验，已停止自动重发'); unknown.code = 'outcome_unknown'; throw unknown; }
     if (job.kind === 'cleanup') {
-      if (doc.revision !== job.cleanupRevision || String(doc.text || '').trim() || IngestPolicy.personal(doc)) return { status: 'done' };
+      if (doc.revision !== job.cleanupRevision || String(doc.text || '').trim() || IngestPolicy.personal(doc) || doc.indexedQuality === 'profile') return { status: 'done' };
       var cleanupStale = await deleteCurrent(doc, cfg, 'historical_metadata');
       await Documents.update(doc.id, function (current) { if (!cleanupStale) { current.admissionState = 'metadata'; current.admissionReason = 'historical_metadata'; current.policyVersion = IngestPolicy.VERSION; current.lastEvaluatedError = current.captureError || ''; } return current; });
       return { status: 'done', stale: cleanupStale };
@@ -124,7 +124,7 @@
       try { doc = await Documents.capture(doc.id, await CaptureAdapters.read(doc, cfg.rag, job.force)); }
       catch (e) {
         blocked = e;
-        doc = await Documents.update(doc.id, function (current) { current.captureState = e.state || 'failed'; current.captureError = e.code || 'unknown'; if (['http_401', 'http_403', 'login_wall', 'waiting_permission', 'waiting_auth'].includes(e.code)) current.accessCondition = e.code; current.captureNote = e.message; current.checkedAt = Date.now(); return current; });
+        doc = await Documents.update(doc.id, function (current) { current.captureState = e.state || 'failed'; current.captureError = e.code || 'unknown'; if (e.publicProfile && JSON.stringify(current.publicProfile) !== JSON.stringify(e.publicProfile)) { current.publicProfile = e.publicProfile; current.revision = (current.revision || 0) + 1; } if (['http_401', 'http_403', 'login_wall', 'waiting_permission', 'waiting_auth'].includes(e.code)) current.accessCondition = e.code; current.captureNote = e.message; current.checkedAt = Date.now(); return current; });
         if (/^(timeout|network)$/.test(e.code)) await NetworkStatus.diagnose(cfg.rag);
       }
     }
@@ -153,7 +153,7 @@
     var updated = await Documents.update(doc.id, function (current) {
       if (current.revision === revision && !current.deleted) {
         current.syncState = result.held ? 'paused' : result.excluded ? 'excluded' : 'synced';
-        if (!result.held && !result.excluded) { current.indexedAt = Date.now(); current.indexedRevision = revision; current.indexedQuality = verdict.includeBody === false ? 'personal' : 'body'; }
+        if (!result.held && !result.excluded) { current.indexedAt = Date.now(); current.indexedRevision = revision; current.indexedQuality = result.quality || (verdict.includeBody === false ? 'personal' : 'body'); }
       }
       return current;
     });
@@ -381,8 +381,8 @@
     return (await AgentDB.allRecords('documents')).filter(function (doc) { return !doc.deleted && receipts[doc.id]; }).map(function (doc) {
       var receipt = receipts[doc.id]; var empty = !String(doc.text || '').trim();
       return { id: doc.id, title: doc.title, url: doc.identity.canonicalUrl, revision: doc.revision,
-        reason: receipt.quality === 'personal' ? '已确认用户备注和别名，保留' : empty ? '本地未保存正文，请核对是否仅元数据' : receipt.quality === 'body' ? '已确认正文版本，保留' : '历史记录资格未核验，保留',
-        selectable: empty && !IngestPolicy.personal(doc) && receipt.quality !== 'personal' && !doc.outcomeUnknown, quality: receipt.quality || 'unknown' };
+        reason: receipt.quality === 'profile' ? '已确认网站资料，保留；未收录正文' : receipt.quality === 'personal' ? '已确认用户备注和别名，保留' : empty ? '本地未保存正文，请核对是否仅元数据' : receipt.quality === 'body' ? '已确认正文版本，保留' : '历史记录资格未核验，保留',
+        selectable: empty && !IngestPolicy.personal(doc) && !['personal', 'profile'].includes(receipt.quality) && !doc.outcomeUnknown, quality: receipt.quality || 'unknown' };
     });
   }
   async function clean(ids) {
@@ -410,7 +410,12 @@
     await NetworkStatus.reset();
     var diagnosis = await NetworkStatus.diagnose(cfg.rag, true);
     if (diagnosis.service === 'unreachable' || diagnosis.reason === 'offline') { await AgentDB.setMeta('pipeline:lastError', '服务链路仍不可达，请检查网络/VPN 后重试'); return summary(); }
-    var jobs = (await AgentDB.allRecords('jobs')).filter(function (job) { return /^(timeout|network|network_suspected)$/.test(job.errorCode || ''); });
+    var docs = new Map((await AgentDB.allRecords('documents')).map(function (doc) { return [doc.id, doc]; }));
+    var jobs = (await AgentDB.allRecords('jobs')).filter(function (job) {
+      var doc = docs.get(job.id);
+      if (!doc || doc.deleted || doc.outcomeUnknown || job.kind === 'delete' || job.kind === 'cleanup') return false;
+      return /^(timeout|network|network_suspected)$/.test(job.errorCode || (doc.indexedQuality === 'profile' ? doc.captureError : '') || '');
+    });
     for (var index = 0; index < jobs.length; index++) {
       var job = jobs[index]; await enqueue(job.id, true);
       await AgentDB.updateRecord('jobs', job.id, function (current) { if (current.status === 'pending') current.nextAt = Date.now() + Math.floor(index / 4) * 30000; return current; });

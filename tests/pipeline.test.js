@@ -112,14 +112,14 @@ test('过期运行租约由新后台恢复，活动租约阻止并发处理', as
   assert.equal(first.docs.size, 0);
 });
 
-test('权限缺失不入库，显示待授权，显式重试后采集正文', async () => {
+test('缺少站点权限时先收录书签身份，显式重试后升级为正文', async () => {
   const f = setup({ permission: false });
   const result = await f.c.SyncEngine.request();
-  assert.equal(result.jobs.paused, 1); assert.equal(f.calls().publicCalls, 0);
+  assert.equal(result.jobs.done, 1); assert.equal(f.calls().publicCalls, 0);
   let document = (await f.c.AgentDB.allRecords('documents'))[0];
   assert.equal(document.captureState, 'waiting_permission');
-  assert.equal(f.docs.size, 0);
-  assert.equal(document.admissionState, 'deferred');
+  assert.equal(f.docs.size, 1);
+  assert.equal(document.indexedQuality, 'profile');
   f.c.chrome.permissions.contains = async () => true;
   await f.c.SyncEngine.retry(document.id);
   document = await f.c.Documents.get(document.id);
@@ -150,6 +150,52 @@ test('不同飞书 token 不合并，wiki 只有解析到真实文档后才关�
 });
 
 module.exports = { setup };
+
+test('登录页缺少介绍时只补采同源首页，平台公开介绍可检索且不冒充私有文档内容', async () => {
+  const f = setup(); const original = f.c.fetch; const urls = [];
+  f.c.fetch = (url, init) => {
+    if (url.startsWith(f.config.rag.baseUrl)) return original(url, init);
+    urls.push(url); assert.equal(init.credentials, 'omit');
+    return Promise.resolve(new Response(new URL(url).pathname === '/' ? '<title>协同平台</title><meta name="description" content="用于团队知识管理、协作文档和任务跟踪"><body>首页正文不可冒充私有文档</body>' : '<title>登录</title><meta name="description" content="登录以继续"><body>扫码输入密码</body>', { headers: { 'content-type': 'text/html' } }));
+  };
+  await f.c.SyncEngine.request();
+  assert.equal(urls.length, 2); assert.equal(urls[1], 'https://example.com/');
+  const saved = Array.from(f.docs.values())[0];
+  assert.equal(saved.metadata.record_quality, 'profile');
+  assert.equal(saved.metadata.canonical_url, 'https://example.com/a');
+  assert.match(saved.content, /团队知识管理[\s\S]*https:\/\/example.com\//);
+  assert.doesNotMatch(saved.content, /首页正文不可冒充私有文档|扫码输入密码|登录以继续/);
+  const doc = (await f.c.AgentDB.allRecords('documents'))[0];
+  assert.equal(doc.captureError, 'login_wall'); assert.equal(doc.text, undefined);
+  assert.equal((await f.c.Rag.retrieve(f.config.rag, '团队协作', f.c.Bookmarks.flatten(f.tree))).length, 1);
+  assert.equal((await f.c.SyncEngine.audit())[0].selectable, false);
+});
+test('登录页自身有有效公开介绍时不再访问首页，不保存登录表单正文', async () => {
+  const f = setup(); const original = f.c.fetch; let captures = 0;
+  f.c.fetch = (url, init) => {
+    if (url.startsWith(f.config.rag.baseUrl)) return original(url, init);
+    captures++; return Promise.resolve(new Response('<title>登录</title><meta name="description" content="免费图片和视频素材资源库"><body>登录表单密码验证码</body>', { headers: { 'content-type': 'text/html' } }));
+  };
+  await f.c.SyncEngine.request(); assert.equal(captures, 1);
+  const saved = Array.from(f.docs.values())[0];
+  assert.match(saved.content, /免费图片和视频素材/); assert.doesNotMatch(saved.content, /登录表单密码验证码/);
+});
+test('只有公开描述的页面以网站资料同步，重复同步不重写；最后书签删除后清理', async () => {
+  const f = setup(); const original = f.c.fetch;
+  f.c.fetch = (url, init) => url.startsWith(f.config.rag.baseUrl) ? original(url, init) : Promise.resolve(new Response('<title>图片工具</title><meta name="description" content="图片压缩、裁剪和格式转换">', { headers: { 'content-type': 'text/html' } }));
+  await f.c.SyncEngine.request(); await f.c.SyncEngine.request(); assert.equal(f.calls().ingests, 1);
+  const saved = Array.from(f.docs.values())[0]; assert.match(saved.content, /图片压缩、裁剪和格式转换/);
+  const stats = await f.c.CollectionStats.read(); assert.equal(stats.coverage.profile, 2); assert.match(stats.collectedItems[0].reason, /尚未取得正文/);
+  f.node('1').children = []; await f.c.SyncEngine.request(); assert.equal(f.docs.size, 0);
+});
+test('源站失败只尝试一次且保留网站身份；网络恢复后升级到正文', async () => {
+  const options = { failCapture: true }; const f = setup(options);
+  await f.c.SyncEngine.request(); assert.equal(f.calls().publicCalls, 1);
+  assert.equal(Array.from(f.docs.values())[0].metadata.record_quality, 'profile');
+  options.failCapture = false; await f.c.SyncEngine.networkRetry(false);
+  assert.equal(Array.from(f.docs.values())[0].metadata.record_quality, 'body');
+  assert.match(Array.from(f.docs.values())[0].content, /订单会自动生成应收凭证/);
+});
 
 function manualEntry(note = '办理报销和请假', aliases = ['007', 'OA']) {
   return { id: 'manual', label: '公司平台', aliases, note, url: 'https://example.com/a' };
@@ -391,7 +437,7 @@ test('无网页标题时沿用收藏标题，重建索引不来回修改版本',
   assert.equal(f.calls().ingests, 1);
 });
 
-test('关闭正文采集时只保存本地入口，完成后不反复入队', async () => {
+test('关闭正文采集时同步网站身份，完成后不反复入队', async () => {
   const f = setup(); f.config.rag.autoCapture = false;
   await f.c.SyncEngine.request();
   const job = (await f.c.AgentDB.allRecords('jobs'))[0];
@@ -400,14 +446,17 @@ test('关闭正文采集时只保存本地入口，完成后不反复入队', as
   assert.equal(current.generation, job.generation);
   assert.equal(current.status, 'done');
   assert.equal(f.calls().publicCalls, 0);
-  assert.equal(f.calls().ingests, 0);
+  assert.equal(f.calls().ingests, 1);
+  assert.equal(Array.from(f.docs.values())[0].metadata.record_quality, 'profile');
 });
 
-test('首次本地网络失败不上传骨架、不删云端、不消耗站点短重试次数', async () => {
+test('首次源站网络失败先同步网站身份，保留采集失败原因而不伪装成正文', async () => {
   const f = setup({ failCapture: true }); await f.c.SyncEngine.request();
   const doc = (await f.c.AgentDB.allRecords('documents'))[0]; const job = await f.c.AgentDB.getRecord('jobs', doc.id);
-  assert.equal(f.calls().ingests, 0); assert.equal(f.docs.size, 0); assert.equal(doc.admissionState, 'deferred');
-  assert.equal(job.attempts, 0); assert.ok(job.nextAt > Date.now()); assert.equal(doc.captureError, 'network');
+  assert.equal(f.calls().ingests, 1); assert.equal(f.docs.size, 1); assert.equal(doc.indexedQuality, 'profile');
+  assert.equal(job.status, 'done'); assert.equal(doc.captureError, 'network');
+  assert.match(f.c.Documents.syncLabel(doc), /未收录正文/);
+  assert.equal(Array.from(f.docs.values())[0].metadata.coverage, 'profile');
 });
 
 test('404 双次复核清理与主动恢复组成闭环，不依赖缓存自己更新', async () => {
@@ -490,14 +539,14 @@ test('网络恢复只唤醒网络类任务，不复活未确认写入或其他�
   const f = setup({ failCapture: true }); await f.c.SyncEngine.request(); const doc = (await f.c.AgentDB.allRecords('documents'))[0];
   await f.c.AgentDB.updateRecord('jobs', doc.id, j => ({ ...j, errorCode: 'outcome_unknown', status: 'paused' }));
   await f.c.Documents.update(doc.id, d => ({ ...d, outcomeUnknown: true }));
-  await f.c.SyncEngine.networkRetry(); assert.equal((await f.c.AgentDB.getRecord('jobs', doc.id)).status, 'paused'); assert.equal(f.calls().ingests, 0);
+  await f.c.SyncEngine.networkRetry(); assert.equal((await f.c.AgentDB.getRecord('jobs', doc.id)).status, 'paused'); assert.equal(f.calls().ingests, 1);
 });
 
-test('补全采集的新正文会通知协调器，元数据完成态可升级入库', async () => {
+test('补全采集的新正文会通知协调器，网站资料可升级正文入库', async () => {
   const f = setup(); f.config.rag.autoCapture = false; await f.c.SyncEngine.request(); const id = (await f.c.AgentDB.allRecords('documents'))[0].id;
-  assert.equal(f.calls().ingests, 0);
+  assert.equal(f.calls().ingests, 1);
   await f.c.AgentDB.putPage({ url: 'https://example.com/a?utm_source=test', version: f.c.ContentIndex.VERSION, status: 'ok', source: 'public', text: '后来补采得到的正文', fetchedAt: Date.now() + 1000 });
-  await f.c.SyncEngine.request(); assert.equal(f.calls().ingests, 1); assert.equal((await f.c.Documents.get(id)).admissionState, 'eligible');
+  await f.c.SyncEngine.request(); assert.equal(f.calls().ingests, 2); assert.equal((await f.c.Documents.get(id)).indexedQuality, 'body');
 });
 
 test('已知登录条件后的匿名 404 不自动判死', async () => {

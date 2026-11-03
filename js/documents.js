@@ -48,7 +48,7 @@
   /* 版本只反映可检索内容与稳定来源，时间、错误提示和处理进度不构成新版本。 */
   function contentVersion(info) {
     return JSON.stringify([info.title || '', info.text || '', info.desc || '', info.source || '',
-      !!info.private, info.coverage || '', info.headings || [], info.sourceRevision || '']);
+      !!info.private, info.coverage || '', info.headings || [], info.sourceRevision || '', info.publicProfile || null]);
   }
   async function reconcile(rows) {
     var grouped = await groups(rows);
@@ -77,6 +77,7 @@
             coverage: page.coverage || (page.text ? 'partial' : 'metadata'), headings: page.headings || [],
             sourceRevision: page.sourceRevision || '', contentHash: pageHash,
             captureError: '', accessCondition: '', invalidCandidate: null, captureState: page.text ? 'partial' : 'metadata', captureNote: page.captureNote || '公开 HTML 提取；动态内容、附件可能缺失' };
+          if (page.publicProfile) incoming.publicProfile = page.publicProfile;
           if (doc.text && !incoming.text) {
             ['title', 'text', 'desc', 'source', 'private', 'coverage', 'headings', 'sourceRevision', 'contentHash', 'fetchedAt'].forEach(function (key) { incoming[key] = doc[key]; });
             incoming.captureError = 'no_content'; incoming.captureState = 'waiting_open'; incoming.captureNote = '本次只有页面描述，保留历史正文';
@@ -125,6 +126,7 @@
     return ({ pending: '等待采集', metadata: '仅元数据', partial: '部分正文', ready: '正文已采集', waiting_open: '待打开文档', waiting_auth: '待页面授权', waiting_permission: '待站点授权', failed: '采集失败' })[doc.captureState] || '仅标题';
   }
   function syncLabel(doc) {
+    if (doc && doc.syncState === 'synced' && doc.indexedQuality === 'profile') return '网站资料已入库，未收录正文';
     if (doc && doc.syncState === 'synced' && doc.indexedQuality === 'personal') return '个人备注和别名已入库，未收录正文';
     if (doc && doc.admissionState === 'invalid') return doc.syncState === 'deleted' ? '页面已失效，已从知识库移除' : '页面已失效，等待云端清理';
     if (doc && doc.admissionState === 'metadata' && doc.syncState !== 'synced') return '仅保存入口，未收录正文';

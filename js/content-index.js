@@ -2,7 +2,7 @@
 (function (global) {
   'use strict';
 
-  var VERSION = 4;
+  var VERSION = 5;
   var OK_TTL = 30 * 864e5;
   var FAIL_TTL = 864e5;
 
