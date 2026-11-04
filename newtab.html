@@ -1,624 +1,2472 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN" data-page-node-id="HoOxDO6F1lyjUWBNBTfhea">
-<head data-page-node-id="EZ1fcqE9ksRn44j3g09zhh">
-  <meta charset="UTF-8" data-page-node-id="l8peRZOrALkhGFiDftFY0n" />
-  <meta name="referrer" content="no-referrer" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="QXZDe3wu0lxlTDHCoNFWiF" />
-  <title>静谧</title>
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/icon16.png?v=1.6.1" data-page-node-id="KPs7Ilfn7WQtpf6rreEADp" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon32.png?v=1.6.1" data-page-node-id="C00YkaHkbwWjD1mKzEiRp3" />
-  <link rel="icon" type="image/png" sizes="48x48" href="assets/icon48.png?v=1.6.1" data-page-node-id="w7git4B9U6YQdrPwS9pcdj" />
-  <link rel="stylesheet" href="css/newtab.css" data-page-node-id="0K2cidqBLYdKtLX7BZn3KJ" />
-</head>
-<body data-page-node-id="vE2gKGeliCAewbxQFtBX7H">
-  <!-- 启动画面：设置与壁纸就绪前盖住首屏，避免黑屏闪现 -->
-  <div class="boot" id="boot" aria-hidden="true">
-    <div class="boot-mark">
-      <img src="assets/icon128.png" width="44" height="44" alt="" />
+  <head data-page-node-id="EZ1fcqE9ksRn44j3g09zhh">
+    <meta charset="UTF-8" data-page-node-id="l8peRZOrALkhGFiDftFY0n" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+      data-page-node-id="QXZDe3wu0lxlTDHCoNFWiF"
+    />
+    <title>静谧</title>
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="assets/icon16.png?v=1.6.1"
+      data-page-node-id="KPs7Ilfn7WQtpf6rreEADp"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="assets/icon32.png?v=1.6.1"
+      data-page-node-id="C00YkaHkbwWjD1mKzEiRp3"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="48x48"
+      href="assets/icon48.png?v=1.6.1"
+      data-page-node-id="w7git4B9U6YQdrPwS9pcdj"
+    />
+    <link
+      rel="stylesheet"
+      href="css/newtab.css"
+      data-page-node-id="0K2cidqBLYdKtLX7BZn3KJ"
+    />
+  </head>
+  <body data-page-node-id="vE2gKGeliCAewbxQFtBX7H">
+    <!-- 启动画面：设置与壁纸就绪前盖住首屏，避免黑屏闪现 -->
+    <div class="boot" id="boot" aria-hidden="true">
+      <div class="boot-mark">
+        <img src="assets/icon128.png" width="44" height="44" alt="" />
+      </div>
+      <p class="boot-caption">正在铺开画面…</p>
     </div>
-    <p class="boot-caption">正在铺开画面…</p>
-  </div>
 
-  <div class="bg-layer" data-page-node-id="QkyL9ZKZWO83JSywDDUMTv" aria-hidden="true">
-    <div class="bg-image" id="bg-image" data-page-node-id="GxKpB4GFK6EdLaJWdZ4DvU"></div>
-    <div class="bg-loader" id="bg-loader" aria-hidden="true"></div>
-    <div class="ambient-light ambient-light-a"></div>
-    <div class="ambient-light ambient-light-b"></div>
-    <div class="grain" data-page-node-id="XhD3qdP7NRiNsmbeC0SbJd"></div>
-    <div class="scrim" data-page-node-id="016DH4JxbpTTSV7kHfZNWv"></div>
-  </div>
+    <div
+      class="bg-layer"
+      data-page-node-id="QkyL9ZKZWO83JSywDDUMTv"
+      aria-hidden="true"
+    >
+      <div
+        class="bg-image"
+        id="bg-image"
+        data-page-node-id="GxKpB4GFK6EdLaJWdZ4DvU"
+      ></div>
+      <div class="bg-loader" id="bg-loader" aria-hidden="true"></div>
+      <div class="ambient-light ambient-light-a"></div>
+      <div class="ambient-light ambient-light-b"></div>
+      <div class="grain" data-page-node-id="XhD3qdP7NRiNsmbeC0SbJd"></div>
+      <div class="scrim" data-page-node-id="016DH4JxbpTTSV7kHfZNWv"></div>
+    </div>
 
-  <main class="stage" id="stage" data-page-node-id="E4WGPWtEEiIcu61qx17Npy">
-    <section class="clock-block" data-page-node-id="j8B9munMGMfkuYfliCiu5E">
-      <div class="clock" id="clock" aria-live="off" data-page-node-id="1R4PcGxGfLo6hCN4a6eyCW">--:--</div>
-      <div class="date-line" id="date-line" data-page-node-id="VdaZZKAgcJohc681MkEpH9">
-        <span id="date-solar" data-page-node-id="vDtRVB7YmyzEIj4pFislqC"></span>
-        <span class="dot" id="date-dot" data-page-node-id="fs7znJitrNXvuBQkHFbmvr">·</span>
-        <span id="date-lunar" data-page-node-id="DgZsBt2icDrv2BsiTqHuaC"></span>
-      </div>
-    </section>
+    <main class="stage" id="stage" data-page-node-id="E4WGPWtEEiIcu61qx17Npy">
+      <section class="clock-block" data-page-node-id="j8B9munMGMfkuYfliCiu5E">
+        <div
+          class="clock"
+          id="clock"
+          aria-live="off"
+          data-page-node-id="1R4PcGxGfLo6hCN4a6eyCW"
+        >
+          --:--
+        </div>
+        <div
+          class="date-line"
+          id="date-line"
+          data-page-node-id="VdaZZKAgcJohc681MkEpH9"
+        >
+          <span
+            id="date-solar"
+            data-page-node-id="vDtRVB7YmyzEIj4pFislqC"
+          ></span>
+          <span
+            class="dot"
+            id="date-dot"
+            data-page-node-id="fs7znJitrNXvuBQkHFbmvr"
+            >·</span
+          >
+          <span
+            id="date-lunar"
+            data-page-node-id="DgZsBt2icDrv2BsiTqHuaC"
+          ></span>
+        </div>
+      </section>
 
-    <form class="search" id="search-form" autocomplete="off" data-page-node-id="fcbtKO3wcmmMpISc08X7mX">
-      <svg class="ico-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" data-page-node-id="Abnb3NRmbDEc5XhDB6rUrB">
-        <circle cx="11" cy="11" r="6.5" data-page-node-id="rJYeTq450RmYaDrRT5h5gW" />
-        <path d="M16 16l4.2 4.2" data-page-node-id="9QVzun0EUSGCTA3D6ecbCd" />
-      </svg>
-      <input id="search-input" type="text" placeholder="搜索网页，@ 快捷直达，/ 检索书签" spellcheck="false" autocomplete="off" data-page-node-id="B2pZIamMNAmpa9JawBsbJ1" />
-      <button class="engine-chip" id="engine-chip" type="button" title="点击切换搜索引擎" data-page-node-id="XAzDE8D5CPf42oocjTgwFv">必应</button>
-      <div class="ac-panel" id="ac-panel" role="listbox" aria-label="书签检索结果" data-page-node-id="s48zFidsGppmsRESchtHlp"></div>
-    </form>
-  </main>
+      <form
+        class="search"
+        id="search-form"
+        autocomplete="off"
+        data-page-node-id="fcbtKO3wcmmMpISc08X7mX"
+      >
+        <svg
+          class="ico-search"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linecap="round"
+          data-page-node-id="Abnb3NRmbDEc5XhDB6rUrB"
+        >
+          <circle
+            cx="11"
+            cy="11"
+            r="6.5"
+            data-page-node-id="rJYeTq450RmYaDrRT5h5gW"
+          />
+          <path d="M16 16l4.2 4.2" data-page-node-id="9QVzun0EUSGCTA3D6ecbCd" />
+        </svg>
+        <input
+          id="search-input"
+          type="text"
+          placeholder="搜索网页，@ 快捷直达，/ 检索书签"
+          spellcheck="false"
+          autocomplete="off"
+          data-page-node-id="B2pZIamMNAmpa9JawBsbJ1"
+        />
+        <button
+          class="engine-chip"
+          id="engine-chip"
+          type="button"
+          title="点击切换搜索引擎"
+          data-page-node-id="XAzDE8D5CPf42oocjTgwFv"
+        >
+          必应
+        </button>
+        <div
+          class="ac-panel"
+          id="ac-panel"
+          role="listbox"
+          aria-label="书签检索结果"
+          data-page-node-id="s48zFidsGppmsRESchtHlp"
+        ></div>
+      </form>
+    </main>
 
-  <footer class="footer" data-page-node-id="xJa8PHxwSLNo0rqpMDuk9y">
-    <div class="quote" id="quote" data-page-node-id="AaNwWeGFMdmtCyo6fBy2Yx"></div>
-  </footer>
+    <footer class="footer" data-page-node-id="xJa8PHxwSLNo0rqpMDuk9y">
+      <div
+        class="quote"
+        id="quote"
+        data-page-node-id="AaNwWeGFMdmtCyo6fBy2Yx"
+      ></div>
+    </footer>
 
-  <div class="quick-dock" aria-label="快捷入口" data-page-node-id="VjNNJ2CQTkk0ts5g9MJltq">
-    <button id="organizer-open" class="dock-btn" type="button" title="打开书签空间" data-page-node-id="j2sfP2CgNT7MUJHoP9IULe">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-page-node-id="YqNcwXQ4G8hquBD0EkJu5a">
-        <path d="M6 4.5h12a1.5 1.5 0 0 1 1.5 1.5v14l-7.5-4-7.5 4V6A1.5 1.5 0 0 1 6 4.5z" data-page-node-id="iNllNauGgm3TYXQuuQAAII" />
-      </svg>
-      <span data-page-node-id="bj6j2ouBFCFSTDNrjgm14L">书签</span>
-    </button>
-    <button class="ghost-btn dock-btn" id="settings-btn" type="button" title="打开静谧工作台" data-page-node-id="OhyUNnxITTwmL2tXB8Zimb">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-page-node-id="dOiUsrMs2rucGnH2QeSeaR">
-        <circle cx="12" cy="12" r="3.1" data-page-node-id="aFUDSNWrPGHTUdvN9gtrgz" />
-        <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.7 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.7 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.7a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.7a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.3 9v.09A1.7 1.7 0 0 0 20.86 10H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z" data-page-node-id="CiB5Nhg1HHF7b0u2fIfpLD" />
-      </svg>
-      <span data-page-node-id="Hl81ZLOkIZch42v08bHIG4">设置</span>
-    </button>
-  </div>
-
-  <div class="drop-hint" id="drop-hint" data-page-node-id="IVRkfhJrpqaXMCRMaIU4gF">松开即设为背景</div>
-
-  <aside class="panel" id="panel" aria-hidden="true" aria-label="静谧工作台" data-page-node-id="jY5HNmpBe8SCUnqrKosNv0">
-    <header class="panel-head" data-page-node-id="SLSVq4vTcFeVb714IiVrKn">
-      <div class="workspace-brand" data-page-node-id="UkdZWMoLR5HBB0xnnyHXfz">
-        <img class="brand-mark" src="assets/icon128.png" width="34" height="34" alt="" aria-hidden="true" data-page-node-id="FLm140TUCrHKjR39YekteB" />
-        <div data-page-node-id="t2Y48XJwmv7rkGHmxlTqPu"><h2 data-page-node-id="JHXyST9cvZGBVStXOUF5vM">静谧工作台</h2><p data-page-node-id="rVYQeU0AOM8nyBWFMRIABJ">你的浏览器，按你的方式</p></div>
-      </div>
-      <button class="panel-close" id="panel-close" type="button" title="关闭" aria-label="关闭工作台" data-page-node-id="e2hbr9gdVz5oP4IKZZeWWy">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" data-page-node-id="H9Ed8b9b6j0wTAiuKmQtAR"><path d="M6 6l12 12M18 6L6 18" data-page-node-id="2kb0ZwiHLef8d5XMQDtxC3" /></svg>
+    <div
+      class="quick-dock"
+      aria-label="快捷入口"
+      data-page-node-id="VjNNJ2CQTkk0ts5g9MJltq"
+    >
+      <button
+        id="organizer-open"
+        class="dock-btn"
+        type="button"
+        title="打开书签空间"
+        data-page-node-id="j2sfP2CgNT7MUJHoP9IULe"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          data-page-node-id="YqNcwXQ4G8hquBD0EkJu5a"
+        >
+          <path
+            d="M6 4.5h12a1.5 1.5 0 0 1 1.5 1.5v14l-7.5-4-7.5 4V6A1.5 1.5 0 0 1 6 4.5z"
+            data-page-node-id="iNllNauGgm3TYXQuuQAAII"
+          />
+        </svg>
+        <span data-page-node-id="bj6j2ouBFCFSTDNrjgm14L">书签</span>
       </button>
-    </header>
+      <button
+        class="ghost-btn dock-btn"
+        id="settings-btn"
+        type="button"
+        title="打开静谧工作台"
+        data-page-node-id="OhyUNnxITTwmL2tXB8Zimb"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          data-page-node-id="dOiUsrMs2rucGnH2QeSeaR"
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="3.1"
+            data-page-node-id="aFUDSNWrPGHTUdvN9gtrgz"
+          />
+          <path
+            d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.7 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.7 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.7a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.7a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.3 9v.09A1.7 1.7 0 0 0 20.86 10H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"
+            data-page-node-id="CiB5Nhg1HHF7b0u2fIfpLD"
+          />
+        </svg>
+        <span data-page-node-id="Hl81ZLOkIZch42v08bHIG4">设置</span>
+      </button>
+    </div>
 
-    <div class="workspace-layout" data-page-node-id="M4By6SAyLURAAhxSVz34DQ">
-      <nav class="workspace-nav" role="tablist" aria-label="工作台功能" data-page-node-id="1vfXZqrN2XyfV2uetNv8vC">
-        <button class="workspace-tab is-active" id="workspace-tab-appearance" type="button" role="tab" aria-selected="true" aria-controls="workspace-appearance" data-workspace-target="appearance">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m4 16 4.5-4.5 3.5 3.5 2.5-2.5 5.5 5.5"/></svg>
-          <span><strong>外观</strong><small>壁纸与画面</small></span>
-        </button>
-        <button class="workspace-tab" id="workspace-tab-search" type="button" role="tab" aria-selected="false" aria-controls="workspace-search" data-workspace-target="search" tabindex="-1">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5M9 8.5h3M9 11.5h3"/></svg>
-          <span><strong>搜索与 AI</strong><small>索引、AI 与自动化</small></span>
-        </button>
-        <button class="workspace-tab" id="workspace-tab-bookmarks" type="button" role="tab" aria-selected="false" aria-controls="organizer-dialog" data-workspace-target="bookmarks" tabindex="-1">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4.5h12a1.5 1.5 0 0 1 1.5 1.5v14l-7.5-4-7.5 4V6A1.5 1.5 0 0 1 6 4.5z"/></svg>
-          <span><strong>书签空间</strong><small>目录浏览与正文状态</small></span>
-        </button>
-        <button class="workspace-tab" id="workspace-tab-tags" type="button" role="tab" aria-selected="false" aria-controls="workspace-tags" data-workspace-target="tags" tabindex="-1">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.3"/></svg>
-          <span><strong>快捷标签</strong><small>常用入口与推荐</small></span>
-        </button>
-        <button class="workspace-tab" id="workspace-tab-preferences" type="button" role="tab" aria-selected="false" aria-controls="workspace-preferences" data-workspace-target="preferences" tabindex="-1">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg>
-          <span><strong>设置</strong><small>时间、显示与开关</small></span>
-        </button>
-        <button class="workspace-account" id="workspace-account" type="button" aria-haspopup="dialog" aria-expanded="false" title="账号与备份">
-          <span class="workspace-account-avatar" id="workspace-account-avatar" aria-hidden="true">?</span>
-          <span class="workspace-account-copy"><strong id="workspace-account-name">登录账号</strong><small>账号与备份</small></span>
-        </button>
-        <div class="workspace-nav-foot" data-page-node-id="b4fG3I7pK864DBeMMO0lrc"><span class="local-dot" data-page-node-id="isqXDW9fS6VGsHgPds7Jzr"></span>本地优先 · 按需连接</div>
-      </nav>
+    <div
+      class="drop-hint"
+      id="drop-hint"
+      data-page-node-id="IVRkfhJrpqaXMCRMaIU4gF"
+    >
+      松开即设为背景
+    </div>
 
-      <div class="panel-body" data-page-node-id="KG1jgbTytwjzPQXnymb3hf">
-        <section class="settings-view" id="workspace-appearance" role="tabpanel" aria-labelledby="workspace-tab-appearance" data-workspace-view="appearance">
-          <div class="view-heading" data-page-node-id="ZYJ2B5LF1m1OidrhR5y4nG"><div data-page-node-id="09riSFEhWWELRmIW2DT9oE"><p class="view-eyebrow" data-page-node-id="VjfR6ntAk0NEngAGdp4jHR">PERSONALIZE</p><h2 data-page-node-id="cu0sUD0fJSOiw663N5YuUU">让新标签页更像你</h2><p data-page-node-id="4M2FQeO7EvPf8CSKszrKDn">选择壁纸、调整画面，所有修改即时预览。</p></div><span class="view-badge" data-page-node-id="k1QkoEkAETgHEUAlo9hAtl">实时预览</span></div>
-          <div class="appearance-grid" data-page-node-id="GxWf4RbdBk9fa6te8WEDS1">
-            <div class="settings-stack" data-page-node-id="NawQwWDGVFXj9TF1qGDlSQ">
-              <section class="group settings-card" data-page-node-id="rFyfTEBs9eaF0Upup4sNjT">
-                <h3 data-page-node-id="DXfe1Tq2bffZILyV1wPo3m">我的背景<span class="src-link" data-page-node-id="qfiHuq8KFviF9DG5PJPr5r">本地图库</span></h3>
-                <div class="row" data-page-node-id="S7BkNRHUFdU8D6OB7ueOfJ">
-                  <label class="btn-primary" for="file-input" data-page-node-id="QlFOmiXjAMhBFfh3v5IDEJ">上传图片</label>
-                  <input id="file-input" type="file" accept="image/*" hidden data-page-node-id="M7zRWFX0ResCiFU07CNQCh" />
-                  <span class="hint" data-page-node-id="SFjJioLrVxE7Kw0A3O3T2J">支持拖拽 / 粘贴</span>
+    <aside
+      class="panel"
+      id="panel"
+      aria-hidden="true"
+      aria-label="静谧工作台"
+      data-page-node-id="jY5HNmpBe8SCUnqrKosNv0"
+    >
+      <header class="panel-head" data-page-node-id="SLSVq4vTcFeVb714IiVrKn">
+        <div class="workspace-brand" data-page-node-id="UkdZWMoLR5HBB0xnnyHXfz">
+          <img
+            class="brand-mark"
+            src="assets/icon128.png"
+            width="34"
+            height="34"
+            alt=""
+            aria-hidden="true"
+            data-page-node-id="FLm140TUCrHKjR39YekteB"
+          />
+          <div data-page-node-id="t2Y48XJwmv7rkGHmxlTqPu">
+            <h2 data-page-node-id="JHXyST9cvZGBVStXOUF5vM">静谧工作台</h2>
+            <p data-page-node-id="rVYQeU0AOM8nyBWFMRIABJ">
+              你的浏览器，按你的方式
+            </p>
+          </div>
+        </div>
+        <button
+          class="panel-close"
+          id="panel-close"
+          type="button"
+          title="关闭"
+          aria-label="关闭工作台"
+          data-page-node-id="e2hbr9gdVz5oP4IKZZeWWy"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            data-page-node-id="H9Ed8b9b6j0wTAiuKmQtAR"
+          >
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              data-page-node-id="2kb0ZwiHLef8d5XMQDtxC3"
+            />
+          </svg>
+        </button>
+      </header>
+
+      <div class="workspace-layout" data-page-node-id="M4By6SAyLURAAhxSVz34DQ">
+        <nav
+          class="workspace-nav"
+          role="tablist"
+          aria-label="工作台功能"
+          data-page-node-id="1vfXZqrN2XyfV2uetNv8vC"
+        >
+          <button
+            class="workspace-tab is-active"
+            id="workspace-tab-appearance"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="workspace-appearance"
+            data-workspace-target="appearance"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="4" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="m4 16 4.5-4.5 3.5 3.5 2.5-2.5 5.5 5.5" />
+            </svg>
+            <span><strong>外观</strong><small>壁纸与画面</small></span>
+          </button>
+          <button
+            class="workspace-tab"
+            id="workspace-tab-search"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="workspace-search"
+            data-workspace-target="search"
+            tabindex="-1"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <circle cx="10.5" cy="10.5" r="6.5" />
+              <path d="m15.5 15.5 4.5 4.5M9 8.5h3M9 11.5h3" />
+            </svg>
+            <span
+              ><strong>搜索与 AI</strong><small>索引、AI 与自动化</small></span
+            >
+          </button>
+          <button
+            class="workspace-tab"
+            id="workspace-tab-bookmarks"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="organizer-dialog"
+            data-workspace-target="bookmarks"
+            tabindex="-1"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="M6 4.5h12a1.5 1.5 0 0 1 1.5 1.5v14l-7.5-4-7.5 4V6A1.5 1.5 0 0 1 6 4.5z"
+              />
+            </svg>
+            <span
+              ><strong>书签空间</strong><small>目录浏览与正文状态</small></span
+            >
+          </button>
+          <button
+            class="workspace-tab"
+            id="workspace-tab-tags"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="workspace-tags"
+            data-workspace-target="tags"
+            tabindex="-1"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"
+              />
+              <circle cx="7" cy="7" r="1.3" />
+            </svg>
+            <span><strong>快捷标签</strong><small>常用入口与推荐</small></span>
+          </button>
+          <button
+            class="workspace-tab"
+            id="workspace-tab-preferences"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="workspace-preferences"
+            data-workspace-target="preferences"
+            tabindex="-1"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" />
+            </svg>
+            <span><strong>设置</strong><small>时间、显示与开关</small></span>
+          </button>
+          <button
+            class="workspace-account"
+            id="workspace-account"
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+            title="账号与备份"
+          >
+            <span
+              class="workspace-account-avatar"
+              id="workspace-account-avatar"
+              aria-hidden="true"
+              >?</span
+            >
+            <span class="workspace-account-copy"
+              ><strong id="workspace-account-name">登录账号</strong
+              ><small>账号与备份</small></span
+            >
+          </button>
+          <div
+            class="workspace-nav-foot"
+            data-page-node-id="b4fG3I7pK864DBeMMO0lrc"
+          >
+            <span
+              class="local-dot"
+              data-page-node-id="isqXDW9fS6VGsHgPds7Jzr"
+            ></span
+            >本地优先 · 按需连接
+          </div>
+        </nav>
+
+        <div class="panel-body" data-page-node-id="KG1jgbTytwjzPQXnymb3hf">
+          <section
+            class="settings-view"
+            id="workspace-appearance"
+            role="tabpanel"
+            aria-labelledby="workspace-tab-appearance"
+            data-workspace-view="appearance"
+          >
+            <div
+              class="view-heading"
+              data-page-node-id="ZYJ2B5LF1m1OidrhR5y4nG"
+            >
+              <div data-page-node-id="09riSFEhWWELRmIW2DT9oE">
+                <p
+                  class="view-eyebrow"
+                  data-page-node-id="VjfR6ntAk0NEngAGdp4jHR"
+                >
+                  PERSONALIZE
+                </p>
+                <h2 data-page-node-id="cu0sUD0fJSOiw663N5YuUU">
+                  让新标签页更像你
+                </h2>
+                <p data-page-node-id="4M2FQeO7EvPf8CSKszrKDn">
+                  选择壁纸、调整画面，所有修改即时预览。
+                </p>
+              </div>
+              <span
+                class="view-badge"
+                data-page-node-id="k1QkoEkAETgHEUAlo9hAtl"
+                >实时预览</span
+              >
+            </div>
+            <div
+              class="appearance-grid"
+              data-page-node-id="GxWf4RbdBk9fa6te8WEDS1"
+            >
+              <div
+                class="settings-stack"
+                data-page-node-id="NawQwWDGVFXj9TF1qGDlSQ"
+              >
+                <section
+                  class="group settings-card"
+                  data-page-node-id="rFyfTEBs9eaF0Upup4sNjT"
+                >
+                  <h3 data-page-node-id="DXfe1Tq2bffZILyV1wPo3m">
+                    我的背景<span
+                      class="src-link"
+                      data-page-node-id="qfiHuq8KFviF9DG5PJPr5r"
+                      >本地图库</span
+                    >
+                  </h3>
+                  <div class="row" data-page-node-id="S7BkNRHUFdU8D6OB7ueOfJ">
+                    <label
+                      class="btn-primary"
+                      for="file-input"
+                      data-page-node-id="QlFOmiXjAMhBFfh3v5IDEJ"
+                      >上传图片</label
+                    >
+                    <input
+                      id="file-input"
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      data-page-node-id="M7zRWFX0ResCiFU07CNQCh"
+                    />
+                    <span
+                      class="hint"
+                      data-page-node-id="SFjJioLrVxE7Kw0A3O3T2J"
+                      >支持拖拽 / 粘贴</span
+                    >
+                  </div>
+                  <div
+                    class="gallery"
+                    id="gallery"
+                    data-page-node-id="ICupIVNsZY1OeVUTyBs01g"
+                  ></div>
+                  <div
+                    class="empty-tip"
+                    id="gallery-empty"
+                    data-page-node-id="vi6bc76MhS4OtS2yZDeobF"
+                  >
+                    还没有自定义图片
+                  </div>
+                  <div
+                    class="row row-stack"
+                    data-page-node-id="HWzh7TRkS38EMTCm06jNUa"
+                  >
+                    <input
+                      class="text-input"
+                      id="url-input"
+                      type="text"
+                      aria-label="网络图片链接"
+                      placeholder="粘贴图片链接 https://..."
+                      spellcheck="false"
+                      data-page-node-id="CiuPH7EeyGLMDPjLrJux97"
+                    />
+                    <button
+                      class="btn-ghost"
+                      id="url-apply"
+                      type="button"
+                      data-page-node-id="xGITEFCzfRHYQqn6s9Lh9j"
+                    >
+                      应用
+                    </button>
+                  </div>
+                </section>
+
+                <section
+                  class="group settings-card"
+                  data-page-node-id="5eVvc3wCznjj4YJ8ixsWWk"
+                >
+                  <h3 data-page-node-id="LbNrHHbr5zE10XPikqaiig">
+                    预设背景<span
+                      class="src-link"
+                      data-page-node-id="HLhbZ7vE7GVlAxiGQxLATZ"
+                      >8 款渐变</span
+                    >
+                  </h3>
+                  <div
+                    class="swatches"
+                    id="swatches"
+                    data-page-node-id="01sp6oWUEsho6NjVcrDwS0"
+                  ></div>
+                </section>
+
+                <section
+                  class="group settings-card"
+                  data-page-node-id="3QmBTHdp1LCs7CDibgVTmS"
+                >
+                  <h3 data-page-node-id="LaGZFZUr5lex6gaY1zckiy">画面调整</h3>
+                  <div
+                    class="slider-row"
+                    data-page-node-id="pOEHBGFtXjYAHkTMQAaXgc"
+                  >
+                    <span
+                      class="label"
+                      data-page-node-id="FUH94Bhkxrup1YQWAT68IJ"
+                      >模糊</span
+                    ><input
+                      id="blur-range"
+                      aria-label="背景模糊"
+                      type="range"
+                      min="0"
+                      max="24"
+                      step="1"
+                      data-page-node-id="NWCh9HgDi887VXnwlI64Sv"
+                    /><span
+                      class="value"
+                      id="blur-value"
+                      data-page-node-id="Fxi6JA8XzOeKWEGdA0YwUk"
+                      >0</span
+                    >
+                  </div>
+                  <div
+                    class="slider-row"
+                    data-page-node-id="1uBwoJpEXrUC2WNb2F2Yvt"
+                  >
+                    <span
+                      class="label"
+                      data-page-node-id="u4hecAOXaplEUqWzWaCugw"
+                      >暗化</span
+                    ><input
+                      id="scrim-range"
+                      aria-label="背景暗化"
+                      type="range"
+                      min="0"
+                      max="85"
+                      step="1"
+                      data-page-node-id="Pj3CfSslfy95rbMH9SqPPc"
+                    /><span
+                      class="value"
+                      id="scrim-value"
+                      data-page-node-id="oykbWxLfLW9sufBYg7Uyij"
+                      >12</span
+                    >
+                  </div>
+                  <div class="switch-row">
+                    <span class="label">动态效果</span
+                    ><label class="switch"
+                      ><input
+                        id="sw-motion"
+                        type="checkbox"
+                        aria-label="启用背景动效" /><i></i
+                    ></label>
+                  </div>
+                  <p class="hint motion-hint">
+                    缓慢漂移、环境流光与指针视差；跟随系统的减少动态效果设置。
+                  </p>
+                </section>
+                <section class="group settings-card current-bg-card">
+                  <h3>当前背景</h3>
+                  <p
+                    id="wp-quality"
+                    class="hint"
+                    role="status"
+                    aria-live="polite"
+                    data-page-node-id="SLqi8vhqtrfr0t8B3Qj7jo"
+                  >
+                    当前背景：正在检测…
+                  </p>
+                  <div class="wallpaper-save-row">
+                    <button
+                      id="wp-save"
+                      class="btn-ghost"
+                      type="button"
+                      disabled
+                    >
+                      保存到离线图库</button
+                    ><span>默认在线使用，需要时再保存</span>
+                  </div>
+                </section>
+                <section
+                  class="group settings-card history-card"
+                  id="wp-history-wrap"
+                  hidden
+                >
+                  <div class="wp-history-head">
+                    <h3>最近使用</h3>
+                    <button id="wp-history-clear" type="button">清空</button>
+                  </div>
+                  <div
+                    class="wp-history-list"
+                    id="wp-history"
+                    aria-label="最近使用的壁纸"
+                  ></div>
+                </section>
+              </div>
+
+              <section
+                class="group settings-card wallpaper-card"
+                data-page-node-id="uNJ65OFKCbUhfEWA24yrkz"
+              >
+                <h3 data-page-node-id="v2BmfGCEG0230EzP9XDeJi">
+                  在线壁纸<span
+                    class="src-link"
+                    data-page-node-id="SNAWZFFVHOWZXoG0mO7v6A"
+                    >原生 4K / 8K</span
+                  >
+                </h3>
+                <div class="wallpaper-source-row">
+                  <label for="wp-provider">图源</label>
+                  <select id="wp-provider" aria-label="选择壁纸图源">
+                    <option value="all">全部高清图源 · 国内优先</option>
+                    <option value="domestic">国内精选 · 中文搜索</option>
+                    <option value="wallpic">
+                      Wallpic · 国风 / 动漫 / 人物
+                    </option>
+                    <option value="tenwallpaper">
+                      10wallpaper 中文 · 高清壁纸
+                    </option>
+                    <option value="pexels">Pexels · 摄影（需 Key）</option>
+                    <option value="unsplash">Unsplash · 摄影（需 Key）</option>
+                    <option value="pixabay">
+                      Pixabay · 摄影 / 写真（需 Key）
+                    </option>
+                    <option value="uhdpaper">UHD Paper · 4K / 8K</option>
+                    <option value="wallpapercave">
+                      Wallpaper Cave · 主题搜索
+                    </option>
+                    <option value="bing">Bing · 每日精选</option>
+                    <option value="haowallpaper">哲风 · 原图需登录</option>
+                  </select>
+                  <a
+                    id="wp-source-link"
+                    href="https://www.wallpic.cn/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >访问来源<svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M7 17 17 7" />
+                      <path d="M9 7h8v8" /></svg
+                  ></a>
                 </div>
-                <div class="gallery" id="gallery" data-page-node-id="ICupIVNsZY1OeVUTyBs01g"></div>
-                <div class="empty-tip" id="gallery-empty" data-page-node-id="vi6bc76MhS4OtS2yZDeobF">还没有自定义图片</div>
-                <div class="row row-stack" data-page-node-id="HWzh7TRkS38EMTCm06jNUa">
-                  <input class="text-input" id="url-input" type="text" aria-label="网络图片链接" placeholder="粘贴图片链接 https://..." spellcheck="false" data-page-node-id="CiuPH7EeyGLMDPjLrJux97" />
-                  <button class="btn-ghost" id="url-apply" type="button" data-page-node-id="xGITEFCzfRHYQqn6s9Lh9j">应用</button>
+                <p id="wp-source-note" class="hint">
+                  支持全站搜索，常见中文关键词自动转换。
+                </p>
+                <div
+                  id="wp-photo-settings"
+                  class="wallpaper-photo-settings"
+                  hidden
+                >
+                  <label id="wp-photo-key-label" for="wp-photo-key"
+                    >摄影图库 API Key</label
+                  ><input
+                    id="wp-photo-key"
+                    class="text-input"
+                    type="password"
+                    autocomplete="off"
+                    placeholder="填写自己的 Key，仅保存在本机"
+                  /><a
+                    id="wp-photo-key-help"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    href="https://www.pexels.com/api/"
+                    >申请 / 查看说明 ↗</a
+                  >
                 </div>
-              </section>
-
-              <section class="group settings-card" data-page-node-id="5eVvc3wCznjj4YJ8ixsWWk">
-                <h3 data-page-node-id="LbNrHHbr5zE10XPikqaiig">预设背景<span class="src-link" data-page-node-id="HLhbZ7vE7GVlAxiGQxLATZ">8 款渐变</span></h3>
-                <div class="swatches" id="swatches" data-page-node-id="01sp6oWUEsho6NjVcrDwS0"></div>
-              </section>
-
-              <section class="group settings-card" data-page-node-id="3QmBTHdp1LCs7CDibgVTmS">
-                <h3 data-page-node-id="LaGZFZUr5lex6gaY1zckiy">画面调整</h3>
-                <div class="slider-row" data-page-node-id="pOEHBGFtXjYAHkTMQAaXgc"><span class="label" data-page-node-id="FUH94Bhkxrup1YQWAT68IJ">模糊</span><input id="blur-range" aria-label="背景模糊" type="range" min="0" max="24" step="1" data-page-node-id="NWCh9HgDi887VXnwlI64Sv" /><span class="value" id="blur-value" data-page-node-id="Fxi6JA8XzOeKWEGdA0YwUk">0</span></div>
-                <div class="slider-row" data-page-node-id="1uBwoJpEXrUC2WNb2F2Yvt"><span class="label" data-page-node-id="u4hecAOXaplEUqWzWaCugw">暗化</span><input id="scrim-range" aria-label="背景暗化" type="range" min="0" max="85" step="1" data-page-node-id="Pj3CfSslfy95rbMH9SqPPc" /><span class="value" id="scrim-value" data-page-node-id="oykbWxLfLW9sufBYg7Uyij">12</span></div>
-                <div class="switch-row"><span class="label">动态效果</span><label class="switch"><input id="sw-motion" type="checkbox" aria-label="启用背景动效" /><i></i></label></div>
-                <p class="hint motion-hint">缓慢漂移、环境流光与指针视差；跟随系统的减少动态效果设置。</p>
-              </section>
-              <section class="group settings-card current-bg-card">
-                <h3>当前背景</h3>
-                <p id="wp-quality" class="hint" role="status" aria-live="polite" data-page-node-id="SLqi8vhqtrfr0t8B3Qj7jo">当前背景：正在检测…</p>
-                <div class="wallpaper-save-row"><button id="wp-save" class="btn-ghost" type="button" disabled>保存到离线图库</button><span>默认在线使用，需要时再保存</span></div>
-              </section>
-              <section class="group settings-card history-card" id="wp-history-wrap" hidden>
-                <div class="wp-history-head"><h3>最近使用</h3><button id="wp-history-clear" type="button">清空</button></div>
-                <div class="wp-history-list" id="wp-history" aria-label="最近使用的壁纸"></div>
+                <div class="row" data-page-node-id="nIPLOwboEOZZinZKE7TAJ9">
+                  <input
+                    class="text-input"
+                    id="wp-query"
+                    type="text"
+                    aria-label="搜索在线壁纸"
+                    placeholder="搜索动漫、风景、星空或英文关键词…"
+                    spellcheck="false"
+                    data-page-node-id="gaLIVDCMUbPgfy4VzUVqYo"
+                  />
+                  <button
+                    class="btn-ghost"
+                    id="wp-search"
+                    type="button"
+                    data-page-node-id="JzimWK8QgK69NSFAgglqi6"
+                  >
+                    搜索
+                  </button>
+                </div>
+                <div
+                  class="wallpaper-suggest"
+                  id="wp-suggest"
+                  aria-label="搜索联想"
+                  hidden
+                ></div>
+                <div class="wallpaper-topics" aria-label="壁纸推荐主题">
+                  <button
+                    type="button"
+                    data-wallpaper-preference="portraits"
+                    aria-pressed="true"
+                  >
+                    人物精选</button
+                  ><button
+                    type="button"
+                    data-wallpaper-preference="illustration"
+                    aria-pressed="false"
+                  >
+                    唯美人物插画</button
+                  ><button type="button" data-wallpaper-query="国风美女">
+                    国风人物</button
+                  ><button
+                    type="button"
+                    data-wallpaper-query="真人美女"
+                    data-wallpaper-provider="domestic"
+                  >
+                    人物写真</button
+                  ><button
+                    type="button"
+                    data-wallpaper-query="女明星"
+                    data-wallpaper-provider="domestic"
+                  >
+                    明星写真</button
+                  ><button
+                    type="button"
+                    data-wallpaper-query="氛围写真"
+                    data-wallpaper-provider="domestic"
+                  >
+                    氛围写真</button
+                  ><button type="button" data-wallpaper-query="风景">
+                    自然风光</button
+                  ><button
+                    type="button"
+                    data-wallpaper-preference="all"
+                    aria-pressed="false"
+                  >
+                    全部题材
+                  </button>
+                </div>
+                <div
+                  class="wp-grid"
+                  id="wp-grid"
+                  data-page-node-id="8BVvEvWDaQ2hLmKFzTo0Tn"
+                ></div>
+                <div
+                  class="wp-status"
+                  id="wp-status"
+                  data-page-node-id="6WxJY0lD8vAEWn38xl63B0"
+                >
+                  正在加载…
+                </div>
+                <div
+                  class="wp-pagination"
+                  aria-label="壁纸分页"
+                  data-page-node-id="cd3zsQvoQhgTQkIKmJgnla"
+                >
+                  <button
+                    class="btn-ghost"
+                    id="wp-prev"
+                    type="button"
+                    disabled
+                    data-page-node-id="4OaRWFP4cxOYcdd6WrIj8j"
+                  >
+                    上一页
+                  </button>
+                  <span
+                    id="wp-page"
+                    aria-live="polite"
+                    data-page-node-id="vVL2zJXTCpY6SfAU8poifc"
+                    >第 1 页</span
+                  >
+                  <button
+                    class="btn-ghost wp-more"
+                    id="wp-more"
+                    type="button"
+                    data-page-node-id="Scq4rm5sguBpOTL6AQzUG0"
+                  >
+                    下一页
+                  </button>
+                </div>
+                <details
+                  id="wp-hao-settings"
+                  class="advanced-settings"
+                  hidden
+                  data-page-node-id="wrZ7x0rA9nkJr62ZQAPgip"
+                >
+                  <summary data-page-node-id="N9dQIOv4s2NdXKSY24K2jW">
+                    高清原图与登录设置<span
+                      data-page-node-id="Bm8ZaC48dXrisc1f3hs7Ya"
+                      >可选</span
+                    >
+                  </summary>
+                  <div
+                    class="advanced-content"
+                    data-page-node-id="8svczQEEOesXPM09sRRFXh"
+                  >
+                    <label
+                      class="field-label"
+                      for="wp-token"
+                      data-page-node-id="7pNaJrYL3gLbVnZqfDrdHl"
+                      >哲风登录 Token</label
+                    >
+                    <input
+                      class="text-input"
+                      id="wp-token"
+                      type="password"
+                      placeholder="仅用于 4K 原图，只保存在本机"
+                      spellcheck="false"
+                      autocomplete="off"
+                      data-page-node-id="mbwHQKYPOCOsV53A8Z9mZE"
+                    />
+                    <button
+                      class="btn-ghost"
+                      id="wp-auth"
+                      type="button"
+                      data-page-node-id="VleDFvpWDC3crlbI8Ahp9k"
+                    >
+                      使用浏览器登录状态
+                    </button>
+                    <p
+                      class="panel-foot"
+                      data-page-node-id="mmUe0fSmAYDNr4dHobwzCk"
+                    >
+                      下载后离线缓存；失败时自动使用公开预览。
+                    </p>
+                  </div>
+                </details>
               </section>
             </div>
+          </section>
 
-            <section class="group settings-card wallpaper-card" data-page-node-id="uNJ65OFKCbUhfEWA24yrkz">
-              <h3 data-page-node-id="v2BmfGCEG0230EzP9XDeJi">在线壁纸<span class="src-link" data-page-node-id="SNAWZFFVHOWZXoG0mO7v6A">原生 4K / 8K</span></h3>
-              <div class="wallpaper-source-row"><label for="wp-provider">图源</label>
-                <select id="wp-provider" aria-label="选择壁纸图源"><option value="all">全部高清图源 · 国内优先</option><option value="domestic">国内精选 · 中文搜索</option><option value="wallpic">Wallpic · 国风 / 动漫 / 人物</option><option value="tenwallpaper">10wallpaper 中文 · 高清壁纸</option><option value="pexels">Pexels · 摄影（需 Key）</option><option value="unsplash">Unsplash · 摄影（需 Key）</option><option value="pixabay">Pixabay · 摄影 / 写真（需 Key）</option><option value="uhdpaper">UHD Paper · 4K / 8K</option><option value="wallpapercave">Wallpaper Cave · 主题搜索</option><option value="bing">Bing · 每日精选</option><option value="haowallpaper">哲风 · 原图需登录</option></select>
-                <a id="wp-source-link" href="https://www.wallpic.cn/" target="_blank" rel="noopener noreferrer">访问来源<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg></a>
+          <section
+            class="settings-view"
+            id="workspace-search"
+            role="tabpanel"
+            aria-labelledby="workspace-tab-search"
+            data-workspace-view="search"
+            hidden
+          >
+            <div
+              class="view-heading"
+              data-page-node-id="HbIhT2nqcSDJBHD8p6KEvp"
+            >
+              <div data-page-node-id="yi0LSWvDycZiJUeedQlxHs">
+                <p
+                  class="view-eyebrow"
+                  data-page-node-id="lZYYTIX4PXubZTi9aVY53B"
+                >
+                  SEARCH
+                </p>
+                <h2 data-page-node-id="l6ui7eplaggvaMETr2FtVd">
+                  从一个搜索框，找到所有收藏
+                </h2>
+                <p data-page-node-id="uM2tD1jbZf1DLuY4oyKjEf">
+                  本地检索保障隐私；AI、同步与自动化按需要开启。
+                </p>
               </div>
-              <p id="wp-source-note" class="hint">支持全站搜索，常见中文关键词自动转换。</p>
-              <div id="wp-photo-settings" class="wallpaper-photo-settings" hidden><label id="wp-photo-key-label" for="wp-photo-key">摄影图库 API Key</label><input id="wp-photo-key" class="text-input" type="password" autocomplete="off" placeholder="填写自己的 Key，仅保存在本机" /><a id="wp-photo-key-help" target="_blank" rel="noopener noreferrer" href="https://www.pexels.com/api/">申请 / 查看说明 ↗</a></div>
-              <div class="row" data-page-node-id="nIPLOwboEOZZinZKE7TAJ9">
-                <input class="text-input" id="wp-query" type="text" aria-label="搜索在线壁纸" placeholder="搜索动漫、风景、星空或英文关键词…" spellcheck="false" data-page-node-id="gaLIVDCMUbPgfy4VzUVqYo" />
-                <button class="btn-ghost" id="wp-search" type="button" data-page-node-id="JzimWK8QgK69NSFAgglqi6">搜索</button>
-              </div>
-              <div class="wallpaper-suggest" id="wp-suggest" aria-label="搜索联想" hidden></div>
-              <div class="wallpaper-topics" aria-label="壁纸推荐主题"><button type="button" data-wallpaper-preference="portraits" aria-pressed="true">人物精选</button><button type="button" data-wallpaper-preference="illustration" aria-pressed="false">唯美人物插画</button><button type="button" data-wallpaper-query="国风美女">国风人物</button><button type="button" data-wallpaper-query="真人美女" data-wallpaper-provider="domestic">人物写真</button><button type="button" data-wallpaper-query="女明星" data-wallpaper-provider="domestic">明星写真</button><button type="button" data-wallpaper-query="氛围写真" data-wallpaper-provider="domestic">氛围写真</button><button type="button" data-wallpaper-query="风景">自然风光</button><button type="button" data-wallpaper-preference="all" aria-pressed="false">全部题材</button></div>
-              <div class="wp-grid" id="wp-grid" data-page-node-id="8BVvEvWDaQ2hLmKFzTo0Tn"></div>
-              <div class="wp-status" id="wp-status" data-page-node-id="6WxJY0lD8vAEWn38xl63B0">正在加载…</div>
-              <div class="wp-pagination" aria-label="壁纸分页" data-page-node-id="cd3zsQvoQhgTQkIKmJgnla">
-                <button class="btn-ghost" id="wp-prev" type="button" disabled data-page-node-id="4OaRWFP4cxOYcdd6WrIj8j">上一页</button>
-                <span id="wp-page" aria-live="polite" data-page-node-id="vVL2zJXTCpY6SfAU8poifc">第 1 页</span>
-                <button class="btn-ghost wp-more" id="wp-more" type="button" data-page-node-id="Scq4rm5sguBpOTL6AQzUG0">下一页</button>
-              </div>
-              <details id="wp-hao-settings" class="advanced-settings" hidden data-page-node-id="wrZ7x0rA9nkJr62ZQAPgip">
-                <summary data-page-node-id="N9dQIOv4s2NdXKSY24K2jW">高清原图与登录设置<span data-page-node-id="Bm8ZaC48dXrisc1f3hs7Ya">可选</span></summary>
-                <div class="advanced-content" data-page-node-id="8svczQEEOesXPM09sRRFXh">
-                  <label class="field-label" for="wp-token" data-page-node-id="7pNaJrYL3gLbVnZqfDrdHl">哲风登录 Token</label>
-                  <input class="text-input" id="wp-token" type="password" placeholder="仅用于 4K 原图，只保存在本机" spellcheck="false" autocomplete="off" data-page-node-id="mbwHQKYPOCOsV53A8Z9mZE" />
-                  <button class="btn-ghost" id="wp-auth" type="button" data-page-node-id="VleDFvpWDC3crlbI8Ahp9k">使用浏览器登录状态</button>
-                  <p class="panel-foot" data-page-node-id="mmUe0fSmAYDNr4dHobwzCk">下载后离线缓存；失败时自动使用公开预览。</p>
+              <span
+                class="view-badge"
+                data-page-node-id="RD1Drz7NhoRunfcMWmfCKC"
+                >本地优先</span
+              >
+            </div>
+
+            <nav
+              class="search-breadcrumb"
+              id="search-breadcrumb"
+              aria-label="当前位置"
+              hidden
+            >
+              <button type="button" data-search-target="overview">
+                搜索与 AI
+              </button>
+              <span aria-hidden="true">/</span
+              ><span id="search-page-name" aria-current="page"></span>
+              <span
+                class="search-breadcrumb-detail"
+                id="search-page-detail-wrap"
+                hidden
+                ><span aria-hidden="true">/</span
+                ><span id="search-page-detail"></span
+              ></span>
+            </nav>
+            <div id="search-overview" class="search-overview">
+              <button
+                type="button"
+                class="search-entry"
+                data-search-target="settings"
+              >
+                <span
+                  ><strong>搜索设置</strong><small>搜索引擎与 AI 模型配置</small
+                  ><span
+                    class="search-entry-status"
+                    data-search-status="settings"
+                  ></span></span
+                ><span class="search-entry-arrow" aria-hidden="true">›</span>
+              </button>
+              <button
+                type="button"
+                class="search-entry"
+                data-search-target="rag"
+              >
+                <span
+                  ><strong>正文采集与 RAG</strong
+                  ><small>采集网页正文，同步到个人搜索集合</small
+                  ><span
+                    class="search-entry-status"
+                    data-search-status="rag"
+                  ></span></span
+                ><span class="search-entry-arrow" aria-hidden="true">›</span>
+              </button>
+              <button
+                type="button"
+                class="search-entry"
+                data-search-target="organize"
+              >
+                <span
+                  ><strong>收藏自动归档</strong
+                  ><small>管理归档规则，确认推荐目录</small
+                  ><span
+                    class="search-entry-status"
+                    data-search-status="organize"
+                  ></span></span
+                ><span class="search-entry-arrow" aria-hidden="true">›</span>
+              </button>
+              <button
+                type="button"
+                class="search-entry"
+                data-search-target="enrich"
+              >
+                <span
+                  ><strong>标题、摘要与标签</strong
+                  ><small>补全收藏信息，处理待确认与失败项</small
+                  ><span
+                    class="search-entry-status"
+                    data-search-status="enrich"
+                  ></span></span
+                ><span class="search-entry-arrow" aria-hidden="true">›</span>
+              </button>
+              <button
+                type="button"
+                class="search-entry"
+                data-search-target="health"
+              >
+                <span
+                  ><strong>书签体检</strong
+                  ><small>检查重复、失效与缺少正文的收藏</small
+                  ><span
+                    class="search-entry-status"
+                    data-search-status="health"
+                  ></span></span
+                ><span class="search-entry-arrow" aria-hidden="true">›</span>
+              </button>
+            </div>
+            <div class="search-subpage" data-search-page="settings" hidden>
+              <div class="settings-block" id="ws-block-engine">
+                <div
+                  class="settings-grid"
+                  data-page-node-id="F2KPOD7oWlPHgsom8rFHGl"
+                >
+                  <section
+                    class="group settings-card"
+                    data-page-node-id="ZJgZSqltb09ue9XHklDTT2"
+                  >
+                    <h3 data-page-node-id="mwtTh5ZdaxehFR4ZFCQCz4">
+                      默认搜索引擎
+                    </h3>
+                    <div
+                      class="segmented"
+                      id="engines"
+                      data-page-node-id="w7cABYe2RgSQyBbF9hWVKX"
+                    ></div>
+                    <p
+                      class="panel-foot align-left"
+                      data-page-node-id="ECxQZDtoU2llzpcqJrfDqS"
+                    >
+                      普通输入直接搜索网页，点击搜索框右侧标签也可切换。
+                    </p>
+                  </section>
                 </div>
-              </details>
-            </section>
-          </div>
-        </section>
-
-        <section class="settings-view" id="workspace-search" role="tabpanel" aria-labelledby="workspace-tab-search" data-workspace-view="search" hidden>
-          <div class="view-heading" data-page-node-id="HbIhT2nqcSDJBHD8p6KEvp"><div data-page-node-id="yi0LSWvDycZiJUeedQlxHs"><p class="view-eyebrow" data-page-node-id="lZYYTIX4PXubZTi9aVY53B">SEARCH</p><h2 data-page-node-id="l6ui7eplaggvaMETr2FtVd">从一个搜索框，找到所有收藏</h2><p data-page-node-id="uM2tD1jbZf1DLuY4oyKjEf">本地检索保障隐私；AI、同步与自动化按需要开启。</p></div><span class="view-badge" data-page-node-id="RD1Drz7NhoRunfcMWmfCKC">本地优先</span></div>
-
-          <nav class="search-breadcrumb" id="search-breadcrumb" aria-label="当前位置" hidden>
-            <button type="button" data-search-target="overview">搜索与 AI</button>
-            <span aria-hidden="true">/</span><span id="search-page-name" aria-current="page"></span>
-            <span class="search-breadcrumb-detail" id="search-page-detail-wrap" hidden><span aria-hidden="true">/</span><span id="search-page-detail"></span></span>
-          </nav>
-          <div id="search-overview" class="search-overview">
-            <button type="button" class="search-entry" data-search-target="settings"><span><strong>搜索设置</strong><small>搜索引擎与 AI 模型配置</small><span class="search-entry-status" data-search-status="settings"></span></span><span class="search-entry-arrow" aria-hidden="true">›</span></button>
-            <button type="button" class="search-entry" data-search-target="rag"><span><strong>正文采集与 RAG</strong><small>采集网页正文，同步到个人搜索集合</small><span class="search-entry-status" data-search-status="rag"></span></span><span class="search-entry-arrow" aria-hidden="true">›</span></button>
-            <button type="button" class="search-entry" data-search-target="organize"><span><strong>收藏自动归档</strong><small>管理归档规则，确认推荐目录</small><span class="search-entry-status" data-search-status="organize"></span></span><span class="search-entry-arrow" aria-hidden="true">›</span></button>
-            <button type="button" class="search-entry" data-search-target="enrich"><span><strong>标题、摘要与标签</strong><small>补全收藏信息，处理待确认与失败项</small><span class="search-entry-status" data-search-status="enrich"></span></span><span class="search-entry-arrow" aria-hidden="true">›</span></button>
-            <button type="button" class="search-entry" data-search-target="health"><span><strong>书签体检</strong><small>检查重复、失效与缺少正文的收藏</small><span class="search-entry-status" data-search-status="health"></span></span><span class="search-entry-arrow" aria-hidden="true">›</span></button>
-          </div>
-          <div class="search-subpage" data-search-page="settings" hidden>
-          <div class="settings-block" id="ws-block-engine">
-            <div class="settings-grid" data-page-node-id="F2KPOD7oWlPHgsom8rFHGl">
-              <section class="group settings-card" data-page-node-id="ZJgZSqltb09ue9XHklDTT2">
-                <h3 data-page-node-id="mwtTh5ZdaxehFR4ZFCQCz4">默认搜索引擎</h3>
-                <div class="segmented" id="engines" data-page-node-id="w7cABYe2RgSQyBbF9hWVKX"></div>
-                <p class="panel-foot align-left" data-page-node-id="ECxQZDtoU2llzpcqJrfDqS">普通输入直接搜索网页，点击搜索框右侧标签也可切换。</p>
-              </section>
-            </div>
-          </div>
-
-          <div class="settings-block" id="ws-block-ai">
-            <details class="group settings-card advanced-card" open data-page-node-id="ru20q5SWOIfkdMv78BVAYv">
-            <summary data-page-node-id="cEFjYkkSs0FuyALGB0JTdd"><span data-page-node-id="xqw1W3EHzZ01wFq1hqVLIW"><strong data-page-node-id="13AdrKybXTtC2vIfcYnODx">AI 模型配置</strong><small data-page-node-id="IALKqIPsMIuvQq6EtqBX2E">用于 ? 智能搜索</small></span><span class="summary-action" data-page-node-id="wDfnaChGP1uu2PMLMY0eUx">展开配置</span></summary>
-            <div class="advanced-card-body" data-page-node-id="mgyGFQDyhnvhSp4wlMsrLc">
-              <div class="compact-switches" data-page-node-id="02HbZeuStw0gPG5XakLx6M">
-                <div class="switch-row" data-page-node-id="aRcDdn3IJrXcuvRDDdiU2G"><span class="label" data-page-node-id="P1Q0OXjYVYDubBEb3gBJ8d">启用 AI 能力</span><label class="switch" data-page-node-id="0oaWSsFqaWVPeGOqLowsf7"><input id="sw-ai" type="checkbox" aria-label="启用 AI 能力" data-page-node-id="gvcEpmophnMvZc0HOD4ow0" /><i data-page-node-id="oGjmqnTPYjzYsIKkawWHD3"></i></label></div>
-
               </div>
-              <div class="field-grid" data-page-node-id="zutp5ffaaHsKhNCRZ05qFu">
-                <label class="field" data-page-node-id="htgZdiKAzA8BzKfxMCOrUJ"><span data-page-node-id="ULyot2Zp6fawNl8FCFbzrC">接口地址</span><input class="text-input" id="ai-base" type="text" placeholder="http://host:9000/v1" spellcheck="false" data-page-node-id="NgJmBE2VVtjGa2yO3rxE7Q" /></label>
-                <label class="field" data-page-node-id="Oz5SDwyAOR7nKZeevDeadL"><span data-page-node-id="RpdMvhDPseI5UMQIpMiWdo">模型名</span><input class="text-input" id="ai-model" type="text" placeholder="例如 qwen3.6-flash" spellcheck="false" data-page-node-id="HCHXZDR19wHE1gvWxvA3zV" /></label>
-                <label class="field"><span>快模型（可选）</span><input class="text-input" id="ai-fast-model" type="text" placeholder="改写、重排与补全" spellcheck="false" /></label>
-                <label class="field"><span>强模型（可选）</span><input class="text-input" id="ai-strong-model" type="text" placeholder="问答与摘要" spellcheck="false" /></label>
-                <label class="field field-wide" data-page-node-id="qD1saNEZfCch2e93t8XRSm"><span data-page-node-id="Vth3WELFQT7Lx7N2v6ytcG">API Key</span><input class="text-input" id="ai-key" type="password" placeholder="只保存在本机" spellcheck="false" autocomplete="off" data-page-node-id="faOZzNfhWEl34ckYcgbDst" /></label>
+
+              <div class="settings-block" id="ws-block-ai">
+                <details
+                  class="group settings-card advanced-card"
+                  open
+                  data-page-node-id="ru20q5SWOIfkdMv78BVAYv"
+                >
+                  <summary data-page-node-id="cEFjYkkSs0FuyALGB0JTdd">
+                    <span data-page-node-id="xqw1W3EHzZ01wFq1hqVLIW"
+                      ><strong data-page-node-id="13AdrKybXTtC2vIfcYnODx"
+                        >AI 模型配置</strong
+                      ><small data-page-node-id="IALKqIPsMIuvQq6EtqBX2E"
+                        >用于 ? 智能搜索</small
+                      ></span
+                    ><span
+                      class="summary-action"
+                      data-page-node-id="wDfnaChGP1uu2PMLMY0eUx"
+                      >展开配置</span
+                    >
+                  </summary>
+                  <div
+                    class="advanced-card-body"
+                    data-page-node-id="mgyGFQDyhnvhSp4wlMsrLc"
+                  >
+                    <div
+                      class="compact-switches"
+                      data-page-node-id="02HbZeuStw0gPG5XakLx6M"
+                    >
+                      <div
+                        class="switch-row"
+                        data-page-node-id="aRcDdn3IJrXcuvRDDdiU2G"
+                      >
+                        <span
+                          class="label"
+                          data-page-node-id="P1Q0OXjYVYDubBEb3gBJ8d"
+                          >启用 AI 能力</span
+                        ><label
+                          class="switch"
+                          data-page-node-id="0oaWSsFqaWVPeGOqLowsf7"
+                          ><input
+                            id="sw-ai"
+                            type="checkbox"
+                            aria-label="启用 AI 能力"
+                            data-page-node-id="gvcEpmophnMvZc0HOD4ow0" /><i
+                            data-page-node-id="oGjmqnTPYjzYsIKkawWHD3"
+                          ></i
+                        ></label>
+                      </div>
+                    </div>
+                    <div
+                      class="field-grid"
+                      data-page-node-id="zutp5ffaaHsKhNCRZ05qFu"
+                    >
+                      <label
+                        class="field"
+                        data-page-node-id="htgZdiKAzA8BzKfxMCOrUJ"
+                        ><span data-page-node-id="ULyot2Zp6fawNl8FCFbzrC"
+                          >接口地址</span
+                        ><input
+                          class="text-input"
+                          id="ai-base"
+                          type="text"
+                          placeholder="http://host:9000/v1"
+                          spellcheck="false"
+                          data-page-node-id="NgJmBE2VVtjGa2yO3rxE7Q"
+                      /></label>
+                      <label
+                        class="field"
+                        data-page-node-id="Oz5SDwyAOR7nKZeevDeadL"
+                        ><span data-page-node-id="RpdMvhDPseI5UMQIpMiWdo"
+                          >模型名</span
+                        ><input
+                          class="text-input"
+                          id="ai-model"
+                          type="text"
+                          placeholder="例如 qwen3.6-flash"
+                          spellcheck="false"
+                          data-page-node-id="HCHXZDR19wHE1gvWxvA3zV"
+                      /></label>
+                      <label class="field"
+                        ><span>快模型（可选）</span
+                        ><input
+                          class="text-input"
+                          id="ai-fast-model"
+                          type="text"
+                          placeholder="改写、重排与补全"
+                          spellcheck="false"
+                      /></label>
+                      <label class="field"
+                        ><span>强模型（可选）</span
+                        ><input
+                          class="text-input"
+                          id="ai-strong-model"
+                          type="text"
+                          placeholder="问答与摘要"
+                          spellcheck="false"
+                      /></label>
+                      <label
+                        class="field field-wide"
+                        data-page-node-id="qD1saNEZfCch2e93t8XRSm"
+                        ><span data-page-node-id="Vth3WELFQT7Lx7N2v6ytcG"
+                          >API Key</span
+                        ><input
+                          class="text-input"
+                          id="ai-key"
+                          type="password"
+                          placeholder="只保存在本机"
+                          spellcheck="false"
+                          autocomplete="off"
+                          data-page-node-id="faOZzNfhWEl34ckYcgbDst"
+                      /></label>
+                    </div>
+                    <div
+                      class="inline-actions"
+                      data-page-node-id="EpcSBa5gnHzVjGeOVWTAZm"
+                    >
+                      <button
+                        class="btn-ghost"
+                        id="ai-test"
+                        type="button"
+                        data-page-node-id="JRwsD3ifonYGc8m49TIPfb"
+                      >
+                        测试连接</button
+                      ><span
+                        class="hint"
+                        id="ai-status"
+                        role="status"
+                        aria-live="polite"
+                        data-page-node-id="HBwZwXdGV0Jjj9CyUNTmAe"
+                      ></span>
+                    </div>
+                    <p
+                      class="panel-foot align-left"
+                      data-page-node-id="1XdCOL95YpEHf9DA1ptiQD"
+                    >
+                      使用 ? 时会发送问题与候选书签片段；/ 检索始终保持本地。
+                    </p>
+                  </div>
+                </details>
               </div>
-              <div class="inline-actions" data-page-node-id="EpcSBa5gnHzVjGeOVWTAZm"><button class="btn-ghost" id="ai-test" type="button" data-page-node-id="JRwsD3ifonYGc8m49TIPfb">测试连接</button><span class="hint" id="ai-status" role="status" aria-live="polite" data-page-node-id="HBwZwXdGV0Jjj9CyUNTmAe"></span></div>
-              <p class="panel-foot align-left" data-page-node-id="1XdCOL95YpEHf9DA1ptiQD">使用 ? 时会发送问题与候选书签片段；/ 检索始终保持本地。</p>
             </div>
-          </details>
-          </div>
-
-
-          </div>
-          <div class="search-subpage" data-search-page="rag" data-page-title="正文采集与 RAG" data-page-detail="处理任务" hidden>
-<section class="automation-card rag-card" id="rag-flow-card" aria-labelledby="rag-flow-title">
+            <div
+              class="search-subpage"
+              data-search-page="rag"
+              data-page-title="正文采集与 RAG"
+              data-page-detail="处理任务"
+              hidden
+            >
+              <section
+                class="automation-card rag-card"
+                id="rag-flow-card"
+                aria-labelledby="rag-flow-title"
+              >
                 <div class="automation-heading">
                   <div class="automation-title">
                     <span class="automation-step">书签内容</span>
                     <div class="automation-title-line">
                       <h3 id="rag-flow-title">自动同步到 RAG</h3>
-                      <span class="rag-state" id="rag-state" data-tone="off">未开启</span>
+                      <span class="rag-state" id="rag-state" data-tone="off"
+                        >未开启</span
+                      >
                     </div>
-                    <p class="automation-description">同步收藏名称、网站公开介绍和个人备注，帮助 AI 找到网站；能读取时再补充页面正文。</p>
+                    <p class="automation-description">
+                      同步收藏名称、网站公开介绍和个人备注，帮助 AI
+                      找到网站；能读取时再补充页面正文。
+                    </p>
                   </div>
-                  <label class="switch"><input id="rag-enabled" type="checkbox" aria-label="自动同步到 RAG" /><i></i></label>
+                  <label class="switch"
+                    ><input
+                      id="rag-enabled"
+                      type="checkbox"
+                      aria-label="自动同步到 RAG" /><i></i
+                  ></label>
                 </div>
                 <div class="rag-overview">
-                  <div class="rag-stats" id="rag-stats" role="group" aria-label="收录概况">
-                    <div class="rag-stat" data-stat="total"><span>总书签</span><strong id="rag-stat-total">—</strong></div>
-                    <div class="rag-stat" data-stat="collected"><span>已收录</span><strong id="rag-stat-collected">—</strong></div>
-                    <div class="rag-stat" data-stat="uncollected"><span>未收录</span><strong id="rag-stat-uncollected">—</strong></div>
-                    <div class="rag-stat" data-stat="failed"><span>失败数量（任务）</span><strong id="rag-stat-failed">—</strong></div>
-                    <div class="rag-stat" data-stat="queue"><span>处理队列（任务）</span><strong id="rag-stat-queue">—</strong></div>
+                  <div
+                    class="rag-stats"
+                    id="rag-stats"
+                    role="group"
+                    aria-label="收录概况"
+                  >
+                    <div class="rag-stat" data-stat="total">
+                      <span>总书签</span><strong id="rag-stat-total">—</strong>
+                    </div>
+                    <div class="rag-stat" data-stat="collected">
+                      <span>已收录</span
+                      ><strong id="rag-stat-collected">—</strong>
+                    </div>
+                    <div class="rag-stat" data-stat="uncollected">
+                      <span>未收录</span
+                      ><strong id="rag-stat-uncollected">—</strong>
+                    </div>
+                    <div class="rag-stat" data-stat="failed">
+                      <span>失败数量（任务）</span
+                      ><strong id="rag-stat-failed">—</strong>
+                    </div>
+                    <div class="rag-stat" data-stat="queue">
+                      <span>处理队列（任务）</span
+                      ><strong id="rag-stat-queue">—</strong>
+                    </div>
                   </div>
-                  <p class="hint">已收录 + 未收录 = 总书签。下方“已收录 / 未收录”按书签逐条展示，“处理任务 / 失败任务”按任务展示。</p>
-                  <div class="automation-path" aria-label="同步流程：采集正文、同步入库、可搜索"><span>采集正文</span><b aria-hidden="true">→</b><span>同步入库</span><b aria-hidden="true">→</b><span>可搜索</span></div>
-                </div>
-                <p id="rag-connection-status" class="automation-progress" role="status" aria-live="polite">RAG 连接尚未检测</p>
-                <p id="rag-status" class="rag-alert" role="status" aria-live="polite"></p>
-                <div class="inline-actions rag-actions"><button id="rag-check" class="btn-ghost" type="button">检测连接</button></div>
-                <div id="pipeline-audit-results" hidden role="region" aria-label="历史收录审查"></div>
-                <p id="pipeline-status" class="automation-progress visually-hidden" role="status" aria-live="polite">自动同步未开启</p>
-                <div class="rag-task-tabs" role="tablist" aria-label="书签收录与同步任务">
-                  <button id="rag-processing-tab" type="button" role="tab" aria-selected="true" aria-controls="rag-processing-panel" data-rag-tab="processing">处理任务 <em id="rag-processing-count">0</em></button>
-                  <button id="rag-failures-tab" type="button" role="tab" aria-selected="false" aria-controls="rag-failures-panel" tabindex="-1" data-rag-tab="failures">失败任务 <em id="rag-failure-count">0</em></button>
-                  <button id="rag-collected-tab" type="button" role="tab" aria-selected="false" aria-controls="rag-bookmarks-panel" tabindex="-1" data-rag-tab="collected">已收录 <em id="rag-collected-count">0</em></button>
-                  <button id="rag-uncollected-tab" type="button" role="tab" aria-selected="false" aria-controls="rag-bookmarks-panel" tabindex="-1" data-rag-tab="uncollected">未收录 <em id="rag-uncollected-count">0</em></button>
-                </div>
-                <div id="rag-processing-panel" role="tabpanel" aria-labelledby="rag-processing-tab">
-                  <div class="inline-actions rag-actions"><button id="pipeline-start" class="btn-ghost action-primary" type="button">批量处理</button><button id="pipeline-pause" class="btn-ghost rag-pause" type="button">暂停处理</button></div>
-                  <p id="pipeline-queue-status" class="automation-progress" role="status" aria-live="polite">正在读取当前队列…</p>
-                  <p id="pipeline-process-result" class="hint" role="status" aria-live="polite"></p>
-                <details id="rag-connection" class="automation-details" data-collapsed>
-                  <summary>同步设置</summary>
-                  <div class="rag-settings-body">
-                    <div class="switch-row"><span class="label">上传手动采集的登录页面正文</span><label class="switch"><input id="rag-private" type="checkbox" aria-label="上传登录页面正文" /><i></i></label></div>
-                    <div class="switch-row"><span class="label">确认失效后自动清理云端正文</span><label class="switch"><input id="rag-cleanup" type="checkbox" aria-label="开启失效清理与恢复巡检" /><i></i></label></div>
-                    <p class="hint">默认关闭自动清理；开启后按复核结果处理，入口保留，恢复后重新评估收录。</p>
-                    <label class="rag-interval"><span>公开正文刷新间隔</span><span class="rag-interval-control"><input id="rag-refresh" class="text-input" type="number" min="1" max="90" /><em>天</em></span></label>
-                    <p class="rag-note">RAG 地址、Key 与集合由后台账号统一管理；每个账号的集合唯一且不可编辑。关闭自动开关会停止后台同步，已同步内容仍可检索。收藏变更会自动同步，登录或动态页面可打开后点击扩展图标采集。</p>
-                    <div class="inline-actions"><button id="pipeline-network" class="btn-ghost" type="button">网络已恢复，重试</button><button id="pipeline-audit" class="btn-ghost" type="button">检查历史收录</button></div>
+                  <p class="hint">
+                    已收录 + 未收录 = 总书签。下方“已收录 /
+                    未收录”按书签逐条展示，“处理任务 / 失败任务”按任务展示。
+                  </p>
+                  <div
+                    class="automation-path"
+                    aria-label="同步流程：采集正文、同步入库、可搜索"
+                  >
+                    <span>采集正文</span><b aria-hidden="true">→</b
+                    ><span>同步入库</span><b aria-hidden="true">→</b
+                    ><span>可搜索</span>
                   </div>
-                </details>
-                <div id="pipeline-records" class="pipeline-records"></div>
                 </div>
-                <div id="rag-failures-panel" role="tabpanel" aria-labelledby="rag-failures-tab" hidden>
-                  <p class="automation-description">失败或等待条件恢复的任务自动保留在这里；重新采集或重试后会按最新状态更新。写入结果不确定时请先核验。</p>
-                  <p id="rag-failure-status" class="automation-progress" role="status" aria-live="polite">正在读取失败任务…</p>
+                <p
+                  id="rag-connection-status"
+                  class="automation-progress"
+                  role="status"
+                  aria-live="polite"
+                >
+                  RAG 连接尚未检测
+                </p>
+                <p
+                  id="rag-status"
+                  class="rag-alert"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+                <div class="inline-actions rag-actions">
+                  <button id="rag-check" class="btn-ghost" type="button">
+                    检测连接
+                  </button>
+                </div>
+                <div
+                  id="pipeline-audit-results"
+                  hidden
+                  role="region"
+                  aria-label="历史收录审查"
+                ></div>
+                <p
+                  id="pipeline-status"
+                  class="automation-progress visually-hidden"
+                  role="status"
+                  aria-live="polite"
+                >
+                  自动同步未开启
+                </p>
+                <div
+                  class="rag-task-tabs"
+                  role="tablist"
+                  aria-label="书签收录与同步任务"
+                >
+                  <button
+                    id="rag-processing-tab"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="rag-processing-panel"
+                    data-rag-tab="processing"
+                  >
+                    处理任务 <em id="rag-processing-count">0</em>
+                  </button>
+                  <button
+                    id="rag-failures-tab"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="rag-failures-panel"
+                    tabindex="-1"
+                    data-rag-tab="failures"
+                  >
+                    失败任务 <em id="rag-failure-count">0</em>
+                  </button>
+                  <button
+                    id="rag-collected-tab"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="rag-bookmarks-panel"
+                    tabindex="-1"
+                    data-rag-tab="collected"
+                  >
+                    已收录 <em id="rag-collected-count">0</em>
+                  </button>
+                  <button
+                    id="rag-uncollected-tab"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="rag-bookmarks-panel"
+                    tabindex="-1"
+                    data-rag-tab="uncollected"
+                  >
+                    未收录 <em id="rag-uncollected-count">0</em>
+                  </button>
+                </div>
+                <div
+                  id="rag-processing-panel"
+                  role="tabpanel"
+                  aria-labelledby="rag-processing-tab"
+                >
+                  <div class="inline-actions rag-actions">
+                    <button
+                      id="pipeline-start"
+                      class="btn-ghost action-primary"
+                      type="button"
+                    >
+                      批量处理</button
+                    ><button
+                      id="pipeline-pause"
+                      class="btn-ghost rag-pause"
+                      type="button"
+                    >
+                      暂停处理
+                    </button>
+                  </div>
+                  <p
+                    id="pipeline-queue-status"
+                    class="automation-progress"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    正在读取当前队列…
+                  </p>
+                  <p
+                    id="pipeline-process-result"
+                    class="hint"
+                    role="status"
+                    aria-live="polite"
+                  ></p>
+                  <details
+                    id="rag-connection"
+                    class="automation-details"
+                    data-collapsed
+                  >
+                    <summary>同步设置</summary>
+                    <div class="rag-settings-body">
+                      <div class="switch-row">
+                        <span class="label">上传手动采集的登录页面正文</span
+                        ><label class="switch"
+                          ><input
+                            id="rag-private"
+                            type="checkbox"
+                            aria-label="上传登录页面正文" /><i></i
+                        ></label>
+                      </div>
+                      <div class="switch-row">
+                        <span class="label">确认失效后自动清理云端正文</span
+                        ><label class="switch"
+                          ><input
+                            id="rag-cleanup"
+                            type="checkbox"
+                            aria-label="开启失效清理与恢复巡检" /><i></i
+                        ></label>
+                      </div>
+                      <p class="hint">
+                        默认关闭自动清理；开启后按复核结果处理，入口保留，恢复后重新评估收录。
+                      </p>
+                      <label class="rag-interval"
+                        ><span>公开正文刷新间隔</span
+                        ><span class="rag-interval-control"
+                          ><input
+                            id="rag-refresh"
+                            class="text-input"
+                            type="number"
+                            min="1"
+                            max="90"
+                          /><em>天</em></span
+                        ></label
+                      >
+                      <p class="rag-note">
+                        RAG 地址、Key
+                        与集合由后台账号统一管理；每个账号的集合唯一且不可编辑。关闭自动开关会停止后台同步，已同步内容仍可检索。收藏变更会自动同步，登录或动态页面可打开后点击扩展图标采集。
+                      </p>
+                      <div class="inline-actions">
+                        <button
+                          id="pipeline-network"
+                          class="btn-ghost"
+                          type="button"
+                        >
+                          网络已恢复，重试</button
+                        ><button
+                          id="pipeline-audit"
+                          class="btn-ghost"
+                          type="button"
+                        >
+                          检查历史收录
+                        </button>
+                      </div>
+                    </div>
+                  </details>
+                  <div id="pipeline-records" class="pipeline-records"></div>
+                </div>
+                <div
+                  id="rag-failures-panel"
+                  role="tabpanel"
+                  aria-labelledby="rag-failures-tab"
+                  hidden
+                >
+                  <p class="automation-description">
+                    失败或等待条件恢复的任务自动保留在这里；重新采集或重试后会按最新状态更新。写入结果不确定时请先核验。
+                  </p>
+                  <p
+                    id="rag-failure-status"
+                    class="automation-progress"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    正在读取失败任务…
+                  </p>
                   <div class="rag-failure-selection">
-                    <label>错误类型 <select id="rag-failure-filter" class="text-input" aria-label="按错误类型筛选"><option value="all">全部错误</option></select></label>
-                    <label><input id="rag-failure-select-all" type="checkbox" />全选当前筛选</label>
-                    <button id="pipeline-retry" class="btn-ghost" type="button" disabled>重试所选</button>
-                    <button id="pipeline-delete-selected" class="btn-ghost rag-delete-selected" type="button" disabled>删除所选</button>
+                    <label
+                      >错误类型
+                      <select
+                        id="rag-failure-filter"
+                        class="text-input"
+                        aria-label="按错误类型筛选"
+                      >
+                        <option value="all">全部错误</option>
+                      </select></label
+                    >
+                    <label
+                      ><input
+                        id="rag-failure-select-all"
+                        type="checkbox"
+                      />全选当前筛选</label
+                    >
+                    <button
+                      id="pipeline-retry"
+                      class="btn-ghost"
+                      type="button"
+                      disabled
+                    >
+                      重试所选
+                    </button>
+                    <button
+                      id="pipeline-delete-selected"
+                      class="btn-ghost rag-delete-selected"
+                      type="button"
+                      disabled
+                    >
+                      删除所选
+                    </button>
                   </div>
-                  <p id="pipeline-retry-hint" class="hint">勾选需要重试或删除的任务；切换筛选会清空选择。</p>
-                  <p id="pipeline-retry-status" class="hint" role="status" aria-live="polite"></p>
-                  <p id="pipeline-delete-status" class="hint" role="status" aria-live="polite"></p>
+                  <p id="pipeline-retry-hint" class="hint">
+                    勾选需要重试或删除的任务；切换筛选会清空选择。
+                  </p>
+                  <p
+                    id="pipeline-retry-status"
+                    class="hint"
+                    role="status"
+                    aria-live="polite"
+                  ></p>
+                  <p
+                    id="pipeline-delete-status"
+                    class="hint"
+                    role="status"
+                    aria-live="polite"
+                  ></p>
                   <div id="rag-failure-records" class="pipeline-records"></div>
                 </div>
-                <div id="rag-bookmarks-panel" role="tabpanel" aria-labelledby="rag-collected-tab" hidden>
-                  <p id="rag-bookmark-description" class="automation-description"></p>
-                  <label id="rag-bookmark-filter-label" class="rag-bookmark-filter">未收录原因 <select id="rag-bookmark-filter" class="text-input" aria-label="按未收录原因筛选"><option value="all">全部原因</option></select></label>
-                  <p id="rag-bookmark-status" class="automation-progress" role="status" aria-live="polite"></p>
+                <div
+                  id="rag-bookmarks-panel"
+                  role="tabpanel"
+                  aria-labelledby="rag-collected-tab"
+                  hidden
+                >
+                  <p
+                    id="rag-bookmark-description"
+                    class="automation-description"
+                  ></p>
+                  <label
+                    id="rag-bookmark-filter-label"
+                    class="rag-bookmark-filter"
+                    >未收录原因
+                    <select
+                      id="rag-bookmark-filter"
+                      class="text-input"
+                      aria-label="按未收录原因筛选"
+                    >
+                      <option value="all">全部原因</option>
+                    </select></label
+                  >
+                  <p
+                    id="rag-bookmark-status"
+                    class="automation-progress"
+                    role="status"
+                    aria-live="polite"
+                  ></p>
                   <div id="rag-bookmark-records" class="pipeline-records"></div>
                 </div>
               </section>
-          </div>
-          <div class="search-subpage" data-search-page="organize" hidden>
-<section id="auto-organize-card" class="automation-card" aria-labelledby="auto-organize-title">
+            </div>
+            <div class="search-subpage" data-search-page="organize" hidden>
+              <section
+                id="auto-organize-card"
+                class="automation-card"
+                aria-labelledby="auto-organize-title"
+              >
                 <div class="automation-heading">
-                  <div><span class="automation-step">收藏归档</span><h3 id="auto-organize-title">AI 辅助收藏归档</h3></div>
-                  <label class="switch"><input id="auto-organize-enabled" type="checkbox" aria-label="自动归档新收藏" /><i></i></label>
+                  <h3 id="auto-organize-title">收藏收件箱</h3>
+                  <label class="switch"
+                    ><input
+                      id="auto-organize-enabled"
+                      type="checkbox"
+                      aria-label="自动归档新收藏" /><i></i
+                  ></label>
                 </div>
-                <p class="automation-description">收藏到“其他书签”后，已确认规则自动归档；AI 结合公开摘要与现有目录推荐位置，确认后才移动。子目录和手动位置保持不变。</p>
-                <p id="auto-organize-status" class="automation-progress" role="status" aria-live="polite">正在读取归档规则…</p>
-                <div class="inline-actions"><button id="auto-organize-scan" class="btn-ghost" type="button">整理其他书签</button><button id="auto-organize-relearn" class="btn-ghost" type="button">从现有书签学习</button></div>
-                <details id="auto-organize-details" class="automation-details">
-                  <summary id="auto-organize-summary">归档规则与待确认建议</summary>
+                <p class="automation-description">
+                  AI 推荐整理每次分析全库最近最多 8
+                  条网页书签。也可以单独整理“其他书签”。
+                </p>
+                <p
+                  id="auto-organize-status"
+                  class="automation-progress"
+                  role="status"
+                  aria-live="polite"
+                >
+                  正在读取归档规则…
+                </p>
+                <div class="inline-actions auto-organize-actions">
+                  <button
+                    id="auto-organize-review"
+                    class="btn-ghost"
+                    type="button"
+                    aria-controls="auto-pending-panel"
+                  >
+                    AI 推荐整理</button
+                  ><button
+                    id="auto-organize-scan"
+                    class="btn-ghost"
+                    type="button"
+                  >
+                    整理其他书签</button
+                  ><button
+                    id="auto-organize-relearn"
+                    class="btn-ghost"
+                    type="button"
+                  >
+                    从现有书签学习
+                  </button>
+                </div>
+                <div
+                  class="auto-tabs"
+                  role="tablist"
+                  aria-label="收藏自动归档列表"
+                >
+                  <button
+                    id="auto-tab-pending"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="auto-pending-panel"
+                    data-auto-tab="pending"
+                  >
+                    待确认 <em id="auto-pending-count">0</em>
+                  </button>
+                  <button
+                    id="auto-tab-rules"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="auto-rules-panel"
+                    tabindex="-1"
+                    data-auto-tab="rules"
+                  >
+                    归档规则 <em id="auto-rule-count">0</em>
+                  </button>
+                  <button
+                    id="auto-tab-history"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="auto-history-panel"
+                    tabindex="-1"
+                    data-auto-tab="history"
+                  >
+                    归档记录 <em id="auto-history-count">0</em>
+                  </button>
+                </div>
+                <div
+                  id="auto-pending-panel"
+                  role="tabpanel"
+                  aria-labelledby="auto-tab-pending"
+                >
+                  <p
+                    id="auto-review-status"
+                    class="automation-progress"
+                    role="status"
+                    aria-live="polite"
+                    hidden
+                  ></p>
+                  <details
+                    id="auto-review-checked"
+                    class="automation-details auto-review-reply"
+                    data-collapsed
+                    hidden
+                  >
+                    <summary id="auto-review-checked-label">
+                      查看本次检查的收藏
+                    </summary>
+                    <ul
+                      id="auto-review-checked-list"
+                      class="auto-review-checked-list"
+                    ></ul>
+                  </details>
+                  <details
+                    id="auto-review-reply"
+                    class="automation-details auto-review-reply"
+                    data-collapsed
+                    hidden
+                  >
+                    <summary>查看 AI 回复</summary>
+                    <pre id="auto-review-reply-text"></pre>
+                  </details>
                   <div id="auto-organize-body" class="auto-organize-body"></div>
-                </details>
-                <div id="auto-organize-history" class="auto-archive-history"></div>
-              </section>
-          </div>
-          <div class="search-subpage" data-search-page="enrich" hidden>
-<section id="enrich-card" class="automation-card" aria-labelledby="enrich-title">
-                <div class="automation-heading">
-                  <div><span class="automation-step">收藏补全</span><h3 id="enrich-title">标题、摘要与标签</h3></div>
-                  <label class="switch"><input id="enrich-enabled" type="checkbox" aria-label="自动补全新收藏" /><i></i></label>
                 </div>
-                <p class="automation-description">收藏后自动采集正文，并为泛泛的标题生成更具体的标题、一句话摘要与标签。应用前不会改名。</p>
-                <p id="enrich-status" class="automation-progress" role="status" aria-live="polite">正在读取补全状态…</p>
-                <div class="inline-actions"><button id="enrich-scan" class="btn-ghost" type="button">扫描全部书签</button><button id="enrich-capture" class="btn-ghost" type="button">补采全部缺失正文</button></div>
+                <div
+                  id="auto-rules-panel"
+                  role="tabpanel"
+                  aria-labelledby="auto-tab-rules"
+                  hidden
+                >
+                  <div
+                    id="auto-organize-rules"
+                    class="auto-organize-body"
+                  ></div>
+                </div>
+                <div
+                  id="auto-history-panel"
+                  role="tabpanel"
+                  aria-labelledby="auto-tab-history"
+                  hidden
+                >
+                  <div class="inline-actions auto-history-actions">
+                    <button
+                      id="auto-history-undo"
+                      class="btn-ghost"
+                      type="button"
+                      disabled
+                    >
+                      撤销上一批移动
+                    </button>
+                    <span
+                      id="auto-history-feedback"
+                      class="automation-progress"
+                      role="status"
+                      aria-live="polite"
+                    ></span>
+                  </div>
+                  <div
+                    id="auto-organize-history"
+                    class="auto-archive-history"
+                  ></div>
+                </div>
+              </section>
+            </div>
+            <div class="search-subpage" data-search-page="enrich" hidden>
+              <section
+                id="enrich-card"
+                class="automation-card"
+                aria-labelledby="enrich-title"
+              >
+                <div class="automation-heading">
+                  <div>
+                    <span class="automation-step">收藏补全</span>
+                    <h3 id="enrich-title">标题、摘要与标签</h3>
+                  </div>
+                  <label class="switch"
+                    ><input
+                      id="enrich-enabled"
+                      type="checkbox"
+                      aria-label="自动补全新收藏" /><i></i
+                  ></label>
+                </div>
+                <p class="automation-description">
+                  利用网页内容生成标题建议、一句话摘要和标签。标题在你确认应用后更新。
+                </p>
+                <p
+                  id="enrich-status"
+                  class="automation-progress"
+                  role="status"
+                  aria-live="polite"
+                >
+                  正在读取补全状态…
+                </p>
+                <div class="inline-actions">
+                  <button id="enrich-scan" class="btn-ghost" type="button">
+                    扫描全部书签</button
+                  ><button id="enrich-capture" class="btn-ghost" type="button">
+                    补采全部缺失正文
+                  </button>
+                </div>
                 <details id="enrich-details" class="automation-details">
                   <summary id="enrich-summary">待确认建议</summary>
-                  <div id="enrich-filters" class="enrich-filters" role="group" aria-label="按状态筛选" hidden></div>
+                  <div
+                    id="enrich-filters"
+                    class="enrich-filters"
+                    role="group"
+                    aria-label="按状态筛选"
+                    hidden
+                  ></div>
                   <div id="enrich-body" class="enrich-body"></div>
                 </details>
               </section>
-          </div>
-          <div class="search-subpage" data-search-page="health" hidden>
-<details id="bookmark-health" class="automation-card automation-details">
+            </div>
+            <div class="search-subpage" data-search-page="health" hidden>
+              <details
+                id="bookmark-health"
+                class="automation-card automation-details"
+              >
                 <summary id="bookmark-health-summary">书签体检</summary>
                 <div id="bookmark-health-body" class="enrich-body"></div>
               </details>
-          </div>
-
-        </section>
-
-        <section class="settings-view" id="workspace-preferences" role="tabpanel" aria-labelledby="workspace-tab-preferences" data-workspace-view="preferences" hidden>
-          <div class="view-heading">
-            <div>
-              <p class="view-eyebrow">PREFERENCES</p>
-              <h2>保留需要的，隐藏其余的</h2>
-              <p>控制时间格式和首页元素，让注意力回到当下。</p>
             </div>
-          </div>
-
-          <div class="preferences-top">
-            <section class="group settings-card time-card">
-              <div class="card-head">
-                <h3>时间</h3>
-                <span class="card-note">实时预览</span>
-              </div>
-              <div class="time-preview" id="time-preview" aria-hidden="true"></div>
-              <div class="switch-list">
-                <div class="switch-row"><span class="label">24 小时制</span><label class="switch"><input id="sw-h24" type="checkbox" aria-label="24 小时制" /><i></i></label></div>
-                <div class="switch-row"><span class="label">显示秒</span><label class="switch"><input id="sw-seconds" type="checkbox" aria-label="显示秒" /><i></i></label></div>
-              </div>
-            </section>
-
-            <section class="group settings-card shortcuts-card">
-              <div class="card-head">
-                <h3>快捷键</h3>
-                <span class="card-note">直接键入</span>
-              </div>
-              <div class="shortcut-list">
-                <span><kbd>/</kbd><span>聚焦搜索或检索书签</span></span>
-                <span><kbd>?</kbd><span>使用 AI 检索</span></span>
-                <span><kbd>@</kbd><span>快捷标签直达</span></span>
-                <span><kbd>Esc</kbd><span>关闭面板</span></span>
-              </div>
-            </section>
-          </div>
-
-          <section class="group settings-card display-card">
-            <div class="card-head">
-              <h3>首页显示元素</h3>
-              <span class="card-note">即时生效</span>
-            </div>
-            <div class="display-groups">
-              <div class="display-group">
-                <p class="display-group-title">时间与日期</p>
-                <div class="switch-row"><span class="label">日期</span><label class="switch"><input id="sw-date" type="checkbox" aria-label="显示日期" /><i></i></label></div>
-                <div class="switch-row"><span class="label">农历</span><label class="switch"><input id="sw-lunar" type="checkbox" aria-label="显示农历" /><i></i></label></div>
-              </div>
-              <div class="display-group">
-                <p class="display-group-title">搜索</p>
-                <div class="switch-row"><span class="label">搜索框</span><label class="switch"><input id="sw-search" type="checkbox" aria-label="显示搜索框" /><i></i></label></div>
-                <div class="switch-row"><span class="label">搜索联想</span><label class="switch"><input id="sw-suggest" type="checkbox" aria-label="搜索联想" /><i></i></label></div>
-              </div>
-              <div class="display-group">
-                <p class="display-group-title">内容与入口</p>
-                <div class="switch-row"><span class="label">底部格言</span><label class="switch"><input id="sw-quote" type="checkbox" aria-label="显示底部格言" /><i></i></label></div>
-                <div class="switch-row"><span class="label">快捷标签（@）</span><label class="switch"><input id="sw-tags" type="checkbox" aria-label="启用 @ 快捷标签" /><i></i></label></div>
-                <div class="switch-row"><span class="label">@ 面板 AI 短名</span><label class="switch"><input id="sw-tag-ai" type="checkbox" aria-label="使用 AI 为快捷标签推荐短名" /><i></i></label></div>
-              </div>
-            </div>
-            <p class="hint display-hint">AI 短名需要先启用 AI 能力；打开 @ 时会把最多 12 个候选的标题与域名发送给你配置的 AI，不发送完整网址。</p>
           </section>
 
-
-          <section class="group settings-card reset-card">
-            <div>
-              <h3>恢复默认设置</h3>
-              <p>重置外观、搜索和显示偏好，不会删除书签或本地内容索引。</p>
+          <section
+            class="settings-view"
+            id="workspace-preferences"
+            role="tabpanel"
+            aria-labelledby="workspace-tab-preferences"
+            data-workspace-view="preferences"
+            hidden
+          >
+            <div class="view-heading">
+              <div>
+                <p class="view-eyebrow">PREFERENCES</p>
+                <h2>保留需要的，隐藏其余的</h2>
+                <p>控制时间格式和首页元素，让注意力回到当下。</p>
+              </div>
             </div>
-            <button class="btn-reset" id="reset-btn" type="button">恢复默认</button>
-          </section>
-        </section>
 
-        <section class="settings-view" id="workspace-tags" role="tabpanel" aria-labelledby="workspace-tab-tags" data-workspace-view="tags" hidden>
-          <div class="view-heading">
-            <div>
-              <p class="view-eyebrow">QUICK TAGS</p>
-              <h2>快捷标签</h2>
-              <p>固定你常用的入口，其余交给系统推荐。个人信息默认本地使用，可由你选择导出或备份。</p>
-            </div>
-            <span class="view-badge" id="tag-count">还没有固定标签</span>
-          </div>
-
-          <div class="tag-manager-grid">
-            <div class="tag-col is-side">
-              <section class="group settings-card card-pinned">
-                <h3>固定标签<span class="src-link" id="tag-pinned-hint">点击名称可改名 · 编辑可添加别名和说明</span></h3>
-                <div class="tag-list" id="tag-pinned-list"></div>
-                <div class="tag-more" id="tag-pinned-more"></div>
-                <div class="empty-tip" id="tag-pinned-empty">还没有固定标签。在右侧搜索书签，或从「系统推荐」里固定一个入口。</div>
-              </section>
-
-              <section class="group settings-card card-ignored">
-                <h3>已忽略<span class="src-link" id="tag-ignored-count"></span></h3>
-                <p class="hint">忽略累计 3 次后不再推荐，可在这里恢复。</p>
-                <div class="tag-list" id="tag-ignored-list"></div>
-                <div class="tag-more" id="tag-ignored-more"></div>
-                <div class="empty-tip" id="tag-ignored-empty">没有忽略任何站点</div>
-              </section>
-
-              <section class="group settings-card card-data">
-                <h3>数据<span class="src-link">自主控制备份范围</span></h3>
-                <div class="switch-row"><span class="label">远端备份包含个人说明</span><label class="switch"><input id="tag-backup-notes" type="checkbox" aria-label="允许远端配置备份包含个人说明" /><i></i></label></div>
-                <div class="row">
-                  <button class="btn-ghost" id="tag-export" type="button">导出 JSON</button>
-                  <button class="btn-ghost" id="tag-import" type="button">导入 JSON</button>
-                  <input type="file" id="tag-import-file" accept="application/json,.json" hidden />
-                  <button class="btn-ghost" id="tag-reset" type="button">清空学习数据</button>
+            <div class="preferences-top">
+              <section class="group settings-card time-card">
+                <div class="card-head">
+                  <h3>时间</h3>
+                  <span class="card-note">实时预览</span>
                 </div>
-                <p class="hint">导出包含入口名称、别名和个人说明；学习记录只影响推荐与排序。</p>
+                <div
+                  class="time-preview"
+                  id="time-preview"
+                  aria-hidden="true"
+                ></div>
+                <div class="switch-list">
+                  <div class="switch-row">
+                    <span class="label">24 小时制</span
+                    ><label class="switch"
+                      ><input
+                        id="sw-h24"
+                        type="checkbox"
+                        aria-label="24 小时制" /><i></i
+                    ></label>
+                  </div>
+                  <div class="switch-row">
+                    <span class="label">显示秒</span
+                    ><label class="switch"
+                      ><input
+                        id="sw-seconds"
+                        type="checkbox"
+                        aria-label="显示秒" /><i></i
+                    ></label>
+                  </div>
+                </div>
+              </section>
+
+              <section class="group settings-card shortcuts-card">
+                <div class="card-head">
+                  <h3>快捷键</h3>
+                  <span class="card-note">直接键入</span>
+                </div>
+                <div class="shortcut-list">
+                  <span><kbd>/</kbd><span>聚焦搜索或检索书签</span></span>
+                  <span><kbd>?</kbd><span>使用 AI 检索</span></span>
+                  <span><kbd>@</kbd><span>快捷标签直达</span></span>
+                  <span><kbd>Esc</kbd><span>关闭面板</span></span>
+                </div>
               </section>
             </div>
 
-            <div class="tag-col is-main">
-              <section class="group settings-card card-cand">
-                <h3>书签与推荐<span class="src-link" id="tag-cand-count">0 个候选</span></h3>
-                <p class="hint" id="tag-cand-hint">搜索全部书签添加备注；系统推荐来自常访站点与最近 120 天新增书签，不会自动固定。</p>
-                <label class="tag-search">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg>
-                  <input id="tag-search" type="search" placeholder="搜索书签，添加别名或说明" aria-label="搜索书签并添加备注" />
-                </label>
-                <div class="tag-list" id="tag-cand-list"></div>
-                <div class="tag-more" id="tag-cand-more"></div>
-                <div class="empty-tip" id="tag-cand-empty">暂无候选，正常使用几天后再来看。</div>
-              </section>
-            </div>
-          </div>
-          <p class="hint tag-status" id="tag-status" role="status" aria-live="polite" hidden></p>
-        </section>
+            <section class="group settings-card display-card">
+              <div class="card-head">
+                <h3>首页显示元素</h3>
+                <span class="card-note">即时生效</span>
+              </div>
+              <div class="display-groups">
+                <div class="display-group">
+                  <p class="display-group-title">时间与日期</p>
+                  <div class="switch-row">
+                    <span class="label">日期</span
+                    ><label class="switch"
+                      ><input
+                        id="sw-date"
+                        type="checkbox"
+                        aria-label="显示日期" /><i></i
+                    ></label>
+                  </div>
+                  <div class="switch-row">
+                    <span class="label">农历</span
+                    ><label class="switch"
+                      ><input
+                        id="sw-lunar"
+                        type="checkbox"
+                        aria-label="显示农历" /><i></i
+                    ></label>
+                  </div>
+                </div>
+                <div class="display-group">
+                  <p class="display-group-title">搜索</p>
+                  <div class="switch-row">
+                    <span class="label">搜索框</span
+                    ><label class="switch"
+                      ><input
+                        id="sw-search"
+                        type="checkbox"
+                        aria-label="显示搜索框" /><i></i
+                    ></label>
+                  </div>
+                  <div class="switch-row">
+                    <span class="label">搜索联想</span
+                    ><label class="switch"
+                      ><input
+                        id="sw-suggest"
+                        type="checkbox"
+                        aria-label="搜索联想" /><i></i
+                    ></label>
+                  </div>
+                </div>
+                <div class="display-group">
+                  <p class="display-group-title">内容与入口</p>
+                  <div class="switch-row">
+                    <span class="label">底部格言</span
+                    ><label class="switch"
+                      ><input
+                        id="sw-quote"
+                        type="checkbox"
+                        aria-label="显示底部格言" /><i></i
+                    ></label>
+                  </div>
+                  <div class="switch-row">
+                    <span class="label">快捷标签（@）</span
+                    ><label class="switch"
+                      ><input
+                        id="sw-tags"
+                        type="checkbox"
+                        aria-label="启用 @ 快捷标签" /><i></i
+                    ></label>
+                  </div>
+                  <div class="switch-row">
+                    <span class="label">@ 面板 AI 短名</span
+                    ><label class="switch"
+                      ><input
+                        id="sw-tag-ai"
+                        type="checkbox"
+                        aria-label="使用 AI 为快捷标签推荐短名" /><i></i
+                    ></label>
+                  </div>
+                </div>
+              </div>
+              <p class="hint display-hint">
+                AI 短名需要先启用 AI 能力；打开 @ 时会把最多 12
+                个候选的标题与域名发送给你配置的 AI，不发送完整网址。
+              </p>
+            </section>
 
-        <section id="organizer-dialog" class="organizer-dialog settings-view" role="tabpanel" aria-labelledby="workspace-tab-bookmarks" data-workspace-view="bookmarks" hidden data-page-node-id="Ck8VmWngvDC0p1YOKwkllt">
-          <header class="organizer-head" data-page-node-id="xUfvkHFVlzaFpFGIeLy4GR">
-            <div class="organizer-heading" data-page-node-id="OJkCVsAWj9gGgC2aN5QOJr">
-              <p class="view-eyebrow" data-page-node-id="2JDC3bAaBf4C2Xs5Ec1xwo">BOOKMARK LIBRARY</p>
-              <div class="organizer-title-line" data-page-node-id="1c64d7GwaEkFbj4lCBwj4q"><h2 id="organizer-title" data-page-node-id="SNPO6q5WB18cr4dEUKEwUq">书签空间</h2><span class="organizer-local-badge" data-page-node-id="K5Br9AE3n71iz38Myq6myW"><i data-page-node-id="04ELh6dSlD4cCZEFkCvZHw"></i> 本地管理</span></div>
-              <p class="organizer-summary" data-page-node-id="6vi546MItA2SAj4sN3GEqM"><span id="organizer-count" data-page-node-id="A3qg4jJrJdcZHVPQDSbfxX">正在读取书签</span><span id="organizer-pending" data-page-node-id="TTBbjt6pHSzUKaVtyilMDh"></span></p>
-            </div>
-            <div class="organizer-head-actions">
-              <button id="organizer-sync-settings" class="btn-ghost organizer-config" type="button">自动化设置</button>
-              <button id="organizer-close" class="btn-ghost organizer-done" type="button" data-page-node-id="p2zdzVLK3bNd5j4CtZQTig">完成</button>
-            </div>
-          </header>
-
-          <section id="organizer-recovery" class="bookmark-recovery" hidden data-page-node-id="9EnaUI4ErDZaai9HSJm3vW">
-            <div data-page-node-id="SyXq5oeKnbM8WMg7flYcjF"><strong data-page-node-id="IM9HMCZZQyKYavoeQVPb97">恢复之前的目录整理</strong><p data-page-node-id="5KyZLpfcoKMMVzfJoBogQJ">按本机日志恢复上一批原位置；后续人工修改会跳过。新建的空目录保留。</p></div>
-            <button id="organizer-undo" class="btn-ghost" type="button" data-page-node-id="3Udwnxj3oQ4PAs2Dtyl0Gf">撤销上一批移动</button>
+            <section class="group settings-card reset-card">
+              <div>
+                <h3>恢复默认设置</h3>
+                <p>重置外观、搜索和显示偏好，不会删除书签或本地内容索引。</p>
+              </div>
+              <button class="btn-reset" id="reset-btn" type="button">
+                恢复默认
+              </button>
+            </section>
           </section>
-          <p id="organizer-status" class="hint" role="status" aria-live="polite" data-page-node-id="zN44JP06DelwE2P0lcT8wm"></p>
-          <div class="organizer-command-bar" data-page-node-id="NetBmI5kIgWzO18QEBpZsN">
-            <label class="bookmark-folder-label" data-page-node-id="4bznnNQueUmIRIoBMESE0i"><span data-page-node-id="WKr73ej38oy3YHTlp8ScN3">原有目录</span><select id="organizer-folder" aria-label="浏览原有书签目录" data-page-node-id="2hi3dvlMGtZbWc4Xdv9cBQ"><option value="" data-page-node-id="wSrTRVN7caot1KD3BRrW0R">全部书签</option></select></label>
-            <label class="organizer-search-label" data-page-node-id="nOlXWR2D33FHd4H1ZQXOP7">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" data-page-node-id="V2FJzs4pnsiE9csBYQFXyE"><circle cx="10.5" cy="10.5" r="6.5" data-page-node-id="wRbneaLLQoOyFWtbHRqlY2"/><path d="m15.5 15.5 4.5 4.5" data-page-node-id="TKofFYCZ7xz9EUpsUAATzd"/></svg>
-              <input id="organizer-query" type="search" aria-label="搜索书签空间" placeholder="搜索标题、网址或标签" data-page-node-id="isNra4h12M33IhJY1tFJFp" />
-            </label>
-          </div>
 
-          <div class="organizer-body" data-page-node-id="EksORCJDHU1SGBNvibvGAA">
-            <div class="organizer-content" data-page-node-id="aBotvu7LyL2iRePtRc1LUB">
-              <div class="organizer-list-head" data-page-node-id="vw4uE2UKVY8opN6G123eC0"><div data-page-node-id="Fj3kFbgi6NN3oAq2xhOHOt"><strong id="organizer-list-title" data-page-node-id="DJKe0HGDn0eLHUkZzOQ9sx">收集箱</strong><span id="organizer-list-count" data-page-node-id="8OTDmmGoobo1xl0LPo8FP6"></span></div><span data-page-node-id="1x50pi8eDcNq9O2iarkkGf">收藏时间 ↓</span></div>
-              <div id="organizer-list" data-page-node-id="YCG0fjsUb5M4g84DmpG8IE"></div>
+          <section
+            class="settings-view"
+            id="workspace-tags"
+            role="tabpanel"
+            aria-labelledby="workspace-tab-tags"
+            data-workspace-view="tags"
+            hidden
+          >
+            <div class="view-heading">
+              <div>
+                <p class="view-eyebrow">QUICK TAGS</p>
+                <h2>快捷标签</h2>
+                <p>
+                  固定你常用的入口，其余交给系统推荐。个人信息默认本地使用，可由你选择导出或备份。
+                </p>
+              </div>
+              <span class="view-badge" id="tag-count">还没有固定标签</span>
             </div>
-          </div>
-          <footer class="organizer-foot" data-page-node-id="e14tI3JutKFqkqVVklkgPJ"><span class="local-dot" data-page-node-id="bbZI7txaKDHjOQvt4bsC0f"></span> 保留浏览器原有目录；正文缓存与同步、归档、补全的开关统一在「搜索与 AI → 内容自动化」中设置。</footer>
-        </section>
+
+            <div class="tag-manager-grid">
+              <div class="tag-col is-side">
+                <section class="group settings-card card-pinned">
+                  <h3>
+                    固定标签<span class="src-link" id="tag-pinned-hint"
+                      >点击名称可改名 · 编辑可添加别名和说明</span
+                    >
+                  </h3>
+                  <div class="tag-list" id="tag-pinned-list"></div>
+                  <div class="tag-more" id="tag-pinned-more"></div>
+                  <div class="empty-tip" id="tag-pinned-empty">
+                    还没有固定标签。在右侧搜索书签，或从「系统推荐」里固定一个入口。
+                  </div>
+                </section>
+
+                <section class="group settings-card card-ignored">
+                  <h3>
+                    已忽略<span class="src-link" id="tag-ignored-count"></span>
+                  </h3>
+                  <p class="hint">忽略累计 3 次后不再推荐，可在这里恢复。</p>
+                  <div class="tag-list" id="tag-ignored-list"></div>
+                  <div class="tag-more" id="tag-ignored-more"></div>
+                  <div class="empty-tip" id="tag-ignored-empty">
+                    没有忽略任何站点
+                  </div>
+                </section>
+
+                <section class="group settings-card card-data">
+                  <h3>数据<span class="src-link">自主控制备份范围</span></h3>
+                  <div class="switch-row">
+                    <span class="label">远端备份包含个人说明</span
+                    ><label class="switch"
+                      ><input
+                        id="tag-backup-notes"
+                        type="checkbox"
+                        aria-label="允许远端配置备份包含个人说明" /><i></i
+                    ></label>
+                  </div>
+                  <div class="row">
+                    <button class="btn-ghost" id="tag-export" type="button">
+                      导出 JSON
+                    </button>
+                    <button class="btn-ghost" id="tag-import" type="button">
+                      导入 JSON
+                    </button>
+                    <input
+                      type="file"
+                      id="tag-import-file"
+                      accept="application/json,.json"
+                      hidden
+                    />
+                    <button class="btn-ghost" id="tag-reset" type="button">
+                      清空学习数据
+                    </button>
+                  </div>
+                  <p class="hint">
+                    导出包含入口名称、别名和个人说明；学习记录只影响推荐与排序。
+                  </p>
+                </section>
+              </div>
+
+              <div class="tag-col is-main">
+                <section class="group settings-card card-cand">
+                  <h3>
+                    书签与推荐<span class="src-link" id="tag-cand-count"
+                      >0 个候选</span
+                    >
+                  </h3>
+                  <p class="hint" id="tag-cand-hint">
+                    搜索全部书签添加备注；系统推荐来自常访站点与最近 120
+                    天新增书签，不会自动固定。
+                  </p>
+                  <label class="tag-search">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="10.5" cy="10.5" r="6.5" />
+                      <path d="m15.5 15.5 4.5 4.5" />
+                    </svg>
+                    <input
+                      id="tag-search"
+                      type="search"
+                      placeholder="搜索书签，添加别名或说明"
+                      aria-label="搜索书签并添加备注"
+                    />
+                  </label>
+                  <div class="tag-list" id="tag-cand-list"></div>
+                  <div class="tag-more" id="tag-cand-more"></div>
+                  <div class="empty-tip" id="tag-cand-empty">
+                    暂无候选，正常使用几天后再来看。
+                  </div>
+                </section>
+              </div>
+            </div>
+            <p
+              class="hint tag-status"
+              id="tag-status"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></p>
+          </section>
+
+          <section
+            id="organizer-dialog"
+            class="organizer-dialog settings-view"
+            role="tabpanel"
+            aria-labelledby="workspace-tab-bookmarks"
+            data-workspace-view="bookmarks"
+            hidden
+            data-page-node-id="Ck8VmWngvDC0p1YOKwkllt"
+          >
+            <header
+              class="organizer-head"
+              data-page-node-id="xUfvkHFVlzaFpFGIeLy4GR"
+            >
+              <div
+                class="organizer-heading"
+                data-page-node-id="OJkCVsAWj9gGgC2aN5QOJr"
+              >
+                <p
+                  class="view-eyebrow"
+                  data-page-node-id="2JDC3bAaBf4C2Xs5Ec1xwo"
+                >
+                  BOOKMARK LIBRARY
+                </p>
+                <div
+                  class="organizer-title-line"
+                  data-page-node-id="1c64d7GwaEkFbj4lCBwj4q"
+                >
+                  <h2
+                    id="organizer-title"
+                    data-page-node-id="SNPO6q5WB18cr4dEUKEwUq"
+                  >
+                    书签空间
+                  </h2>
+                  <span
+                    class="organizer-local-badge"
+                    data-page-node-id="K5Br9AE3n71iz38Myq6myW"
+                    ><i data-page-node-id="04ELh6dSlD4cCZEFkCvZHw"></i>
+                    本地管理</span
+                  >
+                </div>
+                <p
+                  class="organizer-summary"
+                  data-page-node-id="6vi546MItA2SAj4sN3GEqM"
+                >
+                  <span
+                    id="organizer-count"
+                    data-page-node-id="A3qg4jJrJdcZHVPQDSbfxX"
+                    >正在读取书签</span
+                  ><span
+                    id="organizer-pending"
+                    data-page-node-id="TTBbjt6pHSzUKaVtyilMDh"
+                  ></span>
+                </p>
+              </div>
+              <div class="organizer-head-actions">
+                <button
+                  id="organizer-sync-settings"
+                  class="btn-ghost organizer-config"
+                  type="button"
+                >
+                  自动化设置
+                </button>
+                <button
+                  id="organizer-close"
+                  class="btn-ghost organizer-done"
+                  type="button"
+                  data-page-node-id="p2zdzVLK3bNd5j4CtZQTig"
+                >
+                  完成
+                </button>
+              </div>
+            </header>
+
+            <section
+              id="organizer-recovery"
+              class="bookmark-recovery"
+              hidden
+              data-page-node-id="9EnaUI4ErDZaai9HSJm3vW"
+            >
+              <div data-page-node-id="SyXq5oeKnbM8WMg7flYcjF">
+                <strong data-page-node-id="IM9HMCZZQyKYavoeQVPb97"
+                  >恢复之前的目录整理</strong
+                >
+                <p data-page-node-id="5KyZLpfcoKMMVzfJoBogQJ">
+                  按本机日志恢复上一批原位置；后续人工修改会跳过。新建的空目录保留。
+                </p>
+              </div>
+              <button
+                id="organizer-undo"
+                class="btn-ghost"
+                type="button"
+                data-page-node-id="3Udwnxj3oQ4PAs2Dtyl0Gf"
+              >
+                撤销上一批移动
+              </button>
+            </section>
+            <p
+              id="organizer-status"
+              class="hint"
+              role="status"
+              aria-live="polite"
+              data-page-node-id="zN44JP06DelwE2P0lcT8wm"
+            ></p>
+            <div
+              class="organizer-command-bar"
+              data-page-node-id="NetBmI5kIgWzO18QEBpZsN"
+            >
+              <label
+                class="bookmark-folder-label"
+                data-page-node-id="4bznnNQueUmIRIoBMESE0i"
+                ><span data-page-node-id="WKr73ej38oy3YHTlp8ScN3">原有目录</span
+                ><select
+                  id="organizer-folder"
+                  aria-label="浏览原有书签目录"
+                  data-page-node-id="2hi3dvlMGtZbWc4Xdv9cBQ"
+                >
+                  <option value="" data-page-node-id="wSrTRVN7caot1KD3BRrW0R">
+                    全部书签
+                  </option>
+                </select></label
+              >
+              <label
+                class="organizer-search-label"
+                data-page-node-id="nOlXWR2D33FHd4H1ZQXOP7"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                  data-page-node-id="V2FJzs4pnsiE9csBYQFXyE"
+                >
+                  <circle
+                    cx="10.5"
+                    cy="10.5"
+                    r="6.5"
+                    data-page-node-id="wRbneaLLQoOyFWtbHRqlY2"
+                  />
+                  <path
+                    d="m15.5 15.5 4.5 4.5"
+                    data-page-node-id="TKofFYCZ7xz9EUpsUAATzd"
+                  />
+                </svg>
+                <input
+                  id="organizer-query"
+                  type="search"
+                  aria-label="搜索书签空间"
+                  placeholder="搜索标题、网址或标签"
+                  data-page-node-id="isNra4h12M33IhJY1tFJFp"
+                />
+              </label>
+            </div>
+
+            <div
+              class="organizer-body"
+              data-page-node-id="EksORCJDHU1SGBNvibvGAA"
+            >
+              <div
+                class="organizer-content"
+                data-page-node-id="aBotvu7LyL2iRePtRc1LUB"
+              >
+                <div
+                  class="organizer-list-head"
+                  data-page-node-id="vw4uE2UKVY8opN6G123eC0"
+                >
+                  <div data-page-node-id="Fj3kFbgi6NN3oAq2xhOHOt">
+                    <strong
+                      id="organizer-list-title"
+                      data-page-node-id="DJKe0HGDn0eLHUkZzOQ9sx"
+                      >收集箱</strong
+                    ><span
+                      id="organizer-list-count"
+                      data-page-node-id="8OTDmmGoobo1xl0LPo8FP6"
+                    ></span>
+                  </div>
+                  <span data-page-node-id="1x50pi8eDcNq9O2iarkkGf"
+                    >收藏时间 ↓</span
+                  >
+                </div>
+                <div
+                  id="organizer-list"
+                  data-page-node-id="YCG0fjsUb5M4g84DmpG8IE"
+                ></div>
+              </div>
+            </div>
+            <footer
+              class="organizer-foot"
+              data-page-node-id="e14tI3JutKFqkqVVklkgPJ"
+            >
+              <span
+                class="local-dot"
+                data-page-node-id="bbZI7txaKDHjOQvt4bsC0f"
+              ></span>
+              保留浏览器原有目录；正文缓存与同步、归档、补全的开关统一在「搜索与
+              AI → 内容自动化」中设置。
+            </footer>
+          </section>
+        </div>
       </div>
-    </div>
 
       <div class="account-modal" id="account-modal" hidden>
-        <div class="account-modal-card" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
+        <div
+          class="account-modal-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="account-modal-title"
+        >
           <header class="account-modal-head">
             <div class="account-modal-title-wrap">
               <span class="account-modal-glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"/><path d="M9.2 12l2 2 3.6-3.8"/></svg>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"
+                  />
+                  <path d="M9.2 12l2 2 3.6-3.8" />
+                </svg>
               </span>
               <div>
                 <p class="view-eyebrow">ACCOUNT</p>
                 <h3 id="account-modal-title">账号与备份</h3>
               </div>
             </div>
-            <button class="panel-close account-modal-close" id="account-close" type="button" aria-label="关闭账号面板">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            <button
+              class="panel-close account-modal-close"
+              id="account-close"
+              type="button"
+              aria-label="关闭账号面板"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+              >
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
             </button>
           </header>
           <div class="account-modal-body">
-        <div class="account-panel" id="backup-card">
-            <p class="hint backup-intro" id="backup-intro">登录后自动备份设置，换设备或重装后可用同一账号恢复。</p>
+            <div class="account-panel" id="backup-card">
+              <p class="hint backup-intro" id="backup-intro">
+                登录后自动备份设置，换设备或重装后可用同一账号恢复。
+              </p>
 
-            <div class="backup-account" id="backup-account">
-              <div class="backup-account-logged" id="backup-account-logged" hidden>
-                <span>已登录：<strong id="backup-account-name"></strong></span>
-                <button class="btn-ghost" id="backup-logout" type="button">退出登录</button>
+              <div class="backup-account" id="backup-account">
+                <div
+                  class="backup-account-logged"
+                  id="backup-account-logged"
+                  hidden
+                >
+                  <span
+                    >已登录：<strong id="backup-account-name"></strong
+                  ></span>
+                  <button class="btn-ghost" id="backup-logout" type="button">
+                    退出登录
+                  </button>
+                </div>
+                <form class="backup-account-form" id="backup-account-form">
+                  <div class="field-grid backup-account-grid">
+                    <label class="field"
+                      ><span id="backup-username-label">账号</span
+                      ><input
+                        class="text-input"
+                        id="backup-username"
+                        type="text"
+                        placeholder="邮箱或已有用户名"
+                        maxlength="254"
+                        spellcheck="false"
+                        autocomplete="username"
+                        required
+                    /></label>
+                    <label class="field"
+                      ><span>密码</span
+                      ><input
+                        class="text-input"
+                        id="backup-password"
+                        type="password"
+                        placeholder="请输入密码"
+                        maxlength="128"
+                        autocomplete="current-password"
+                        required
+                    /></label>
+                    <label class="field" id="backup-confirm-field" hidden
+                      ><span>确认密码</span
+                      ><input
+                        class="text-input"
+                        id="backup-confirm-password"
+                        type="password"
+                        placeholder="再次输入密码"
+                        maxlength="128"
+                        autocomplete="new-password"
+                    /></label>
+                    <label class="field" id="backup-invite-field" hidden
+                      ><span>邀请码</span
+                      ><input
+                        class="text-input"
+                        id="backup-invite"
+                        type="password"
+                        placeholder="向维护者获取邀请码"
+                        maxlength="128"
+                        autocomplete="off"
+                        spellcheck="false"
+                    /></label>
+                  </div>
+                  <div class="backup-account-actions">
+                    <button
+                      class="btn-ghost action-primary"
+                      id="backup-login"
+                      type="submit"
+                    >
+                      登录
+                    </button>
+                    <button
+                      class="btn-ghost"
+                      id="backup-register"
+                      type="button"
+                    >
+                      注册账号
+                    </button>
+                    <button
+                      class="btn-ghost"
+                      id="backup-back-login"
+                      type="button"
+                      hidden
+                    >
+                      返回登录
+                    </button>
+                  </div>
+                </form>
               </div>
-              <form class="backup-account-form" id="backup-account-form">
-                <div class="field-grid backup-account-grid">
-                  <label class="field"><span id="backup-username-label">账号</span><input class="text-input" id="backup-username" type="text" placeholder="邮箱或已有用户名" maxlength="254" spellcheck="false" autocomplete="username" required /></label>
-                  <label class="field"><span>密码</span><input class="text-input" id="backup-password" type="password" placeholder="请输入密码" maxlength="128" autocomplete="current-password" required /></label>
-                  <label class="field" id="backup-confirm-field" hidden><span>确认密码</span><input class="text-input" id="backup-confirm-password" type="password" placeholder="再次输入密码" maxlength="128" autocomplete="new-password" /></label>
-                  <label class="field" id="backup-invite-field" hidden><span>邀请码</span><input class="text-input" id="backup-invite" type="password" placeholder="向维护者获取邀请码" maxlength="128" autocomplete="off" spellcheck="false" /></label>
-                </div>
-                <div class="backup-account-actions">
-                  <button class="btn-ghost action-primary" id="backup-login" type="submit">登录</button>
-                  <button class="btn-ghost" id="backup-register" type="button">注册账号</button>
-                  <button class="btn-ghost" id="backup-back-login" type="button" hidden>返回登录</button>
-                </div>
-              </form>
-            </div>
 
-            <div class="backup-actions" id="backup-actions" hidden>
-              <div class="backup-action-group">
-                <button class="btn-ghost action-primary" id="backup-now" type="button">立即备份</button>
-                <button class="btn-ghost" id="backup-restore" type="button">从服务器恢复</button>
+              <div class="backup-actions" id="backup-actions" hidden>
+                <div class="backup-action-group">
+                  <button
+                    class="btn-ghost action-primary"
+                    id="backup-now"
+                    type="button"
+                  >
+                    立即备份
+                  </button>
+                  <button class="btn-ghost" id="backup-restore" type="button">
+                    从服务器恢复
+                  </button>
+                </div>
               </div>
+              <p
+                class="hint backup-status"
+                id="backup-status"
+                role="status"
+                aria-live="polite"
+              ></p>
+              <p class="hint backup-note" id="backup-note" hidden>
+                设置变更会自动备份。壁纸图片不参与备份，恢复后可重新选择。
+              </p>
             </div>
-            <p class="hint backup-status" id="backup-status" role="status" aria-live="polite"></p>
-            <p class="hint backup-note" id="backup-note" hidden>设置变更会自动备份。壁纸图片不参与备份，恢复后可重新选择。</p>
-        </div>
           </div>
         </div>
       </div>
+    </aside>
 
-  </aside>
+    <div
+      class="toast"
+      id="toast"
+      data-page-node-id="jrCnOldW1F2WW4HGXi6D2i"
+    ></div>
 
-  <div class="toast" id="toast" data-page-node-id="jrCnOldW1F2WW4HGXi6D2i"></div>
-
-  <script src="js/profiles.js"></script>
-  <script src="js/db.js"></script>
-  <script src="js/bookmarks.js"></script>
-  <script src="js/content-index.js"></script>
-  <script src="js/documents.js"></script>
-  <script src="js/resource-gate.js"></script>
-  <script src="js/retry-policy.js"></script>
-  <script src="js/collection-stats.js"></script>
-  <script src="js/network-status.js"></script>
-  <script src="js/site-profile.js"></script>
-  <script src="js/ingest-policy.js"></script>
-  <script src="js/pageinfo.js"></script>
-  <script src="js/ai.js"></script>
-  <script src="js/organizer.js"></script>
-  <script src="js/rag.js"></script>
-  <script src="js/rag-settings.js"></script>
-  <script src="js/workspace.js"></script>
-  <script src="js/organizer-ui.js"></script>
-  <script src="js/auto-organizer-ui.js"></script>
-  <script src="js/bookmark-enrich-ui.js"></script>
-  <script src="js/bookmark-health.js"></script>
-  <script src="js/bookmark-health-ui.js"></script>
-  <script src="js/bookmark-answer.js"></script>
-  <script src="js/bookmark-enrich.js"></script>
-  <script src="js/bookmark-search.js"></script>
-  <script src="js/search-suggest.js"></script>
-  <script src="js/quick-tags.js"></script>
-  <script src="js/tag-suggest.js"></script>
-  <script src="js/personal-targets.js"></script>
-  <script src="js/tag-editor.js"></script>
-  <script src="js/tag-manager.js"></script>
-  <script src="js/store.js"></script>
-  <script src="js/backup.js"></script>
-  <script src="js/backup-ui.js"></script>
-  <script src="js/wallpaper-uhd.js"></script>
-  <script src="js/wallpaper-sources.js"></script>
-  <script src="js/wallpaper-photos.js"></script>
-  <script src="js/wallpaper-pixabay.js"></script>
-  <script src="js/wallpaper-assist.js"></script>
-  <script src="js/wallpaper-cn.js"></script>
-  <script src="js/wallpaper-search.js"></script>
-  <script src="js/wallpaper.js"></script>
-  <script src="js/daily-quote.js"></script>
-  <script src="js/ambient.js"></script>
-  <script src="js/newtab.js"></script>
-</body>
+    <script src="js/profiles.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/bookmarks.js"></script>
+    <script src="js/content-index.js"></script>
+    <script src="js/documents.js"></script>
+    <script src="js/resource-gate.js"></script>
+    <script src="js/retry-policy.js"></script>
+    <script src="js/collection-stats.js"></script>
+    <script src="js/network-status.js"></script>
+    <script src="js/site-profile.js"></script>
+    <script src="js/ingest-policy.js"></script>
+    <script src="js/pageinfo.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/organizer.js"></script>
+    <script src="js/rag.js"></script>
+    <script src="js/rag-settings.js"></script>
+    <script src="js/workspace.js"></script>
+    <script src="js/organizer-ui.js"></script>
+    <script src="js/auto-organizer-ui.js"></script>
+    <script src="js/bookmark-enrich-ui.js"></script>
+    <script src="js/bookmark-health.js"></script>
+    <script src="js/bookmark-health-ui.js"></script>
+    <script src="js/bookmark-answer.js"></script>
+    <script src="js/bookmark-enrich.js"></script>
+    <script src="js/bookmark-search.js"></script>
+    <script src="js/search-suggest.js"></script>
+    <script src="js/quick-tags.js"></script>
+    <script src="js/tag-suggest.js"></script>
+    <script src="js/personal-targets.js"></script>
+    <script src="js/tag-editor.js"></script>
+    <script src="js/tag-manager.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/backup.js"></script>
+    <script src="js/backup-ui.js"></script>
+    <script src="js/wallpaper-uhd.js"></script>
+    <script src="js/wallpaper-sources.js"></script>
+    <script src="js/wallpaper-photos.js"></script>
+    <script src="js/wallpaper-pixabay.js"></script>
+    <script src="js/wallpaper-assist.js"></script>
+    <script src="js/wallpaper-cn.js"></script>
+    <script src="js/wallpaper-search.js"></script>
+    <script src="js/wallpaper.js"></script>
+    <script src="js/daily-quote.js"></script>
+    <script src="js/ambient.js"></script>
+    <script src="js/newtab.js"></script>
+  </body>
 </html>
