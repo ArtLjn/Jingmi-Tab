@@ -276,6 +276,9 @@
       done++;
       if (onProgress) onProgress(done, missing.length);
       if (typeof AgentDB !== 'undefined') await AgentDB.putPage(row);
+      if (global.AutoOrganizer && Organizer.publicSummary(row)) {
+        AutoOrganizer.onPageReady(row.url).catch(function () {});
+      }
     });
 
     return map;
