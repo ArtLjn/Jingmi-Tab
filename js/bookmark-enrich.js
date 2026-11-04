@@ -161,6 +161,10 @@
     });
   }
 
+  function aiQuotaReleased(item) {
+    return RetryPolicy.dailyResource(item) === 'ai' && global.ResourceGate && ResourceGate.isUnlimited('ai');
+  }
+
   async function captureOne(url, force) {
     try {
       var pages = await PageInfo.getMany([url], null, { force: !!force });
@@ -209,7 +213,8 @@
     node = Object.assign({}, node, { enrichMode: item.mode });
 
     var failed = (await AgentDB.getMeta(FAILED_KEY) || []).find(function (f) { return f.id === String(node.id) && f.url === node.url; });
-    if (!item.force && item.mode !== 'private' && failed && !RetryPolicy.classify(failed.code, failed.attempts).auto && !RetryPolicy.resumed(failed.code, failed.at) && !(failed.code === 'ai_config' && AI.available(settings.ai))) return;
+    if (RetryPolicy.dailyResource(failed) === 'ai' && global.Profiles) await Profiles.ready();
+    if (!item.force && item.mode !== 'private' && failed && !RetryPolicy.classify(failed.code, failed.attempts).auto && !aiQuotaReleased(failed) && !RetryPolicy.resumed(failed.code, failed.at) && !(failed.code === 'ai_config' && AI.available(settings.ai))) return;
     var done = await AgentDB.getMeta(DONE_KEY) || {};
     var cached = await AgentDB.getPages([ContentIndex.normUrl(node.url)]);
     if (!item.force && item.mode === 'enrich' && done[node.id] && done[node.id].url === node.url && done[node.id].at > item.at && ContentIndex.fresh(cached[ContentIndex.normUrl(node.url)], Date.now())) return;
@@ -320,6 +325,7 @@
     var summaries = await AgentDB.getMeta(SUMMARY_KEY) || {};
     var completed = await AgentDB.getMeta(DONE_KEY) || {};
     var failures = await AgentDB.getMeta(FAILED_KEY) || [];
+    if (global.Profiles && failures.some(function (f) { return RetryPolicy.dailyResource(f) === 'ai'; })) await Profiles.ready();
     var now = Date.now();
     var networkWaiting = false;
     if (options.retryFailed && global.NetworkStatus) { var currentSettings = await Settings.load(); await NetworkStatus.diagnose(Rag.withAuth(currentSettings.rag, currentSettings.backup), true); networkWaiting = await NetworkStatus.waiting(); }
@@ -331,7 +337,7 @@
       var error = failed || page && page.status === 'fail' && { code: page.reason, attempts: 0 };
       var policy = error && RetryPolicy.classify(error.code, error.attempts);
       if (options.retryFailed) return !(page && (page.private || page.source === 'capture')) && policy && (policy.bulk || error.code === 'network_suspected' && !networkWaiting);
-      if (error && !(error.code === 'ai_config' && AI.available(options.ai))) {
+      if (error && !aiQuotaReleased(failed) && !(error.code === 'ai_config' && AI.available(options.ai))) {
         if (!policy.auto && !RetryPolicy.resumed(error.code, failed && failed.at, now)) return false;
         if (options.incremental && now - (failed && failed.at || 0) < policy.delay) return false;
       }
@@ -345,7 +351,7 @@
       return (list || []).map(function (f) { return chosen.some(function (r) { return String(r.id) === f.id && r.url === f.url; }) ? Object.assign({}, f, { attempts: 0 }) : f; });
     });
     var queued = await enqueueMany(chosen.map(function (row) {
-      return { id: String(row.id), url: row.url, mode: pending.some(function (p) { return p.id === String(row.id) && p.url === row.url; }) ? 'capture' : mode, force: !!options.retryFailed || failures.some(function (f) { return f.id === String(row.id) && f.url === row.url && RetryPolicy.resumed(f.code, f.at, now); }) };
+      return { id: String(row.id), url: row.url, mode: pending.some(function (p) { return p.id === String(row.id) && p.url === row.url; }) ? 'capture' : mode, force: !!options.retryFailed || failures.some(function (f) { return f.id === String(row.id) && f.url === row.url && !aiQuotaReleased(f) && RetryPolicy.resumed(f.code, f.at, now); }) };
     }));
     schedule(); alarm().catch(function () {});
     return { mode: mode, queued: queued, total: rows.length };

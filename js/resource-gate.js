@@ -2,13 +2,16 @@
 (function (global) {
   'use strict';
   var LIMITS = { capture: 500, ai: 200, rag: 500 };
+  function isUnlimited(kind) {
+    var binding = global.Profiles && Profiles.cloud();
+    if (!binding) return false;
+    if (kind === 'ai') return binding.username === 'ljn';
+    return (kind === 'capture' || kind === 'rag') && binding.unlimited === true;
+  }
   async function reserve(kind) {
     if (!LIMITS[kind]) throw new Error('未知资源类型');
-    if ((kind === 'capture' || kind === 'rag') && global.Profiles) {
-      await Profiles.ready();
-      var binding = Profiles.cloud();
-      if (binding && binding.unlimited === true) return;
-    }
+    if (global.Profiles) await Profiles.ready();
+    if (isUnlimited(kind)) return;
     var allowed = false;
     var date = new Date();
     var day = [date.getFullYear(), date.getMonth() + 1, date.getDate()].join('-');
@@ -20,5 +23,5 @@
     });
     if (!allowed) { var e = new Error('今日后台额度已用完，明日自动恢复'); e.code = 'daily_limit'; throw e; }
   }
-  global.ResourceGate = { reserve: reserve, limits: LIMITS };
+  global.ResourceGate = { reserve: reserve, limits: LIMITS, isUnlimited: isUnlimited };
 })(typeof self !== 'undefined' ? self : window);

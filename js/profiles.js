@@ -183,7 +183,9 @@
         if (!who || who.kind !== 'session' || String(who.user.id) !== String(ticket.user.id)) throw failure('请重新登录账号', 'unauthorized');
         var conf = await api('/api/rag/config', ticket.token);
         assertActive(ticket);
-        binding = conf && conf.enabled === true && /^chrome_tab_[A-Za-z0-9_-]+$/.test(conf.collection) ? { collection: conf.collection, token: ticket.token, version: ticket.version, unlimited: conf.unlimited === true } : null;
+        binding = conf && conf.enabled === true && /^chrome_tab_[A-Za-z0-9_-]+$/.test(conf.collection) ? {
+          collection: conf.collection, token: ticket.token, version: ticket.version, unlimited: conf.unlimited === true, username: who.user.username
+        } : null;
         cloudError = binding ? null : failure('后台尚未配置可用的个人 RAG 集合', 'cloud_unavailable');
         checkedAt = Date.now();
         return binding;

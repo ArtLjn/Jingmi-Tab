@@ -38,5 +38,11 @@
     if (/^client_blocked$/.test(raw)) return { key: 'blocked', label: '被拦截' };
     return { key: 'other', label: '其他' };
   }
-  global.RetryPolicy = { classify: classify, resumed: resumed, category: category };
+  function dailyResource(item) {
+    if (!item || item.code !== 'daily_limit') return '';
+    if (String(item.reason || '').startsWith('AI 请求失败：')) return 'ai';
+    if (String(item.reason || '').startsWith('正文采集失败：')) return 'capture';
+    return '';
+  }
+  global.RetryPolicy = { classify: classify, resumed: resumed, category: category, dailyResource: dailyResource };
 })(typeof self !== 'undefined' ? self : window);

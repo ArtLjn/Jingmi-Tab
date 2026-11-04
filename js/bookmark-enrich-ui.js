@@ -132,7 +132,11 @@
       var reason = item.code === 'private' ? '已保存页面正文；生成建议前需确认发送片段给 AI'
         : manual ? '公开抓取无法读取正文；打开页面后点击扩展图标采集'
           : item.reason;
-      if (item.code === 'daily_limit') reason = '今日采集额度已用完，明日恢复；手动重试不会重置额度';
+      if (item.code === 'daily_limit') {
+        var resource = RetryPolicy.dailyResource(item);
+        var resourceLabel = resource === 'ai' ? '后台 AI 请求' : resource === 'capture' ? '网页采集' : '后台处理';
+        reason = '上次处理达到每日' + resourceLabel + '次数上限';
+      }
       var policy = item.policy || RetryPolicy.classify(item.code, item.attempts);
       var tone = policy.kind === 'retryable' ? 'retryable'
         : policy.kind === 'paused' ? 'paused'
@@ -154,14 +158,13 @@
 
     function renderFailure(item) {
       var info = failureInfo(item);
-      var row = el('div', '', 'enrich-item');
+      var row = el('div', '', 'enrich-item enrich-failure');
       var main = el('div', '', 'enrich-main');
-      var head = el('div', '', 'enrich-item-head');
+      var tools = el('div', '', 'enrich-failure-tools');
       var tags = el('span', '', 'enrich-item-tags');
       tags.append(el('span', info.category.label, 'enrich-cat-chip'),
         el('span', info.label, 'enrich-status-chip is-' + info.tone));
-      head.append(el('p', item.title || item.url || item.id, 'enrich-current'), tags);
-      main.append(head, el('p', info.reason, 'enrich-summary'));
+      main.append(el('p', item.title || item.url || item.id, 'enrich-current'), el('p', info.reason, 'enrich-summary'));
       var action = null;
       if (item.code === 'private') {
         action = el('button', '发送正文给 AI', 'auto-action');
@@ -177,8 +180,9 @@
         action.type = 'button';
         action.dataset.enrichRetry = item.id;
       }
-      row.append(main);
-      if (action) row.append(action);
+      tools.append(tags);
+      if (action) tools.append(action);
+      row.append(main, tools);
       return row;
     }
 
@@ -227,11 +231,7 @@
       var pending = state.pending || [];
       var failures = state.failures || [];
       var recent = state.recent || [];
-      status.textContent = state.collection ? CollectionStats.format(state.collection) : '正在读取补全状态…';
-      var accounting = document.getElementById('enrich-accounting');
-      if (!accounting) { accounting = el('p', '', 'enrich-summary'); accounting.id = 'enrich-accounting'; status.after(accounting); }
-      accounting.textContent = state.collection ? CollectionStats.breakdown(state.collection) : '';
-      status.title = '总书签＝已收录＋未收录；未收录明细按书签逐条统计。下方补全任务按任务单独计数。';
+      status.textContent = state.collection ? 'RAG 已收录 ' + state.collection.collected + ' / ' + state.collection.total + ' 条书签 · 未收录 ' + state.collection.uncollected : '正在读取 RAG 收录状态…';
       summary.textContent = 'AI 建议待确认 ' + counts.pending + ' · 采集补全异常 ' + counts.failures;
       renderFilters(state);
       syncBreadcrumb();
@@ -255,7 +255,7 @@
       if (filter === 'failures') {
         var scope = failureScope(state);
         var scopeBox = el('div', '', 'enrich-scope');
-        scopeBox.append(el('p', '补全 = 生成标题、摘要和标签。已入库书签的后续更新失败也会出现在这里，但仍可正常检索。', 'enrich-scope-line'));
+        scopeBox.append(el('p', '这里显示补全时的采集或 AI 异常。已收录的内容仍可检索。', 'enrich-scope-line'));
         if (scope) scopeBox.append(el('p', scope, 'enrich-scope-line is-count'));
         var tagSummary = failureTagSummary(state);
         if (tagSummary) scopeBox.append(el('p', tagSummary, 'enrich-scope-line is-count'));
