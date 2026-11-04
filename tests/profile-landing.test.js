@@ -120,14 +120,15 @@ test('退出登录同样等待新后台恢复扩展页，不导航到 Chrome 原
 
 test('RAG 绑定过期自动重验；手动检测可强制校验并保留服务未配置原因', async () => {
   const f = setup(); let now = Date.now(); let enabled = true; let unlimited = true; let configCalls = 0;
-  f.values['newtab.session.v1'] = { version: 'logged-in', user: { id: 2 }, token: '测试令牌' };
+  f.values['newtab.session.v1'] = { version: 'logged-in', user: { id: 2, username: '本地名称' }, token: '测试令牌' };
   f.c.Date = class extends Date { static now() { return now; } };
   f.c.fetch = async url => ({ ok: true, status: 200, json: async () => ({ ok: true, data: url.endsWith('/me')
-    ? { kind: 'session', user: { id: 2 } }
+    ? { kind: 'session', user: { id: 2, username: 'ljn' } }
     : (configCalls++, { enabled, unlimited, collection: 'chrome_tab_account' }) }) });
   await f.c.Profiles.ready();
   assert.equal(f.c.Profiles.canCloud(), true);
   assert.equal(f.c.Profiles.cloud().unlimited, true);
+  assert.equal(f.c.Profiles.cloud().username, 'ljn');
   unlimited = false;
   now += 61000;
   assert.equal(f.c.Profiles.canCloud(), false);

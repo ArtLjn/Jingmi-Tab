@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { fixture } = require('./helpers/extension');
 
-test('仅服务端确认的不限额账号跳过采集和入库次数限制，AI与其他账号仍受限', async () => {
+test('网页与入库按服务端权限免额，后台 AI 仅对已验证的 ljn 免额', async () => {
   const { c } = fixture();
   const d = new Date(); const day = [d.getFullYear(), d.getMonth() + 1, d.getDate()].join('-');
   await c.AgentDB.setMeta('guard:daily', { day, counts: { capture: 500, rag: 500, ai: 200 } });
@@ -12,9 +12,14 @@ test('仅服务端确认的不限额账号跳过采集和入库次数限制，AI
   await c.ResourceGate.reserve('capture');
   await c.ResourceGate.reserve('rag');
   await assert.rejects(c.ResourceGate.reserve('ai'), { code: 'daily_limit' });
+  binding = { username: 'ljn', unlimited: false };
+  await c.ResourceGate.reserve('ai');
+  assert.equal((await c.AgentDB.getMeta('guard:daily')).counts.ai, 200);
+  await assert.rejects(c.ResourceGate.reserve('capture'), { code: 'daily_limit' });
   for (binding of [{ unlimited: false }, { unlimited: 'true' }, null]) {
     await assert.rejects(c.ResourceGate.reserve('capture'), { code: 'daily_limit' });
     await assert.rejects(c.ResourceGate.reserve('rag'), { code: 'daily_limit' });
+    await assert.rejects(c.ResourceGate.reserve('ai'), { code: 'daily_limit' });
   }
 });
 

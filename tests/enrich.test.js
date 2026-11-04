@@ -29,6 +29,38 @@ function setup(aiEnabled = true) {
   return f;
 }
 
+test('已有正文的 AI 额度暂停当天可恢复，普通账号和网站限流仍暂停', async () => {
+  const f = setup();
+  const { c } = f;
+  c.setTimeout = () => 0;
+  const url = f.node('3').url;
+  await c.PageInfo.getMany([url]);
+  const settings = await c.Settings.load();
+  c.Settings = { load: async () => settings };
+  let username = '其他账号';
+  c.Profiles = {
+    initial: async () => {}, ready: async () => {}, dbName: name => name,
+    cloud: () => ({ username, unlimited: false }), canCloud: () => true, requireCloud: async () => {}
+  };
+  const at = Date.now();
+  await c.AgentDB.setMeta('enrich:failed', [
+    { id: '3', url, code: 'daily_limit', reason: 'AI 请求失败：今日后台 AI 请求额度已用完，明日恢复', at },
+    { id: '4', url: f.node('4').url, code: 'http_429', at }
+  ]);
+  const date = new Date(at);
+  const day = [date.getFullYear(), date.getMonth() + 1, date.getDate()].join('-');
+  await c.AgentDB.setMeta('guard:daily', { day, counts: { ai: 200, capture: 500 } });
+  const tree = f.tree[0].children[1].children;
+  tree.splice(2);
+  assert.equal((await c.BookmarkEnrich.scan({ incremental: true })).queued, 0);
+  username = 'ljn';
+  assert.equal((await c.BookmarkEnrich.scan({ incremental: true })).queued, 1);
+  await c.BookmarkEnrich.run();
+  const state = await c.BookmarkEnrich.status();
+  assert.equal(state.pending[0].id, '3');
+  assert.deepEqual(Array.from(state.failures, item => item.code), ['http_429']);
+});
+
 test('新收藏自动采正文并生成标题/摘要建议，应用后才改名', async () => {
   const f = setup();
   await f.c.BookmarkEnrich.onCreated('3', f.node('3'));
